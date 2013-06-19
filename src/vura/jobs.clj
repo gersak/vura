@@ -2,19 +2,20 @@
   (:use [dreamcatcher.core :reload-all true]
         [dreamcatcher.util :reload-all true]
         [clj-time.local :only (local-now)])
-  (:require [clj-time.core :as t]))
-
-;;(in-ns 'baloime)
+  (:require [clj-time.core :as t]
+            [taoensso.timbre :as timbre :refer (info debug warn)])
+  (:import [java.util.concurrent LinkedBlockingQueue Executors TimeUnit]))
 
 (def ^:private blank-job-machine (make-state-machine [:initialize :start (fn [x] (assoc-data x "*started-at*" (local-now)))
                                                       :start :end identity
                                                       :end :finished (fn [x] (assoc-data x "*ended-at*" (local-now) "*running*" false))]))
 
-
 (defn job-life [x]
   (if (-> x get-data (get "*running*"))
-    (if (:finished (get-state x))
+    (if (= :finished (get-state x))
       (do
+        (when *agent*
+          (debug "Job with phases " (get-states x)  " is finished... Setting *running* to false!"))
         (send-off *agent* #'job-life)
         (assoc-data x "*running*" false))
       (do
@@ -97,7 +98,7 @@
 (defprotocol JobActions
   (start! [this] "Starts Job. That is sends-off job-agent to do the job. If Job
                  was previously stoped than it continues from last phase.")
-  (stop! [this] "Stops running Job. If Job will allways try to complete current phase.
+  (stop! [this] "Stops running Job. Job will allways try to complete current phase.
                 If validator doesn't allow execution to continue than Job is stoped
                 at current phase.")
   (reset-job! [this] [this params] "Returns job to initialized state. Optional parameter
@@ -128,7 +129,7 @@
   (duration? [this] (if (.finished? this)
                       (-> (t/interval (.started-at? this) (.ended-at? this)) t/in-msecs)))
   (in-error? [this] (agent-error job-agent))
-  (active? [this] (-> @job-agent get-data (get "*running*") (not= false)))
+  (active? [this] (-> @job-agent get-data (get "*running*") boolean))
   JobActions
   (start! [this] (do
                    (send-off job-agent #(assoc-data % "*running*" true))
@@ -227,3 +228,8 @@
   and. If condition is not provided than it is true."
   ([check-timer] (fn [_] (do (Thread/sleep check-timer) true)))
   ([check-timer condition] (fn [_] (Thread/sleep check-timer) (if (fn? condition) (condition) condition))))
+
+
+
+;; Load work
+(load "work")
