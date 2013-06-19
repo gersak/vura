@@ -83,7 +83,9 @@
   (let [fixed? (when fixed 
                  (if (= element fixed) :fixed))
         in-range? (when range 
-                    (if (and (>= element (first range)) (<= element (second range))) :range))
+                    (if (<= (first range) (second range))
+                      (when (and (>= element (first range)) (<= element (second range))) :range)
+                      (when (or (>= element (first range)) (<= element (second range))) :range)))
         belongs? (when sequence 
                    (if (get sequence element) :sequence))
         valid? (if (every? nil? [fixed range sequence]) :any)]
@@ -94,7 +96,7 @@
   (let [mapping (parse-cron-string cron-string)
         cron (joda->cron timestamp)
         evaluated-elements (map #(apply valid-element? %) (partition 2 (interleave cron mapping)))]
-    (not-any? nil? evaluated-elements))) 
+    (not-any? nil? evaluated-elements)))
 
 (defn next-timestamp
   "Return next valid timestamp after input 
@@ -122,20 +124,3 @@
                       (list y m d h minutes s))
         found-date (first found-dates)]
     (when found-date (to-local-date-time (apply t/date-time found-date)))))
-
-
-
-
-(defn current-cron-time? []
-  "Returns current local time in CRON format"
-  (let [t (local-now)]
-    [(joda->cron t) t]))
-
-(defn- test-find-valid-day? [s]
-  (let [[c t] (current-cron-time?)]
-    (next-timestamp t s)))
-
-(defn print-cron [cron-string]
-  (let [elements (map clojure.string/trim (clojure.string/split cron-string #" "))
-        mapping '("Seconds: " "Minutes: " "Hours: " "Day of the month: " "Month: " "Day of the week: " "Year: ")]
-    (println (map #(str %) (interleave mapping elements)))))
