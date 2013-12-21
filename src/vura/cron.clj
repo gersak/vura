@@ -69,7 +69,7 @@
     (vec parts)))
 
 (defn joda->cron [t]
-  [(t/sec t) (t/minute t) (t/hour t) (t/day t) (t/month t) (t/day-of-week t) (t/year t)])
+  [(t/second t) (t/minute t) (t/hour t) (t/day t) (t/month t) (t/day-of-week t) (t/year t)])
 
 (defn cron->joda [c]
   (let [tc (reverse c) 

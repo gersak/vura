@@ -4,7 +4,7 @@
         [clj-time.local :only (local-now)])
   (:require [clj-time.core :as t]
             [taoensso.timbre :as timbre :refer (info debug warn)])
-  (:import [java.util.concurrent LinkedBlockingQueue Executors TimeUnit]))
+  (:import [java.util.concurrent LinkedBlockingQueue Executors TimeUnit SynchronousQueue]))
 
 (def ^:private blank-job-machine (make-state-machine [:initialize :start (fn [x] (assoc-data x "*started-at*" (local-now)))
                                                       :start :end identity
@@ -127,7 +127,7 @@
   (started? [this] (not= :start (.at-phase? this)))
   (finished? [this] (= :finished (get-state  @job-agent)))
   (duration? [this] (if (.finished? this)
-                      (-> (t/interval (.started-at? this) (.ended-at? this)) t/in-msecs)))
+                      (-> (t/interval (.started-at? this) (.ended-at? this)) t/in-millis)))
   (in-error? [this] (agent-error job-agent))
   (active? [this] (-> @job-agent get-data (get "*running*") boolean))
   JobActions
