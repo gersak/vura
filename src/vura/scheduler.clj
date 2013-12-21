@@ -153,26 +153,23 @@
 
 
 
+(comment
+  (defjob another-job1 [:drinking (safe (println "job1 drinking"))
+                        :going-home (safe (println "job1 going home")) (wait-for 15000)])
 
-;; Testing
-;;(defjob another-job1 [:drinking (safe (println "job1 drinking"))
-;;                      :going-home (safe (println "job1 going home")) (wait-for 15000)])
-;;
-;;(defjob suicide-job [:buying-rope (safe (println "Suicide is buying a rope! Watch out!"))
-;;                     :suicide (safe (println "Last goodbay!"))])
-;;
-;;(defjob test-job [:test1 (safe (println "Testis 1"))
-;;                  ;:start-tests (start-jobs another-job1 suicide-job)
-;;                  :test2 (safe (println "Testis 2")) (wait-for 3000) 
-;;                  ;:stop-tests (stop-jobs another-job1 suicide-job) (wait-for 3000 #(-> another-job1 (after-phase? :drinking)))
-;;                  :test3 (safe (println "Testis 3"))])
-;;
-;;
-;;
-;;(defschedule s [:t test-job "5 * * * * * *"
-;;                :a another-job1 "*/10 * * * * * *"
-;;                :s suicide-job "*/4 * * * * * *"])
-;;
-;;(def x (make-dispatcher s))
-;;
-;;(def test-schedule (-> (Schedule. (atom nil)) (add-job :test-job test-job "* * * * * * *") (add-job :another another-job1 "* 1 * * * * *")))
+  (defjob suicide-job [:buying-rope (safe (println "Suicide is buying a rope! Watch out!"))
+                       :suicide (safe (println "Last goodbay!"))])
+
+  (defjob test-job [:test1 (safe (println "Testis 1"))
+                    :test2 (safe (println "Testis 2")) (wait-for 3000) 
+                    :test3 (safe (println "Testis 3"))])
+
+
+
+  (defschedule s [:t test-job "5 * * * * * *"
+                  :a another-job1 "*/10 * * * * * *"
+                  :s suicide-job "*/4 * * * * * *"])
+
+  (def x (make-dispatcher s))
+
+  (def test-schedule (-> (Schedule. (atom nil)) (add-job :test-job test-job "* * * * * * *") (add-job :another another-job1 "* 1 * * * * *"))))
