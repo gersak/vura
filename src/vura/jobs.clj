@@ -215,11 +215,44 @@
   jobs."
   [check-timer & jobs] (fn [_] (Thread/sleep check-timer) (every? finished? jobs)))
 
-(defn start-jobs [& jobs] (fn [x] (doseq [j jobs] (start! j)) x))
+(defn start-jobs 
+  "Returns function that takes one parameter
+  and returns the same parameter. In mean time
+  it starts all jobs that are put in as jobs
+  argument of this function"
+  [& jobs] (fn [x] (doseq [j jobs] (start! j)) x))
 
-(defn reset-jobs [& jobs] (fn [x] (doseq [j jobs] (reset-job! j)) x))
+(defn reset-jobs 
+  "Returns function that takes one parameter
+  and returns the same parameter. In mean time
+  it resets all jobs that are put in as jobs
+  argument of this function"
+  [& jobs] (fn [x] (doseq [j jobs] (reset-job! j)) x))
 
-(defn stop-jobs [& jobs] (fn [x] (doseq [j jobs] (stop! j)) x))
+(defn stop-jobs 
+  "Returns function that takes one parameter
+  and returns the same parameter. In mean time
+  it stops all jobs that are put in as jobs
+  argument of this function"
+  [& jobs] (fn [x] (doseq [j jobs] (stop! j)) x))
+
+(defn restart-job! 
+  "Returns function that takes one parameter
+  and returns the same parameter. In mean time
+  it restarts all jobs that are put in as jobs
+  argument of this function"
+  [job]
+  (stop! job)
+  (reset-job! job)
+  (start! job))
+
+(defn restart-jobs 
+  "Returns function that takes one parameter
+  and returns the same parameter. In mean time
+  it restarts all jobs that are put in as jobs
+  argument of this function"
+  [& jobs]
+  (fn [x] (doseq [j jobs] (restart-job! j)) x))
 
 (defn wait-for 
   "Wait for is another wrapper that can 
