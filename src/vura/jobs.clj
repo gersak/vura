@@ -237,14 +237,10 @@
   [& jobs] (fn [x] (doseq [j jobs] (stop! j)) x))
 
 (defn restart-job! 
-  "Returns function that takes one parameter
-  and returns the same parameter. In mean time
-  it restarts all jobs that are put in as jobs
-  argument of this function"
+  "Restarts job combining functions stop! restart-job!
+  start!"
   [job]
-  (stop! job)
-  (reset-job! job)
-  (start! job))
+  (comp start! reset-job! stop!))
 
 (defn restart-jobs 
   "Returns function that takes one parameter
