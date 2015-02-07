@@ -1,9 +1,13 @@
 (ns vura.jobs 
-  (:use [dreamcatcher.core :reload-all true]
-        [dreamcatcher.util :reload-all true]
-        [clj-time.local :only (local-now)])
-  (:require [clj-time.core :as t]
-            [taoensso.timbre :as timbre :refer (info debug warn)])
+  (:require 
+    [clj-time.core :as t]
+    [clj-time.local :refer (local-now)] 
+    [dreamcatcher.util :refer [get-states
+                               has-transition?
+                               get-transition
+                               get-validators]]
+    [dreamcatcher.core :refer :all]
+    [taoensso.timbre :as timbre :refer (info debug warn)])
   (:import [java.util.concurrent LinkedBlockingQueue Executors TimeUnit SynchronousQueue]))
 
 (def ^:private blank-job-machine (make-state-machine [:initialize :start (fn [x] (assoc-data x "*started-at*" (local-now)))

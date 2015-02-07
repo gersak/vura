@@ -1,10 +1,12 @@
 (ns vura.scheduler
-  (:use vura.jobs
-        vura.cron
-        [clj-time.local :only (local-now)]
-        [vura.cron :only (next-timestamp valid-timestamp?)])
-  (:require [clj-time.core :as t]
-            [taoensso.timbre :as timbre :refer (info debug warn error)]))
+  (:require 
+    [vura.cron :refer [next-timestamp valid-timestamp?]]
+    [vura.jobs :refer [start! stop! at-phase? before-phase?
+                       started? reset-job! in-error? defjob safe
+                       after-phase? started-at? finished? active?]]
+    [clj-time.core :as t]
+    [clj-time.local :refer (local-now)]
+    [taoensso.timbre :as timbre :refer (info debug warn error)]))
 
 
 ;; Schedule definitions

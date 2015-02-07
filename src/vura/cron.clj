@@ -1,8 +1,9 @@
 (ns vura.cron
-  (:use dreamcatcher.core
-        [clj-time.local :only (local-now to-local-date-time)])
-  (:require [clj-time.core :as t]
-            [clj-time.format :as tf]))
+  (:require 
+    [clj-time.core :as t]
+    [clj-time.local :refer (local-now to-local-date-time)] 
+    [clj-time.format :as tf]  
+    #_[dreamcatcher.core]))
 
 (defn cron-element-parserer 
   "Parses CRON like element. Elements are in form
