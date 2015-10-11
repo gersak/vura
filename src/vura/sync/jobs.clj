@@ -1,31 +1,34 @@
-(ns vura.jobs
+(ns vura.sync.jobs
   (:require
     [clj-time.core :as t]
     [clj-time.local :refer (local-now)]
+    [taoensso.timbre :as timbre :refer (info debug warn error)]
     [dreamcatcher.util :refer [has-transition?
                                get-transition
                                get-validators
                                get-states]]
-    [dreamcatcher.core :refer :all]
-    [taoensso.timbre :as timbre :refer (info debug warn)])
-  (:import [java.util.concurrent LinkedBlockingQueue Executors TimeUnit SynchronousQueue]))
+    [dreamcatcher.core :refer :all]))
+
+(def ^:private start-mark start-mark)
+(def ^:private end-mark end-mark)
+(def ^:private running-mark running-mark)
 
 (def ^:private blank-job-machine
   (make-state-machine
-    [:initialize :start (fn [x] (assoc-in x [:data "*started-at*"] (local-now)))
+    [:initialize :start (fn [x] (assoc-in x [:data start-mark] (local-now)))
      :start :end identity
      :end :finished (fn [x] (-> x
-                                (assoc-in [:data "*ended-at*"] (local-now))
-                                (assoc-in [:data "*running*"] false)))]))
+                                (assoc-in [:data end-mark] (local-now))
+                                (assoc-in [:data running-mark] false)))]))
 
 (defn job-life [x]
-  (if (get-in x [:data "*running*"])
+  (if (get-in x [:data running-mark])
     (if (= :finished (state? x))
       (do
         (when *agent*
           (debug "Job with phases " (-> x stm? keys)  " is finished... Setting *running* to false!"))
         (send-off *agent* #'job-life)
-        (assoc-in x [:data "*running*"] false))
+        (assoc-in x [:data running-mark] false))
       (do
         (send-off *agent* #'job-life)
         (act! x)))
@@ -50,24 +53,23 @@
   "Functions adds phase to the end
   of the phase chain that completes
   job"
-  ([^clojure.lang.Atom job new-phase [function validator]]
-   (assert (not-any? #(= % new-phase) (get-states @job)) "Phase already defined")
-   (let [last-phase (first (filter #(has-transition? @job % :end) (get-states @job)))]
+  ([job new-phase [function validator]]
+   (assert (not-any? #(= % new-phase) (get-states job)) "Phase already defined")
+   (let [last-phase (first (filter #(has-transition? job % :end) (get-states job)))]
      (remove-transition job last-phase :end)
      (remove-validator job last-phase :end)
      (add-state job new-phase)
      (add-transition job last-phase new-phase function)
      (when validator (add-validator job last-phase new-phase validator))
-     (add-transition job new-phase :end identity)
      job)))
 
 (defn insert-phase
   "Inserts new phase after at-phase"
-  ([^clojure.lang.Atom job new-phase at-phase function validator]
-   (assert (not-any? #(= % new-phase) (get-states @job)) "Phase already defined")
-   (let [next-phase (get-next-phase @job  at-phase)
-         transition (get-transition @job at-phase next-phase)
-         p-validator (first (get-validators @job at-phase))]
+  ([job new-phase at-phase function validator]
+   (assert (not-any? #(= % new-phase) (get-states job)) "Phase already defined")
+   (let [next-phase (get-next-phase job  at-phase)
+         transition (get-transition job at-phase next-phase)
+         p-validator (first (get-validators job at-phase))]
      (remove-transition job at-phase next-phase)
      (remove-validator job at-phase next-phase)
      (add-state job new-phase)
@@ -79,18 +81,18 @@
 
 (defn remove-phase
   "Removes phase from job"
-  [^clojure.lang.Atom job phase]
-  (assert (some #(= % phase) (get-states @job)) "Phase is not defined for this job")
-  (let [next-phase (get-next-phase @job phase)
-        previous-phase (get-previous-phase @job phase)
-        tp (get-transition @job phase next-phase)
-        vp (first (get-validators @job phase))]
-    (remove-transition job previous-phase phase)
-    (remove-validator job previous-phase phase)
-    (remove-state job phase)
-    (add-transition job previous-phase next-phase tp)
-    (add-validator job previous-phase next-phase vp)
-    job))
+  [job phase]
+  (assert (some #(= % phase) (get-states job)) "Phase is not defined for this job")
+  (let [next-phase (get-next-phase job phase)
+        previous-phase (get-previous-phase job phase)
+        tp (get-transition job phase next-phase)
+        vp (first (get-validators job phase))]
+    (-> job
+        (remove-transition previous-phase phase)
+        (remove-validator previous-phase phase)
+        (remove-state phase)
+        (add-transition previous-phase next-phase tp)
+        (add-validator previous-phase next-phase vp))))
 
 (defprotocol JobInfo
   (at-phase? [this] "Returns current phase that job-agent is working on")
@@ -132,19 +134,19 @@
                                (or
                                  (boolean (#{:finished :end} current))
                                  (> (.indexOf phases current) (.indexOf phases phase)))))
-  (started-at? [this] (-> @job-agent data? (get "*started-at*")))
-  (ended-at? [this] (-> @job-agent data? (get "*ended-at*")))
+  (started-at? [this] (-> @job-agent data? (get start-mark)))
+  (ended-at? [this] (-> @job-agent data? (get end-mark)))
   (started? [this] (not= :start (.at-phase? this)))
   (finished? [this] (= :finished (state? @job-agent)))
   (duration? [this] (if (.finished? this)
                       (-> (t/interval (.started-at? this) (.ended-at? this)) t/in-millis)))
   (in-error? [this] (agent-error job-agent))
-  (active? [this] (-> @job-agent data? (get "*running*") boolean))
+  (active? [this] (-> @job-agent data? (get running-mark) boolean))
   JobActions
   (start! [this] (do
-                   (send-off job-agent #(assoc-in % [:data "*running*"] true))
+                   (send-off job-agent #(assoc-in % [:data running-mark] true))
                    (send-off job-agent job-life)))
-  (stop! [this] (send-off job-agent #(assoc-in % [:data "*running*"] false)))
+  (stop! [this] (send-off job-agent #(assoc-in % [:data running-mark] false)))
   (reset-job! [this] (.reset-job! this nil))
   (reset-job! [this params]
     (if (agent-error job-agent)
