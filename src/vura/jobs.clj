@@ -1,46 +1,52 @@
-(ns vura.jobs 
-  (:require 
+(ns vura.jobs
+  (:require
     [clj-time.core :as t]
-    [clj-time.local :refer (local-now)] 
-    [dreamcatcher.util :refer [get-states
-                               has-transition?
+    [clj-time.local :refer (local-now)]
+    [dreamcatcher.util :refer [has-transition?
                                get-transition
-                               get-validators]]
+                               get-validators
+                               get-states]]
     [dreamcatcher.core :refer :all]
     [taoensso.timbre :as timbre :refer (info debug warn)])
   (:import [java.util.concurrent LinkedBlockingQueue Executors TimeUnit SynchronousQueue]))
 
-(def ^:private blank-job-machine (make-state-machine [:initialize :start (fn [x] (assoc-data x "*started-at*" (local-now)))
-                                                      :start :end identity
-                                                      :end :finished (fn [x] (assoc-data x "*ended-at*" (local-now) "*running*" false))]))
+(def ^:private blank-job-machine
+  (make-state-machine
+    [:initialize :start (fn [x] (assoc-in x [:data "*started-at*"] (local-now)))
+     :start :end identity
+     :end :finished (fn [x] (-> x
+                                (assoc-in [:data "*ended-at*"] (local-now))
+                                (assoc-in [:data "*running*"] false)))]))
 
 (defn job-life [x]
-  (if (-> x get-data (get "*running*"))
-    (if (= :finished (get-state x))
+  (if (get-in x [:data "*running*"])
+    (if (= :finished (state? x))
       (do
         (when *agent*
-          (debug "Job with phases " (get-states x)  " is finished... Setting *running* to false!"))
+          (debug "Job with phases " (-> x stm? keys)  " is finished... Setting *running* to false!"))
         (send-off *agent* #'job-life)
-        (assoc-data x "*running*" false))
+        (assoc-in x [:data "*running*"] false))
       (do
         (send-off *agent* #'job-life)
         (act! x)))
     x))
 
 (defn- get-next-phase [job phase]
-  (let [t (-> job phase :transitions)] 
-    (when (seq t) (-> t first key))))
+  (let [job (assoc job :state phase)
+        t (-> job choices?)]
+    (when (seq t) (first t))))
 
 (defn- get-job-phases [job]
-  (loop [phase :start
-         phases nil]
-    (if (= phase :end) (-> phases reverse rest) 
-      (recur (get-next-phase job phase) (conj phases phase)))))
+  (let [job (assoc job :state :start)]
+    (loop [phase :start
+           phases nil]
+      (if (= phase :end) (-> phases reverse rest)
+        (recur (get-next-phase job phase) (conj phases phase))))))
 
 (defn- get-previous-phase [job phase]
   (or (first (filter #(has-transition? job % phase) (get-job-phases job))) :start))
 
-(defn add-phase 
+(defn add-phase
   "Functions adds phase to the end
   of the phase chain that completes
   job"
@@ -55,7 +61,7 @@
      (add-transition job new-phase :end identity)
      job)))
 
-(defn insert-phase 
+(defn insert-phase
   "Inserts new phase after at-phase"
   ([^clojure.lang.Atom job new-phase at-phase function validator]
    (assert (not-any? #(= % new-phase) (get-states @job)) "Phase already defined")
@@ -68,7 +74,7 @@
      (add-transition job at-phase new-phase function)
      (add-transition job new-phase next-phase transition)
      (when validator (add-validator job new-phase next-phase validator))
-     (when p-validator (add-validator job at-phase new-phase validator)) 
+     (when p-validator (add-validator job at-phase new-phase validator))
      job)))
 
 (defn remove-phase
@@ -112,41 +118,41 @@
 
 (defrecord Job [job-agent]
   JobInfo
-  (get-phases [this] (-> @job-agent get-stm get-job-phases))
-  (at-phase? [this] (or 
-                      (get-next-phase (get-stm @job-agent) (get-state @job-agent))
-                      (get-state @job-agent)))
+  (get-phases [this] (-> @job-agent get-job-phases))
+  (at-phase? [this] (or
+                      (get-next-phase @job-agent (state? @job-agent))
+                      (state? @job-agent)))
   (before-phase? [this phase] (let [phases (.get-phases this)
                                     current (.at-phase? this)]
-                                (or 
+                                (or
                                   (boolean (#{:start :initialize} current))
                                   (< (.indexOf phases current) (.indexOf phases phase)))))
   (after-phase? [this phase] (let [phases (.get-phases this)
                                    current (.at-phase? this)]
-                               (or 
+                               (or
                                  (boolean (#{:finished :end} current))
                                  (> (.indexOf phases current) (.indexOf phases phase)))))
-  (started-at? [this] (-> @job-agent get-data (get "*started-at*")))
-  (ended-at? [this] (-> @job-agent get-data (get "*ended-at*")))
+  (started-at? [this] (-> @job-agent data? (get "*started-at*")))
+  (ended-at? [this] (-> @job-agent data? (get "*ended-at*")))
   (started? [this] (not= :start (.at-phase? this)))
-  (finished? [this] (= :finished (get-state  @job-agent)))
+  (finished? [this] (= :finished (state? @job-agent)))
   (duration? [this] (if (.finished? this)
                       (-> (t/interval (.started-at? this) (.ended-at? this)) t/in-millis)))
   (in-error? [this] (agent-error job-agent))
-  (active? [this] (-> @job-agent get-data (get "*running*") boolean))
+  (active? [this] (-> @job-agent data? (get "*running*") boolean))
   JobActions
   (start! [this] (do
-                   (send-off job-agent #(assoc-data % "*running*" true))
+                   (send-off job-agent #(assoc-in % [:data "*running*"] true))
                    (send-off job-agent job-life)))
-  (stop! [this] (send-off job-agent #(assoc-data % "*running*" false)))
+  (stop! [this] (send-off job-agent #(assoc-in % [:data "*running*"] false)))
   (reset-job! [this] (.reset-job! this nil))
-  (reset-job! [this params] 
+  (reset-job! [this params]
     (if (agent-error job-agent)
-      (restart-agent job-agent (-> @job-agent 
-                                   (remove-data (-> @job-agent get-data keys))
+      (restart-agent job-agent (-> @job-agent
+                                   (update :data dissoc (-> @job-agent data? keys))
                                    (reset-state! :initialize)))
       (letfn [(initialize-params [x params]
-                (assoc x  :data params :state :initialize))] 
+                (assoc x  :data params :state :initialize))]
         (.stop! this)
         (send-off job-agent initialize-params params)))))
 
@@ -154,12 +160,12 @@
 ;; Job shell returns job phases that can
 ;; be wrapped with atom, and changed over time
 ;;
-;; Real job instances are produced with job 
-;; function.  
+;; Real job instances are produced with job
+;; function.
 (defn make-job-shell [phases]
   (let [job (atom blank-job-machine)]
     (loop [phases phases]
-      (if (empty? phases) 
+      (if (empty? phases)
         @job
         (recur (do
                  (add-phase job (first phases) (take-while fn? (rest phases)))
@@ -170,83 +176,72 @@
   "Returns real Job record with life. It
   is possible to initialize data for job.
   Pass in params after job definition."
-  ([j] (Job. (-> j (get-machine-instance :initialize) give-life! agent)))
-  ([j & params] (let [initialize-data (fn [x] (apply assoc-data (conj params x)))]
-                  (Job. (-> j 
-                            (get-machine-instance :initialize) 
-                            initialize-data
-                            give-life!
-                            agent)))))
+  ([j] (Job. (-> j (make-machine-instance :initialize) give-life! agent)))
+  ([j & params] (Job. (-> j
+                          (make-machine-instance :initialize (hash-map params))
+                          give-life!
+                          agent))))
 
 
 ;; Intended for static job definition
-(defmacro defjob 
+(defmacro defjob
   "Defines job shell that represents blueprint for
-  successively executing functions that are defined 
+  successively executing functions that are defined
   as transitions from phase to phase. Transitions are
-  valid if validator function returns true or if 
+  valid if validator function returns true or if
   validator is not defined."
   [name & phases]
   `(def ~name (let [job# (atom ~blank-job-machine)
                     job-shell# (loop [phases# ~@phases]
-                                 (if (empty? phases#) 
+                                 (if (empty? phases#)
                                    @job#
                                    (recur (do
                                             (add-phase job# (first phases#) (take-while fn? (rest phases#)))
                                             (drop-while fn? (rest phases#))))))]
                 (Job. (-> job-shell#
-                          (get-machine-instance :initialize)
+                          (make-machine-instance :initialize)
                           give-life!
                           agent)))))
 
 ;; Reason for this macro is if "I" don't wan't to make
-;; chage to Job. data durring Job. phases than this 
+;; chage to Job. data durring Job. phases than this
 ;; macro evaluates body while returning Job. data as it was.
-(defmacro safe
-  "Simple wrapping macro for easier
-  defjob definition. Wraps body in a 
-  function THAT returns same argument 
-  that was argument. Body parts are 
-  evaluated thorougly."
-  [& body]
-  `(fn [x#]
-     (do ~@body) x#))
 
-(defn depend-on 
+(defn depend-on
   "depend-on function is wrapper for job
   validator, that ties execution of next
   phase to successfull finish of other
   jobs."
   [check-timer & jobs] (fn [_] (Thread/sleep check-timer) (every? finished? jobs)))
 
-(defn start-jobs 
+(defn start-jobs
   "Returns function that takes one parameter
   and returns the same parameter. In mean time
   it starts all jobs that are put in as jobs
   argument of this function"
   [& jobs] (fn [x] (doseq [j jobs] (start! j)) x))
 
-(defn reset-jobs 
+(defn reset-jobs
   "Returns function that takes one parameter
   and returns the same parameter. In mean time
   it resets all jobs that are put in as jobs
   argument of this function"
   [& jobs] (fn [x] (doseq [j jobs] (reset-job! j)) x))
 
-(defn stop-jobs 
+(defn stop-jobs
   "Returns function that takes one parameter
   and returns the same parameter. In mean time
   it stops all jobs that are put in as jobs
   argument of this function"
   [& jobs] (fn [x] (doseq [j jobs] (stop! j)) x))
 
-(defn restart-job! 
+(defn restart-job!
   "Restarts job combining functions stop! restart-job!
   start!"
   [job]
   (comp start! reset-job! stop!))
 
-(defn restart-jobs 
+(defn restart-jobs
   "Returns function that takes one parameter
   and returns the same parameter. In mean time
   it restarts all jobs that are put in as jobs
@@ -254,15 +249,10 @@
   [& jobs]
   (fn [x] (doseq [j jobs] (restart-job! j)) x))
 
-(defn wait-for 
-  "Wait for is another wrapper that can 
+(defn wait-for
+  "Wait for is another wrapper that can
   be used as validator for job. It periodicaly
   checks if condition fn or condition is valid
   and. If condition is not provided than it is true."
   ([check-timer] (fn [_] (do (Thread/sleep check-timer) true)))
   ([check-timer condition] (fn [_] (Thread/sleep check-timer) (if (fn? condition) (condition) condition))))
-
-
-
-;; Load work
-(load "work")
