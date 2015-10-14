@@ -11,7 +11,7 @@
     [dreamcatcher.util :refer :all]
     [dreamcatcher.async :refer :all]
     [dreamcatcher.core :refer :all]
-    #?@(:clj [[clojure.core.async :refer [go go-loop chan >! <! alt!! put! close! take! mult mix admix]]
+    #?@(:clj [[clojure.core.async :refer [go go-loop chan >! <! <!! alt!! put! close! take! mult mix admix timeout]]
               [clj-time.core :as t]
               [clj-time.local :refer (local-now)]])
     #?@(:cljs [[cljs.core.async :refer [chan >! <! put! close! take!]]
@@ -100,9 +100,8 @@
 ;; Following... Job domain definition
 
 (defprotocol JobInfo
-  (at-phase? [this] "Returns current phase that job-agent is working on")
-  (before-phase? [this phase] "Returns boolean true if current phase that job-agent is working on is before input phase")
-  (after-phase? [this phase] "Returns boolean true if current phase that job-agent is working on is before input phase")
+  (dreamcatcher [this] "Returns wrapped machine instance from dreamcatcher.async namespace
+  supporting protocol AsyncSTMData and AsyncSTMIO")
   (get-phases [this] "Lists all Job phases")
   (started-at? [this] "Returns org.joda.time.DateTime timestamp")
   (ended-at? [this] "Returns org.joda.time.DateTime timestamp")
@@ -114,10 +113,10 @@
 
 (defprotocol JobActions
   (start! [this] [this data] "Starts Job. That is sends-off job-agent to do the job. If Job
-                 was previously stoped than it continues from last phase.")
+  was previously stoped than it continues from last phase.")
   (stop! [this] "Stops running Job. Job will allways try to complete current phase.
-                If validator doesn't allow execution to continue than Job is stoped
-                at current phase."))
+  If validator doesn't allow execution to continue than Job is stoped
+  at current phase."))
 
 (defn make-job-shell [phases]
   (let [job (atom blank-job-machine)]
@@ -157,7 +156,10 @@
                 (swap! job-data assoc end-mark (get-in x [:data end-mark]))
                 (swap! job-data assoc running-mark false)
                 true))))
-    (doseq [s (keys (state-channels? state-machine-instance))]
+    ;; For state monitoring
+    ;; Can't see a way to properly monitor which
+    ;; phase is currently active
+    #_(doseq [s (keys (state-channels? state-machine-instance))]
       (admix
         end-collector
         (suck state-machine-instance
@@ -168,15 +170,7 @@
                      true)))))
     (reify
       JobInfo
-      #_(at-phase? [this] (get @job-data ::at-phase))
-      #_(before-phase? [this phase] (when (at-phase? this)
-                                    (<
-                                     (.indexOf (get-phases this) (at-phase? this))
-                                     (.indexOf (get-phases this) phase))))
-      #_(after-phase? [this phase] (when (at-phase? this)
-                                   (>
-                                    (.indexOf (get-phases this) (at-phase? this))
-                                    (.indexOf (get-phases this) phase))))
+      (dreamcatcher [_] state-machine-instance)
       (get-phases [this]
         (let [job (assoc state-machine-shell :state ::initialize)]
           (loop [phase ::initialize phases nil]
@@ -193,10 +187,9 @@
       JobActions
       (start! [this data]
         (if (get @job-data disabled-mark)
-          (throw (Exception. (str "Job was stopped at phase: " (at-phase? this))))
+          (throw (Exception. (str "Job was stopped at phase.")))
           (if (and (not (finished? this)) (active? this))
-            (throw (Exception. (str "Job hasn't finished jet! Currently running transition to phase: "
-                                    (nth (vec (get-phases this)) (inc (.indexOf (get-phases this) (at-phase? this)))))))
+            (throw (Exception. (str "Job hasn't finished jet!")))
             (do
               (swap! job-data assoc running-mark true start-mark nil end-mark nil)
               (inject state-machine-instance ::initialize data)))))
@@ -207,11 +200,12 @@
 
 
 ;; Intended for static job definition
-(def test-job (make-job [:test1 (safe  (println "Testis 1")) #_(fn [_] (Thread/sleep 2000) true)
-                         :test2 (safe  (println "Testis 2")) #_(fn [_] (Thread/sleep 5000) true)
-                         :test3 (safe  (println "Testis 3")) #_(fn [_] (Thread/sleep 10000) true)]))
+(def test-job (make-job
+                [:test1 (safe  (println "Testis 1")) (fn [_] (<!! (timeout 2000)) true)
+                 :test2 (safe  (println "Testis 2")) (fn [_] (<!! (timeout 4000)) true)
+                 :test3 (safe  (println "Testis 3")) (fn [_] (<!! (timeout 8000)) true)]))
 
 (def t (make-job-shell
-         [:test1 (safe  (println "Testis 1")) #_(fn [_] (Thread/sleep 2000) true)
-          :test2 (safe  (println "Testis 2")) #_(fn [_] (Thread/sleep 5000) true)
-          :test3 (safe  (println "Testis 3")) #_(fn [_] (Thread/sleep 10000) true)]))
+         [:test1 (safe  (println "Testis 1")) (fn [_] (<!! (timeout 2000)) true)
+          :test2 (safe  (println "Testis 2")) (fn [_] (<!! (timeout 4000)) true)
+          :test3 (safe  (println "Testis 3")) (fn [_] (<!! (timeout 8000)) true)]))
