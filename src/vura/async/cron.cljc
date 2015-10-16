@@ -3,9 +3,10 @@
       (:require
         [clj-time.core :as t]
         [clj-time.local :refer (local-now to-local-date-time)])
-     :cljs (:require
-             [cljs-time.core :as t]
-             [cljs-time.local :refer (local-now to-local-date-time)])))
+     :cljs
+      (:require
+        [cljs-time.core :as t]
+        [cljs-time.local :refer (local-now to-local-date-time)])))
 
 (defn cron-element-parserer
   "Parses CRON like element. Elements are in form
@@ -18,11 +19,11 @@
   (let [[element interval] (clojure.string/split element #"/")
         temp (cond
                (= "*" element) nil
-               (seq (re-find #"-" element)) {:range (map #(Integer/valueOf %) (clojure.string/split element #"-"))}
-               (seq (re-find #"," element)) {:sequence (apply sorted-set (map #(Integer/valueOf %) (clojure.string/split element #",")))}
-               :else {:fixed (Integer/valueOf element)})]
+               (seq (re-find #"-" element)) {:range (map #?(:clj #(Integer/valueOf %) :cljs #(js/parseInt %))  (clojure.string/split element #"-"))}
+               (seq (re-find #"," element)) {:sequence (apply sorted-set (map #?(:clj #(Integer/valueOf %) :cljs #(js/parseInt %)) (clojure.string/split element #",")))}
+               :else {:fixed (#?(:clj Integer/valueOf :cljs js/parseInt) element)})]
     (if interval
-      (assoc temp :interval (Integer/valueOf interval))
+      (assoc temp :interval (#?(:clj Integer/valueOf :cljs js/parseInt) interval))
       temp)))
 
 (defn- set-constraints [cron-mapping]
@@ -101,6 +102,10 @@
         evaluated-elements (map #(apply valid-element? %) (partition 2 (interleave cron mapping)))]
     (not-any? nil? evaluated-elements)))
 
+(defn- make-relative-range [range-start range-end start-element]
+  (take (inc (- range-end range-start))
+        (drop (dec start-element) (cycle (range range-start range-end)))))
+
 (defn next-timestamp
   "Return next valid timestamp after input
   timestamp"
@@ -111,18 +116,18 @@
         day-time-mapping (replace mapping [6 4 3 2 1 0])
         found-dates (for [y (range (current-cron 0) 4000)
                           :when (valid-element? y (day-time-mapping 0))
-                          m (range 1 13)
+                          m (make-relative-range 1 13 (current-cron 1))
                           :when (valid-element? m (day-time-mapping 1))
-                          d (range 1 (inc (t/number-of-days-in-the-month (t/date-time y m))))
+                          d (make-relative-range 1 (inc (t/number-of-days-in-the-month (t/date-time y m))) (current-cron 2))
                           :when (and
                                   (valid-element? d (day-time-mapping 2))
                                   (valid-element? (t/day-of-week (t/date-time y m d)) day-of-the-week-mapping)
                                   (not (t/before? (t/date-time y m d) (apply t/date-time (take 3 current-cron)))))
-                          h (range 0 24)
+                          h (make-relative-range 0 24 (current-cron 3))
                           :when (valid-element? h (day-time-mapping 3))
-                          minutes (range 0 60)
+                          minutes (make-relative-range 0 60 (current-cron 4))
                           :when (valid-element? minutes (day-time-mapping 4))
-                          s (range 0 60)
+                          s (make-relative-range 0 60 (current-cron 5))
                           :when (and  (valid-element? s (day-time-mapping 5)) (t/after? (to-local-date-time (t/date-time y m d h minutes s)) timestamp))]
                       (list y m d h minutes s))
         found-date (first found-dates)]

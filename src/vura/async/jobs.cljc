@@ -1,20 +1,28 @@
 (ns vura.async.jobs
   #?(:cljs
-      (:require-macros [dreamcatcher.core :refer defstm]
-                       [cljs.core.async.macros :refer [go alt! go-loop mult mix admix]]))
+      (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
   (:require
     [dreamcatcher.util :refer [has-transition?
                                get-transitions
                                get-transition
                                get-validators
                                get-states]]
-    [dreamcatcher.util :refer :all]
-    [dreamcatcher.async :refer :all]
-    [dreamcatcher.core :refer :all]
-    #?@(:clj [[clojure.core.async :refer [go go-loop chan >! <! <!! alt!! put! close! take! mult mix admix timeout]]
+    [dreamcatcher.util :refer [get-transitions get-transition get-validators has-transition?]]
+    [dreamcatcher.async :refer [wrap-async-machine suck inject disable ]]
+    [dreamcatcher.core
+     :refer [make-state-machine
+             #?(:clj with-stm)
+             add-state
+             add-transition
+             add-validator
+             remove-transition
+             remove-validator
+             remove-state]
+     #?@(:cljs [:refer-macros [with-stm]])]
+    #?@(:clj [[clojure.core.async :refer [go go-loop chan <! mult mix admix timeout]]
               [clj-time.core :as t]
               [clj-time.local :refer (local-now)]])
-    #?@(:cljs [[cljs.core.async :refer [chan >! <! put! close! take!]]
+    #?@(:cljs [[cljs.core.async :refer [chan <! mult mix admix timeout]]
                [cljs-time.core :as t]
                [cljs-time.local :refer (local-now)]])))
 
@@ -159,15 +167,6 @@
     ;; For state monitoring
     ;; Can't see a way to properly monitor which
     ;; phase is currently active
-    #_(doseq [s (keys (state-channels? state-machine-instance))]
-      (admix
-        end-collector
-        (suck state-machine-instance
-              s
-              1
-              (map (with-stm x
-                     (swap! job-data assoc ::at-phase s)
-                     true)))))
     (reify
       JobInfo
       (dreamcatcher [_] state-machine-instance)
@@ -187,9 +186,11 @@
       JobActions
       (start! [this data]
         (if (get @job-data disabled-mark)
-          (throw (Exception. (str "Job was stopped at phase.")))
+          #?(:clj (throw (Exception. (str "Job was stopped...")))
+             :cljs (throw (js/Error (str "Job was stopped..."))))
           (if (and (not (finished? this)) (active? this))
-            (throw (Exception. (str "Job hasn't finished jet!")))
+            #?(:clj (throw (Exception. (str "Job hasn't finished jet!")))
+               :cljs (throw (js/Error (str "Job hasn't finished jet!"))))
             (do
               (swap! job-data assoc running-mark true start-mark nil end-mark nil)
               (inject state-machine-instance ::initialize data)))))
@@ -197,15 +198,3 @@
       (stop! [this] (do
                       (swap! job-data assoc running-mark false disabled-mark true)
                       (disable state-machine-instance))))))
-
-
-;; Intended for static job definition
-(def test-job (make-job
-                [:test1 (safe  (println "Testis 1")) (fn [_] (<!! (timeout 2000)) true)
-                 :test2 (safe  (println "Testis 2")) (fn [_] (<!! (timeout 4000)) true)
-                 :test3 (safe  (println "Testis 3")) (fn [_] (<!! (timeout 8000)) true)]))
-
-(def t (make-job-shell
-         [:test1 (safe  (println "Testis 1")) (fn [_] (<!! (timeout 2000)) true)
-          :test2 (safe  (println "Testis 2")) (fn [_] (<!! (timeout 4000)) true)
-          :test3 (safe  (println "Testis 3")) (fn [_] (<!! (timeout 8000)) true)]))
