@@ -1,4 +1,4 @@
-(defproject vura "0.5.1"
+(defproject vura "0.5.2"
   :aot :all
   :description "Vura is tiny library that is intendend for task
                managment and scheduling"

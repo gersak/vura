@@ -8,11 +8,11 @@
                              started? started-at?
                              finished? active?] :as j]
     #?(:clj [clojure.core.async :refer [go go-loop <! put! chan timeout alts! close!] :as async]
-       :cljs [cljs.core.async :refer [<! put! chan timeout alts! close!] :as async])
+            :cljs [cljs.core.async :refer [<! put! chan timeout alts! close!] :as async])
     #?(:clj [clj-time.core :as t]
-       :cljs [cljs-time.core :as t])
+            :cljs [cljs-time.core :as t])
     #?(:clj [clj-time.local :refer (local-now)]
-       :cljs [cljs-time.local :refer (local-now)])))
+            :cljs [cljs-time.local :refer (local-now)])))
 
 
 (def ^:dynamic *scheduler-exception-fn* (fn [job-name job-definition exception]
@@ -125,22 +125,23 @@
       (disable-dispatcher [_] (close! control-channel)))))
 
 
-(def test-job (make-job
-                [:telling (safe  (println "Telling!"))
-                 :throwning (safe (println "Throwing..."))]))
+(comment
+  (def test-job (make-job
+                  [:telling (safe  (println "Telling!"))
+                   :throwning (safe (println "Throwing..."))]))
 
-(def another-job1 (make-job
-                    [:drinking (safe  (println  "job1 drinking"))
-                     :going-home (safe (println "job1 going home"))]))
+  (def another-job1 (make-job
+                      [:drinking (safe  (println  "job1 drinking"))
+                       :going-home (safe (println "job1 going home"))]))
 
-#?(:clj
-    (def long-job (make-job
-                    [:phuba (safe
-                              (println "Going from phuba!")
-                              (async/<!! (timeout 2000)))
-                     :letovanic (safe
-                                  (println "paryting in Letovanic")
-                                  (async/<!! (timeout 5000)))])))
+  #?(:clj
+      (def long-job (make-job
+                      [:phuba (safe
+                                (println "Going from phuba!")
+                                (async/<!! (timeout 2000)))
+                       :letovanic (safe
+                                    (println "paryting in Letovanic")
+                                    (async/<!! (timeout 5000)))])))
 
 
 (def test-schedule (make-schedule
@@ -151,7 +152,7 @@
 
 (def suicide-job (make-job
                    [:buying-rope (safe (println "@" (local-now)) (println "Suicide is buying a rope! Watch out!"))
-                    :suicide (safe (println "Last goodbay!"))]))
+                    :suicide (safe (println "Last goodbay!"))])))
 
 
 (comment
