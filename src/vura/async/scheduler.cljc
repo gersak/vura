@@ -103,9 +103,7 @@
                        (recur))
                      (recur))
                    ;; If dispatcher is running
-                   (let [candidates (-> schedule job-candidates?)
-                         jobs (map #(get-job schedule %) candidates)
-                         finished-jobs (filter #(and (finished? %) (started? %)) jobs)]
+                   (let [candidates (-> schedule job-candidates?)]
                      (doseq [x candidates]
                        (try
                          (start! (get-job schedule x))
