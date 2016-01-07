@@ -7,12 +7,16 @@
     [vura.async.jobs :refer [start! stop! make-job
                              started? started-at?
                              finished? active?] :as j]
-    #?(:clj [clojure.core.async :refer [go go-loop <! put! chan timeout alts! close!]]
-       :cljs [cljs.core.async :refer [<! put! chan timeout alts! close!]])
+    #?(:clj [clojure.core.async :refer [go go-loop <! put! chan timeout alts! close!] :as async]
+       :cljs [cljs.core.async :refer [<! put! chan timeout alts! close!] :as async])
     #?(:clj [clj-time.core :as t]
        :cljs [cljs-time.core :as t])
     #?(:clj [clj-time.local :refer (local-now)]
        :cljs [cljs-time.local :refer (local-now)])))
+
+
+(def ^:dynamic *scheduler-exception-fn* (fn [job-name job-definition exception]
+                                          (println (.getMessage exception))))
 
 
 ;; Schedule definitions
@@ -103,7 +107,12 @@
                          jobs (map #(get-job schedule %) candidates)
                          finished-jobs (filter #(and (finished? %) (started? %)) jobs)]
                      (doseq [x candidates]
-                       (start! (get-job schedule x)))
+                       (try
+                         (start! (get-job schedule x))
+                         #?(:clj
+                             (catch Exception e (*scheduler-exception-fn* x (get-job schedule x) e))
+                             :cljs
+                             (catch :default e (*scheduler-exception-fn* x (get-job schedule x) e)))))
                      (recur))))))
     (reify
       DispatcherActions
@@ -126,9 +135,21 @@
                     [:drinking (safe  (println  "job1 drinking"))
                      :going-home (safe (println "job1 going home"))]))
 
+#?(:clj
+    (def long-job (make-job
+                    [:phuba (safe
+                              (println "Going from phuba!")
+                              (async/<!! (timeout 2000)))
+                     :letovanic (safe
+                                  (println "paryting in Letovanic")
+                                  (async/<!! (timeout 5000)))])))
+
+
 (def test-schedule (make-schedule
                      :test-job test-job "4/10 * * * * * *"
+                     #?@(:clj [:long-job long-job "*/2 * * * * * *"])
                      :another another-job1 "*/15 * * * * * *"))
+
 
 (def suicide-job (make-job
                    [:buying-rope (safe (println "@" (local-now)) (println "Suicide is buying a rope! Watch out!"))
