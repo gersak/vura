@@ -54,7 +54,7 @@
                    (reschedule-job [this job-name new-schedule] (do
                                                                   (swap! schedule-data assoc job-name {::schedule new-schedule ::job (-> @schedule-data (get job-name) ::job)})
                                                                   this)))]
-    (doseq [[_ job :as x] args]
+    (doseq [[name job :as x] args]
       (do
         (assert (satisfies? j/JobInfo job) "Every instance of jobs has to implement JobInfo protocol.")
         (assert (satisfies? j/JobActions job) "Every instance of jobs has to implement JobActions protocol.")
@@ -79,7 +79,9 @@
 
 (defn- job-candidates? [schedule]
   (let [timestamp (local-now)]
-    (remove nil? (for [[job-name job] (get-schedules schedule)] (when (valid-timestamp? timestamp job) job-name)))))
+    (remove nil?
+            (for [[job-name job] (get-schedules schedule)]
+              (when (valid-timestamp? timestamp job) job-name)))))
 
 
 (defn make-dispatcher [schedule]
@@ -101,9 +103,9 @@
                    ;; If dispatcher is running
                    (let [candidates (-> schedule job-candidates?)
                          jobs (map #(get-job schedule %) candidates)
-                         finished-jobs (filter #(and (finished? %) (started? %)) jobs)]
-                     (doseq [x candidates]
-                       (start! (get-job schedule x)))
+                         finished-jobs (filter #(or (and (finished? %) (started? %)) (not (started? %))) jobs)]
+                     (doseq [x finished-jobs]
+                       (start! x))
                      (recur))))))
     (reify
       DispatcherActions
@@ -118,49 +120,44 @@
       (disable-dispatcher [_] (close! control-channel)))))
 
 
-(def test-job (make-job
-                [:telling (safe  (println "Telling!"))
-                 :throwning (safe (println "Throwing..."))]))
-
-(def another-job1 (make-job
-                    [:drinking (safe  (println  "job1 drinking"))
-                     :going-home (safe (println "job1 going home"))]))
-
-(def test-schedule (make-schedule
-                     :test-job test-job "4/10 * * * * * *"
-                     :another another-job1 "*/15 * * * * * *"))
-
-(def suicide-job (make-job
-                   [:buying-rope (safe (println "@" (local-now)) (println "Suicide is buying a rope! Watch out!"))
-                    :suicide (safe (println "Last goodbay!"))]))
-
-
 (comment
+  (def test-job (make-job
+                  [:telling (safe  (println "Telling!"))
+                   :throwning (safe (println "Throwing..."))]))
 
-  (defschedule test-schedule
-    [:test-job test-job "0/10 * * * * * *"])
-
-  (def test-dispatcher (make-dispatcher test-schedule))
-
-
-  (defjob another-job1 [:drinking (safe (println "job1 drinking"))
-                        :going-home (safe (println "job1 going home")) (wait-for 1000)])
-
-  (defjob suicide-job [:buying-rope (safe (println "Suicide is buying a rope! Watch out!"))
-                       :suicide (safe (println "Last goodbay!"))])
-
-  (defjob test-job [:test1 (safe (println "Testis 1"))
-                    :test2 (safe (println "Testis 2")) (wait-for 3000)
-                    :test3 (safe (println "Testis 3"))])
-
-
-
-  (defschedule s [:t test-job "5 * * * * * *"
-                  :a another-job1 "*/10 * * * * * *"
-                  :s suicide-job "*/4 * * * * * *"])
-
-  (def x (make-dispatcher s))
+  (def another-job1 (make-job
+                      [:drinking (safe  (println  "job1 drinking"))
+                       :going-home (safe (println "job1 going home"))]))
 
   (def test-schedule (make-schedule
-                           (:test-job test-job "* * * * * * *")
-                           (:another another-job1 "* 1 * * * * *"))))
+                       :test-job test-job "4/10 * * * * * *"
+                       :another another-job1 "*/15 * * * * * *"))
+
+  (def suicide-job (make-job
+                     [:buying-rope (safe (println "@" (local-now)) (println "Suicide is buying a rope! Watch out!"))
+                      :suicide (safe (println "Last goodbay!"))]))
+
+  (def fetch-pe-configurations
+    (make-job
+      [:fetching (safe
+                   (println "Fetching PE configurations: " (local-now)))]))
+
+
+  (def night-watch
+    (make-job
+      [:night-wathcing (safe (println "Watching... At night!" (local-now)))]))
+
+  (def device-monitoring
+    (make-job
+      [:device-monitoring (safe (println "Monitoring devices!" (local-now)))]))
+
+
+  (def network-schedule
+    (make-schedule
+      :pe-fetching fetch-pe-configurations "0/20 * * * * * *"
+      :night-watch night-watch "30 1 * * * * *"
+      :device-monitoring device-monitoring "30 30-50 * * * * *"))
+
+
+  (def krakken-dispatcher
+    (make-dispatcher network-schedule)))
