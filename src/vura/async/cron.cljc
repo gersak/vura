@@ -102,9 +102,8 @@
         evaluated-elements (map #(apply valid-element? %) (partition 2 (interleave cron mapping)))]
     (not-any? nil? evaluated-elements)))
 
-(defn- make-relative-range [range-start range-end start-element]
-  (take (inc (- range-end range-start))
-        (drop (dec start-element) (cycle (range range-start range-end)))))
+(defn- time-date [date-time]
+  [(t/year date-time) (t/month date-time) (t/day date-time) (t/hour date-time) (t/minute date-time) (t/second date-time)])
 
 (defn next-timestamp
   "Return next valid timestamp after input
@@ -114,21 +113,37 @@
         current-cron (replace (joda->cron timestamp) [6 4 3 2 1 0])
         day-of-the-week-mapping (nth mapping 5)
         day-time-mapping (replace mapping [6 4 3 2 1 0])
+        after-this-moment? (fn [& args]
+                             (let [temp-time (to-local-date-time (apply t/date-time args))]
+                               (or
+                                 (t/after? temp-time timestamp)
+                                 (= (vector args) (vector (take (count args) (time-date timestamp)))))))
         found-dates (for [y (range (current-cron 0) 4000)
-                          :when (valid-element? y (day-time-mapping 0))
-                          m (make-relative-range 1 13 (current-cron 1))
-                          :when (valid-element? m (day-time-mapping 1))
-                          d (make-relative-range 1 (inc (t/number-of-days-in-the-month (t/date-time y m))) (current-cron 2))
                           :when (and
-                                  (valid-element? d (day-time-mapping 2))
-                                  (valid-element? (t/day-of-week (t/date-time y m d)) day-of-the-week-mapping)
-                                  (not (t/before? (t/date-time y m d) (apply t/date-time (take 3 current-cron)))))
-                          h (make-relative-range 0 24 (current-cron 3))
-                          :when (valid-element? h (day-time-mapping 3))
-                          minutes (make-relative-range 0 60 (current-cron 4))
-                          :when (valid-element? minutes (day-time-mapping 4))
-                          s (make-relative-range 0 60 (current-cron 5))
-                          :when (and  (valid-element? s (day-time-mapping 5)) (t/after? (to-local-date-time (t/date-time y m d h minutes s)) timestamp))]
+                                  (after-this-moment? y)
+                                  (valid-element? y (day-time-mapping 0)))
+                          m (range 1 13)
+                          :when (and
+                                  (after-this-moment? y m)
+                                  (valid-element? m (day-time-mapping 1)))
+                          d (range 1 (t/number-of-days-in-the-month (t/date-time y m)))
+                          :when (do
+                                  (and
+                                    (after-this-moment? y m d)
+                                    (valid-element? d (day-time-mapping 2))
+                                    (valid-element? (t/day-of-week (t/date-time y m d)) day-of-the-week-mapping)))
+                          h (range 24)
+                          :when (and
+                                  (after-this-moment? y m d h)
+                                  (valid-element? h (day-time-mapping 3)))
+                          minutes (range 60)
+                          :when (and
+                                    (valid-element? minutes (day-time-mapping 4))
+                                    (after-this-moment? y m d h minutes))
+                          s (range 60)
+                          :when (and
+                                  (valid-element? s (day-time-mapping 5))
+                                  (t/after? (to-local-date-time (t/date-time y m d h minutes s)) timestamp))]
                       (list y m d h minutes s))
         found-date (first found-dates)]
     (when found-date (to-local-date-time (apply t/date-time found-date)))))

@@ -1,4 +1,4 @@
-(ns vura.jobs
+(ns vura.sync.jobs
   (:require
     [clj-time.core :as t]
     [clj-time.local :refer (local-now)]

@@ -75,15 +75,16 @@
 (defn- period [a b]
   (t/in-millis (t/interval a b)))
 
-(defn- wake-up-at? [schedule]
+(defn wake-up-at? [schedule]
   (let [schedules (get-schedules schedule)
         timestamp (local-now)
         next-timestamps (for [[job-name job] schedules] (next-timestamp timestamp job))]
-   (first (sort-by #(period timestamp %) next-timestamps))))
+    (first (sort-by #(period timestamp %) next-timestamps))))
 
-(defn- job-candidates? [schedule]
-  (let [timestamp (local-now)]
-    (remove nil? (for [[job-name job] (get-schedules schedule)] (when (valid-timestamp? timestamp job) job-name)))))
+(defn job-candidates? [schedule]
+  (let [timestamp (local-now)
+        candidates (remove nil? (for [[job-name job] (get-schedules schedule)] (when (valid-timestamp? timestamp job) job-name))) ]
+    candidates))
 
 
 (defn make-dispatcher [schedule]
@@ -127,16 +128,21 @@
 
 (comment
   (def test-job (make-job
-                  [:telling (safe  (println "Telling!"))
+                  [:telling (safe
+                              (println (local-now))
+                              (println "Telling!"))
                    :throwning (safe (println "Throwing..."))]))
 
   (def another-job1 (make-job
-                      [:drinking (safe  (println  "job1 drinking"))
+                      [:drinking (safe
+                                   (println (local-now))
+                                   (println  "job1 drinking"))
                        :going-home (safe (println "job1 going home"))]))
 
   #?(:clj
       (def long-job (make-job
                       [:phuba (safe
+                                (println (local-now))
                                 (println "Going from phuba!")
                                 (async/<!! (timeout 2000)))
                        :letovanic (safe
@@ -149,6 +155,8 @@
                      #?@(:clj [:long-job long-job "*/2 * * * * * *"])
                      :another another-job1 "*/15 * * * * * *"))
 
+(def t (make-schedule
+         :t test-job "0 0/20 * * * * *"))
 
 (def suicide-job (make-job
                    [:buying-rope (safe (println "@" (local-now)) (println "Suicide is buying a rope! Watch out!"))
@@ -178,6 +186,8 @@
   (defschedule s [:t test-job "5 * * * * * *"
                   :a another-job1 "*/10 * * * * * *"
                   :s suicide-job "*/4 * * * * * *"])
+
+  (defschedule t [:t test-job "0 0/20 * * * * *"])
 
   (def x (make-dispatcher s))
 
