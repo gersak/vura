@@ -5,6 +5,7 @@
   :dependencies [[org.clojure/clojure "1.7.0"]
                  [kovacnica/dreamcatcher "1.0.4"]
                  [org.clojure/core.async "0.2.374"]
+                 [com.taoensso/timbre "4.2.0"]
                  [com.andrewmcveigh/cljs-time "0.3.14"]
                  [clj-time "0.11.0"]]
   :source-paths ["src"]
