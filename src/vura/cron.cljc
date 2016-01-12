@@ -1,4 +1,4 @@
-(ns vura.async.cron
+(ns vura.cron
   #?(:clj
       (:require
         [clj-time.core :as t]

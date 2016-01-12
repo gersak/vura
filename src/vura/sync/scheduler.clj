@@ -1,7 +1,7 @@
 (ns vura.sync.scheduler
   (:require
     [dreamcatcher.core :refer [safe]]
-    [vura.sync.cron :refer [next-timestamp valid-timestamp?]]
+    [vura.cron :refer [next-timestamp valid-timestamp?]]
     [vura.sync.jobs :refer [start! stop! at-phase? before-phase?
                        started? reset-job! in-error? defjob wait-for
                        after-phase? started-at? finished? active?] :as j]
