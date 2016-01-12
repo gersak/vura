@@ -3,7 +3,7 @@
                             [cljs.core.async.macros :refer [go go-loop]]))
   (:require
     #?(:clj [dreamcatcher.core :refer [safe]])
-    [vura.async.cron :refer [next-timestamp valid-timestamp?]]
+    [vura.cron :refer [next-timestamp valid-timestamp?]]
     [vura.async.jobs :refer [start! stop! make-job
                              started? started-at?
                              finished? active?] :as j]
