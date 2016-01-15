@@ -16,7 +16,7 @@
 
 
 (def ^:dynamic *scheduler-exception-fn* (fn [job-name job-definition exception]
-                                          (println (.getMessage exception))))
+                                          (println job-name ": " (.getMessage exception))))
 
 
 ;; Schedule definitions
@@ -114,6 +114,16 @@
                              (catch :default e (*scheduler-exception-fn* x (get-job schedule x) e)))))
                      (recur))))))
     (reify
+      ScheduleInfo
+      (get-job [this job] (get-job schedule job))
+      (get-jobs [this] (get-jobs schedule))
+      (get-schedule [this job] (get-schedule schedule job))
+      (get-schedules [this] (get-schedules schedule))
+      ScheduleActions
+      (add-job [this job-name job new-job-schedule] (add-job schedule job-name job new-job-schedule))
+      (remove-job [this job-name] (remove-job schedule job-name))
+      (replace-job [this job-name new-job new-schedule] (replace-job schedule job-name new-job new-schedule))
+      (reschedule-job [this job-name new-schedule] (reschedule-job schedule job-name new-schedule))
       DispatcherActions
       (start-dispatching! [this]
         (do
