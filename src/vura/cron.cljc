@@ -126,12 +126,11 @@
                           :when (and
                                   (after-this-moment? y m)
                                   (valid-element? m (day-time-mapping 1)))
-                          d (range 1 (t/number-of-days-in-the-month (t/date-time y m)))
-                          :when (do
-                                  (and
+                          d (range 1 (inc (t/number-of-days-in-the-month (t/date-time y m))))
+                          :when (and
                                     (after-this-moment? y m d)
                                     (valid-element? d (day-time-mapping 2))
-                                    (valid-element? (t/day-of-week (t/date-time y m d)) day-of-the-week-mapping)))
+                                    (valid-element? (t/day-of-week (t/date-time y m d)) day-of-the-week-mapping))
                           h (range 24)
                           :when (and
                                   (after-this-moment? y m d h)
