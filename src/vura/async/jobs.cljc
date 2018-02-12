@@ -2,11 +2,13 @@
   #?(:cljs
       (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
   (:require
-    [dreamcatcher.util :refer [has-transition?
-                               get-transitions
-                               get-transition
-                               get-validators
-                               get-states]]
+    [vura.core :as core]
+    [dreamcatcher.util 
+     :refer [has-transition?
+             get-transitions
+             get-transition
+             get-validators
+             get-states]]
     [dreamcatcher.util :refer [get-transitions get-transition get-validators has-transition?]]
     [dreamcatcher.async :refer [wrap-async-machine suck inject disable ]]
     [dreamcatcher.core
@@ -19,12 +21,8 @@
              remove-validator
              remove-state]
      #?@(:cljs [:refer-macros [with-stm]])]
-    #?@(:clj [[clojure.core.async :refer [go go-loop chan <! mult mix admix timeout]]
-              [clj-time.core :as t]
-              [clj-time.local :refer (local-now)]])
-    #?@(:cljs [[cljs.core.async :refer [chan <! mult mix admix timeout]]
-               [cljs-time.core :as t]
-               [cljs-time.local :refer (local-now)]])))
+    #?@(:clj [[clojure.core.async :refer [go go-loop chan <! mult mix admix timeout]]])
+    #?@(:cljs [[cljs.core.async :refer [chan <! mult mix admix timeout]]])))
 
 (def ^:private start-mark "*started-at*")
 (def ^:private end-mark "*ended-at*")
@@ -35,9 +33,9 @@
 
 (def ^:private blank-job-machine
   (make-state-machine
-    [::initialize ::start (fn [x] (assoc-in x [:data start-mark] (local-now)))
+    [::initialize ::start (fn [x] (assoc-in x [:data start-mark] (core/date)))
      ::start ::finished (fn [x] (-> x
-                                (assoc-in [:data end-mark] (local-now))
+                                (assoc-in [:data end-mark] (core/date))
                                 (assoc-in [:data running-mark] false)))]))
 
 ;; Helper function for job phase buildup
@@ -69,7 +67,7 @@
      (add-transition job last-phase new-phase function)
      (when validator (add-validator job last-phase new-phase validator))
      (add-transition job new-phase ::finished (fn [x] (-> x
-                                                          (assoc-in [:data end-mark] (local-now))
+                                                          (assoc-in [:data end-mark] (core/date))
                                                           (assoc-in [:data running-mark] false))))
      job)))
 
@@ -181,7 +179,7 @@
       (finished? [this] (-> this ended-at? boolean))
       (active? [this] (get @job-data running-mark))
       (duration? [this] (when (finished? this)
-                          (-> (t/interval (started-at? this) (ended-at? this)) t/in-millis)))
+                          (core/interval (started-at? this) (ended-at? this))))
       (in-error? [this] nil)
       JobActions
       (start! [this data]

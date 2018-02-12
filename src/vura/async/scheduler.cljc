@@ -3,6 +3,7 @@
                             [cljs.core.async.macros :refer [go go-loop]]))
   (:require
     #?(:clj [dreamcatcher.core :refer [safe]])
+    [vura.core :as core]
     [vura.cron 
      :refer [next-timestamp valid-timestamp?]]
     [vura.async.jobs 
@@ -12,15 +13,9 @@
     #?(:clj [clojure.core.async 
              :refer [go go-loop <! put! chan 
                      timeout alts! close!] :as async]
-            :cljs [cljs.core.async 
-                   :refer [<! put! chan 
-                           timeout alts! close!] :as async])
-    #?(:clj [clj-time.core :as t]
-            :cljs [cljs-time.core :as t])
-    #?(:clj [clj-time.local 
-             :refer (local-now)]
-            :cljs [cljs-time.local 
-                   :refer (local-now)])))
+       :cljs [cljs.core.async 
+              :refer [<! put! chan 
+                      timeout alts! close!] :as async])))
 
 
 (def ^:dynamic *scheduler-exception-fn* 
@@ -47,18 +42,18 @@
   (disable-dispatcher [this] "Function disables dispatcher, stopping it from executing permenantly. Eaven if start-dispatching! is ran."))
 
 
-(defn- period [a b]
-  (t/in-millis (t/interval a b)))
-
 (defn wake-up-at? [schedule]
   (let [schedules (get-schedules schedule)
-        timestamp (local-now)
+        timestamp (core/date) 
         next-timestamps (for [[job-name job] schedules] (next-timestamp timestamp job))]
-    (first (sort-by #(period timestamp %) next-timestamps))))
+    (first (sort-by #(core/interval timestamp %) next-timestamps))))
 
 (defn job-candidates? [schedule]
-  (let [timestamp (local-now)
-        candidates (remove nil? (for [[job-name job] (get-schedules schedule)] (when (valid-timestamp? timestamp job) job-name))) ]
+  (let [timestamp (core/date) 
+        candidates (remove 
+                     nil? 
+                     (for [[job-name job] (get-schedules schedule)]
+                       (when (valid-timestamp? timestamp job) job-name))) ]
     candidates))
 
 (defn make-schedule
@@ -114,7 +109,7 @@
                                              ;; This means that it is possible to add jobs regardless
                                              ;; start-disptaching! was started or not
                                              (if-let [next-wakeup (wake-up-at?  schedule)]
-                                               (<! (timeout (period (local-now) next-wakeup)))
+                                               (<! (timeout (core/interval (core/date) next-wakeup)))
                                                (<! (timeout 10000))) ::TIMEOUT)])]
                 (when-not (nil? control-data)
                   (if-not @dispatch?

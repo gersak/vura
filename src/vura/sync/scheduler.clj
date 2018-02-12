@@ -1,13 +1,13 @@
 (ns vura.sync.scheduler
   (:require
     [dreamcatcher.core :refer [safe]]
+    [clojure.tools.logging :refer [error info warn]]
+    [vura.core :as core]
     [vura.cron :refer [next-timestamp valid-timestamp?]]
-    [vura.sync.jobs :refer [start! stop! at-phase? before-phase?
-                       started? reset-job! in-error? defjob wait-for
-                       after-phase? started-at? finished? active?] :as j]
-    [clj-time.core :as t]
-    [clj-time.local :refer (local-now)]
-    [taoensso.timbre :as timbre :refer (info debug warn error)]))
+    [vura.sync.jobs 
+     :refer [start! stop! at-phase? before-phase?
+             started? reset-job! in-error? defjob wait-for
+             after-phase? started-at? finished? active?] :as j]))
 
 
 ;; Schedule definitions
@@ -79,17 +79,15 @@
   (start-dispatching! [this] "Function activates dispatcher.")
   (stop-dispatching! [this] "Function deactivates dispatcher."))
 
-(defn- period [a b]
-  (t/in-millis (t/interval a b)))
 
 (defn- wake-up-at? [schedule]
   (let [schedules (get-schedules schedule)
-        timestamp (local-now)
+        timestamp (core/date)
         next-timestamps (for [x schedules] (next-timestamp timestamp (second x)))]
-   (first (sort-by #(period timestamp %) next-timestamps))))
+   (first (sort-by #(core/interval timestamp %) next-timestamps))))
 
 (defn- job-candidates? [schedule]
-  (let [timestamp (local-now)]
+  (let [timestamp (core/date)]
     (remove nil? (for [x (get-schedules schedule)] (when (valid-timestamp? timestamp (second x)) (first x))))))
 
 (defn dispatcher-life
@@ -104,7 +102,7 @@
   If job didn't finish in time than WARN is logged
   and no actions are taken."
   [instance]
-  (Thread/sleep (period (local-now) (wake-up-at? (:schedule instance))))
+  (Thread/sleep (core/interval (core/date) (wake-up-at? (:schedule instance))))
   (if (:running instance)
     (let [candidates (-> instance :schedule job-candidates?)
           jobs (map #(get-job (-> instance :schedule) %) candidates)
@@ -131,13 +129,13 @@
 (defrecord Dispatcher [^clojure.lang.Agent dispatcher]
   DispatcherActions
   (start-dispatching! [this] (do
-                               #_(info "Starting dispatcher!")
+                               (info "Starting dispatcher!")
                                (send-off dispatcher #(assoc % :running true))
                                (await dispatcher)
                                (send-off dispatcher dispatcher-life)
                                nil))
   (stop-dispatching! [this] (do
-                              #_(info "Stoping dispatcher!")
+                              (info "Stoping dispatcher!")
                               (send-off dispatcher #(assoc % :running false))
                               (await dispatcher)
                               nil)))
@@ -146,17 +144,15 @@
   (Dispatcher. (agent {:schedule schedule :running true})))
 
 
-
-
 (comment
   (defjob test-job [:telling (safe (println "starting over"))
                     :throwning (safe (throw (Exception. "Fucking...")))])
 
   (defschedule test-schedule
-    [:test-job test-job "0/10 * * * * * *"])
+    [:test-job test-job "0/10 *"])
 
   (def test-dispatcher (make-dispatcher test-schedule))
-
+  (start-dispatching! test-dispatcher)
 
   (defjob another-job1 [:drinking (safe (println "job1 drinking"))
                         :going-home (safe (println "job1 going home")) (wait-for 1000)])
@@ -170,11 +166,16 @@
 
 
 
-  (defschedule s [:t test-job "5 * * * * * *"
-                  :a another-job1 "*/10 * * * * * *"
-                  :s suicide-job "*/4 * * * * * *"])
-
+  (defschedule s [:t test-job "5"
+                  :a another-job1 "*/10"
+                  ; :s suicide-job "*/4 * * * * * *"
+                  ])
   (def x (make-dispatcher s))
+  (stop-dispatching! x)
+
+  (wake-up-at? s)
+  (job-candidates? s)
+
 
   (def test-schedule (-> (Schedule. (atom nil))
                          (add-job :test-job test-job "* * * * * * *")

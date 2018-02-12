@@ -533,6 +533,27 @@ of keys:
      (<-local
        (/ (.getTime t) 1000)))))
 
+
+
+(defn intervals
+  "Given sequence of timestamps (Date) values returns period values between each timestamp
+   value in milliseconds"
+  [& timestamps]
+  (assert 
+    (every? (partial instance? #?(:clj java.util.Date :cljs js/Date)) timestamps) 
+    (str "Wrong input value."))
+  (let [timestamps' (map date->value timestamps)
+        t1 (rest timestamps')
+        t2 (butlast timestamps')]
+    (map (partial * 1000) (map - t1 t2))))
+
+(defn interval
+  "Returns period of time value in milliseconds between start and end. Input values
+   are supposed to be Date."
+  [start end]
+  (first (intervals start end)))
+
+
 #?(:clj 
    (defmacro with-time-configuration [{:keys [offset 
                                               weekend-days

@@ -32,21 +32,22 @@
                         {:min min-
                          :max max-
                          :interval interval})))
-      (if (= element "*") 
-        (constantly true)
-        (cond-> #{}
-          (seq (re-find #"-" element)) (into
-                                         (let [[f l] (clojure.string/split  (re-find #"\d+-\d+" element) #"-")] 
-                                           (range 
-                                             (parse-number f)
-                                             (inc (parse-number l)))))
-          interval (into
-                     (case fixed
-                       ["*"] (range min- (inc max-) interval)
-                       (reduce 
-                         concat
-                         (map #(range %  (inc max-) interval) fixed)))) 
-          true (into fixed))))))
+      (cond 
+        (and (= element "*") (not interval)) (constantly true)
+        (= element "*") (set (range min- (inc max-) interval))
+        :else (cond-> #{}
+                (seq (re-find #"-" element)) (into
+                                               (let [[f l] (clojure.string/split  (re-find #"\d+-\d+" element) #"-")] 
+                                                 (range 
+                                                   (parse-number f)
+                                                   (inc (parse-number l)))))
+                interval (into
+                           (case fixed
+                             ["*"] (range min- (inc max-) interval)
+                             (reduce 
+                               concat
+                               (map #(range %  (inc max-) interval) fixed)))) 
+                true (into fixed))))))
 
 (defn parse-cron-string
   "Parses CRON string e.g.
@@ -77,8 +78,7 @@
                             (let [[f l] (:range x)] 
                               (assoc x :sequence (into sequence (range f (inc l)))))))
               true (dissoc :range :interval :fixed)))] 
-    (let [elements (mapv clojure.string/trim (clojure.string/split cron-record  #" +"))
-          ; parts (map transform-interval (set-constraints (map cron-element-parserer elements)))
+    (let [elements (mapv clojure.string/trim (clojure.string/split cron-record  #"\s+"))
           constraints [[0 59]
                        [0 59]
                        [0 23]
@@ -86,8 +86,26 @@
                        [1 12]
                        [1 7]
                        [nil nil]]]
-      ; (map #(vector %1 %2) elements constraints)
       (mapv cron-element-parserer elements constraints))))
+
+(defn valid-timestamp? 
+  "Given a timestamp and cron definition function returns true
+   if timestamp satisfies cron definition."
+  [timestamp cron-string]
+  (let [tv (core/date->value timestamp)
+        constraints (parse-cron-string cron-string)
+        elements ((juxt 
+                    core/second?
+                    core/minute? 
+                    core/hour? 
+                    core/month? 
+                    core/day-in-month? 
+                    core/day?
+                    core/year?) tv)]
+    ; (partition 2 (interleave constraints elements))
+    (every? 
+      (fn [[validator value]] (validator value))
+      (partition 2 (interleave constraints elements)))))
 
 (defn next-timestamp
   "Return next valid timestamp after input
@@ -101,7 +119,7 @@
                               core/day-in-month? 
                               core/hour? 
                               core/minute? 
-                              core/second?) timestamp-value)
+                              core/second?) timestamp-value) 
         timestamp-min-values (reduce 
                                (fn [r v]
                                  (let [v' (core/date->value
@@ -114,31 +132,43 @@
                              (core/date->value (apply core/date args))
                              (get timestamp-min-values (count args))))
         found-dates (for [y (iterate inc (core/year? timestamp-value))
-                          :when ((mapping 6) y) 
+                          :when ((get mapping 6 (constantly true)) y) 
                           m (range 1 13)
                           :when (and
                                   (after-timestamp? y m)
-                                  ((mapping 4) m)) 
+                                  ((get mapping 4 (constantly true)) m)) 
                           d (range 1 (inc (core/days-in-month m (core/leap-year? y))))
                           :when (and
                                   (after-timestamp? y m d)
-                                  ((mapping 5) (-> (core/date y m d) core/date->value core/day?))
-                                  ((mapping 3) d)) 
+                                  ((get mapping 5 (constantly true)) 
+                                   (-> (core/date y m d) core/date->value core/day?))
+                                  ((get mapping 3 (constantly true)) d)) 
                           h (range 24)
                           :when (and
                                   (after-timestamp? y m d h)
-                                  ((mapping 2) h)) 
+                                  ((get mapping 2 (constantly true)) h)) 
                           minutes (range 60)
                           :when (and
                                   (after-timestamp? y m d h minutes)
-                                  ((mapping 1) minutes)) 
+                                  ((get mapping 1 (constantly true)) minutes)) 
                           s (range 60)
                           :when (and
                                   (after-timestamp? y m d h minutes s)
-                                  ((mapping 0) s))]
+                                  (> 
+                                    (core/date->value (core/date y m d h minutes s)) 
+                                    (+ timestamp-value core/second)) 
+                                  ((get mapping 0 (constantly true)) s))]
                       (core/date y m d h minutes s))]
     (first found-dates)))
 
 
 (comment
-  (next-timestamp (core/date 2018 2 9 15 50 30) "0,3,20/10 0 0 3-20/10 * * *"))
+  (next-timestamp (core/date) "*/10")
+  (parse-cron-string "*/10 *")
+  (next-timestamp (core/date 2018 2 9 15 50 30) "*/10")
+  (next-timestamp (core/date 2018 2 9 15 50 30) "15 10 13 29 2 4 *")
+  (def timestamp (core/date 2018 2 9 15 50 0))
+  (def cron-string "0 * * * * *")
+  (def tv (core/date->value timestamp))
+  (def constraints (parse-cron-string cron-string))
+  (valid-timestamp? (core/date 2018 12 20 0 0 0) "0 * * * * * 2019"))
