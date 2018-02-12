@@ -1,148 +1,144 @@
 (ns vura.cron
-  #?(:clj
-      (:require
-        [clj-time.core :as t]
-        [clj-time.local :refer (local-now to-local-date-time)])
-     :cljs
-      (:require
-        [cljs-time.core :as t]
-        [cljs-time.local :refer (local-now to-local-date-time)])))
+  (:require [vura.core :as core]))
 
 (defn cron-element-parserer
   "Parses CRON like element. Elements are in form
-  1-25/0
-  1,5,40/10
-  1,20,40
-  20-40/5
-  */2 etc."
-  [element]
-  (let [[element interval] (clojure.string/split element #"/")
-        temp (cond
-               (= "*" element) nil
-               (seq (re-find #"-" element)) {:range (map #?(:clj #(Integer/valueOf %) :cljs #(js/parseInt %))  (clojure.string/split element #"-"))}
-               (seq (re-find #"," element)) {:sequence (apply sorted-set (map #?(:clj #(Integer/valueOf %) :cljs #(js/parseInt %)) (clojure.string/split element #",")))}
-               :else {:fixed (#?(:clj Integer/valueOf :cljs js/parseInt) element)})]
-    (if interval
-      (assoc temp :interval (#?(:clj Integer/valueOf :cljs js/parseInt) interval))
-      temp)))
-
-(defn- set-constraints [cron-mapping]
-  (let [trans [{:min 0 :max 59} ;; Seconds
-               {:min 0 :max 59} ;; Minutes
-               {:min 0 :max 23} ;; Hours
-               {:min 1 :max 31} ;; Day of the month
-               {:min 1 :max 12} ;; Month
-               {:min 1 :max 7}  ;; Day of the week
-               {:min 0 :max 4000}]
-        prepared (partition 2 (interleave cron-mapping trans))]
-    (map #(apply merge %) prepared)))
-
-(defn- validate-range [x] (when (:range x)
-                            (and (>= (-> x :range first) (:min x)) (<= (-> x :range second) (:max x)))))
-
-(defn- validate-interval [x] (when (:interval x)
-                               (and (<= (:interval x) (- (:max x) (:min x))))))
-
-(defn- validate-sequence [x] (when (:sequence x)
-                               (and (every? #(>= % (:min x)) (:sequence x)) (every? #(<= % (:max x)) (:sequence x)))))
-
-(defn- validate-fixed [x] (when (:fixed x) (and (>= (:fixed x) (:min x)) (<= (:fixed x) (:max x)))))
-
-(def ^:private validators [validate-range validate-sequence validate-fixed validate-interval])
-
-(defn- validate-cron-mapping [x]
-  (doseq [v validators] (assert (not (false? (v x))) (str (or (:range x) (:fixed x) (:sequence x) (:interval x)) " is out of range. [:min :max] = " [(:min x) (:max x)]))))
+   1-25/0
+   1,5,40/10
+   1,20,40
+   20-40/5
+   */2 etc."
+  [element [min- max-]]
+  (letfn [(parse-number [x]
+            #?(:clj (Integer/valueOf x)
+               :cljs (js/parseInt x)))] 
+    (let [[element interval] (clojure.string/split element #"/")
+          interval (when interval (parse-number interval))
+          fixed (mapv
+                  parse-number
+                  (remove
+                    #(or
+                       (re-find #"\d+-\d+" %)
+                       (re-find #"\*" %))
+                    (clojure.string/split element #",")))]
+      (when (and
+              interval
+              (pos? interval)
+              (or 
+                (> interval max-)
+                (< interval min-)
+                (zero? interval)))
+        (throw (ex-info ("Out of bounds. Interval cannot be outside " [min- max-])
+                        {:min min-
+                         :max max-
+                         :interval interval})))
+      (if (= element "*") 
+        (constantly true)
+        (cond-> #{}
+          (seq (re-find #"-" element)) (into
+                                         (let [[f l] (clojure.string/split  (re-find #"\d+-\d+" element) #"-")] 
+                                           (range 
+                                             (parse-number f)
+                                             (inc (parse-number l)))))
+          interval (into
+                     (case fixed
+                       ["*"] (range min- (inc max-) interval)
+                       (reduce 
+                         concat
+                         (map #(range %  (inc max-) interval) fixed)))) 
+          true (into fixed))))))
 
 (defn parse-cron-string
   "Parses CRON string e.g.
 
-  \"0,3,20/20 0 0 3-20/10 * * *\"
+   \"0,3,20/20 0 0 3-20/10 * * *\"
 
-  If record is not valid assertion will
-  be thrown. Returned data is sequence
-  of cron-mappings that define what time
-  is valid to execute Job."
+   If record is not valid assertion will
+   be thrown. Returned data is sequence
+   of cron-mappings that define what time
+   is valid to execute Job."
   [^String cron-record]
-  (let [elements (map clojure.string/trim (clojure.string/split cron-record  #" +"))
-        transform-interval (fn [x] (if-let [interval (:interval x)]
-                                     (dissoc (assoc x :sequence (apply sorted-set (range (or (:fixed x) 0) (-> x :max inc) interval))) :fixed :interval)
-                                     x))
-        parts (map transform-interval (set-constraints (map cron-element-parserer elements)))]
-    (assert (and (= (count parts) 7)) "Wrong number of elements passed in. Cron schedule has 7 elements.")
-    (doseq [x parts] (validate-cron-mapping x))
-    (vec parts)))
-
-(defn joda->cron [t]
-  [(t/second t) (t/minute t) (t/hour t) (t/day t) (t/month t) (t/day-of-week t) (t/year t)])
-
-(defn cron->joda [c]
-  (let [tc (reverse c)
-        tc (cons (first tc) (subvec (vec tc) 2 7))
-        t (to-local-date-time (apply t/date-time tc))]
-    (assert (= (t/day-of-week t) (c 5)) "Cron day of the week is not valid!")
-    t))
-
-
-(defn- valid-element? [element {:keys [fixed range sequence] :as mapping}]
-  (let [fixed? (when fixed
-                 (if (= element fixed) :fixed))
-        in-range? (when range
-                    (if (<= (first range) (second range))
-                      (when (and (>= element (first range)) (<= element (second range))) :range)
-                      (when (or (>= element (first range)) (<= element (second range))) :range)))
-        belongs? (when sequence
-                   (if (get sequence element) :sequence))
-        valid? (if (every? nil? [fixed range sequence]) :any)]
-    (or fixed? belongs? in-range? valid?)))
-
-(defn valid-timestamp? [timestamp cron-string]
-  "Returns true if timestamp is valid."
-  (let [mapping (parse-cron-string cron-string)
-        cron (joda->cron timestamp)
-        evaluated-elements (map #(apply valid-element? %) (partition 2 (interleave cron mapping)))]
-    (not-any? nil? evaluated-elements)))
-
-(defn- time-date [date-time]
-  [(t/year date-time) (t/month date-time) (t/day date-time) (t/hour date-time) (t/minute date-time) (t/second date-time)])
+  (letfn [(transform-interval [x]
+            (cond-> x
+              (and 
+                (:interval x)
+                (:fixed x)) ((fn [{:keys [interval fixed] :as x}]
+                               (let [anchorns (conj (sorted-set fixed))]
+                                 (assoc x :sequence
+                                        (apply sorted-set
+                                               (reduce 
+                                                 concat
+                                                 (map
+                                                   #(range %  (-> x :max inc) interval)
+                                                   anchorns)))))))
+              (:range x) ((fn [{:keys [sequence]
+                                :or {sequence (sorted-set)} 
+                                :as x}]
+                            (let [[f l] (:range x)] 
+                              (assoc x :sequence (into sequence (range f (inc l)))))))
+              true (dissoc :range :interval :fixed)))] 
+    (let [elements (mapv clojure.string/trim (clojure.string/split cron-record  #" +"))
+          ; parts (map transform-interval (set-constraints (map cron-element-parserer elements)))
+          constraints [[0 59]
+                       [0 59]
+                       [0 23]
+                       [1 31]
+                       [1 12]
+                       [1 7]
+                       [nil nil]]]
+      ; (map #(vector %1 %2) elements constraints)
+      (mapv cron-element-parserer elements constraints))))
 
 (defn next-timestamp
   "Return next valid timestamp after input
   timestamp"
   [timestamp cron-string]
   (let [mapping (parse-cron-string cron-string)
-        current-cron (replace (joda->cron timestamp) [6 4 3 2 1 0])
-        day-of-the-week-mapping (nth mapping 5)
-        day-time-mapping (replace mapping [6 4 3 2 1 0])
-        after-this-moment? (fn [& args]
-                             (let [temp-time (to-local-date-time (apply t/date-time args))]
-                               (or
-                                 (t/after? temp-time timestamp)
-                                 (= (vector args) (vector (take (count args) (time-date timestamp)))))))
-        found-dates (for [y (range (current-cron 0) 4000)
-                          :when (and
-                                  (after-this-moment? y)
-                                  (valid-element? y (day-time-mapping 0)))
+        timestamp-value (core/date->value timestamp)
+        timestamp-elements ((juxt 
+                              core/year? 
+                              core/month? 
+                              core/day-in-month? 
+                              core/hour? 
+                              core/minute? 
+                              core/second?) timestamp-value)
+        timestamp-min-values (reduce 
+                               (fn [r v]
+                                 (let [v' (core/date->value
+                                            (apply core/date (take v timestamp-elements)))]
+                                   (conj r v')))
+                               []
+                               (range 7))
+        after-timestamp? (fn [& args]
+                           (>= 
+                             (core/date->value (apply core/date args))
+                             (get timestamp-min-values (count args))))
+        found-dates (for [y (iterate inc (core/year? timestamp-value))
+                          :when ((mapping 6) y) 
                           m (range 1 13)
                           :when (and
-                                  (after-this-moment? y m)
-                                  (valid-element? m (day-time-mapping 1)))
-                          d (range 1 (inc (t/number-of-days-in-the-month (t/date-time y m))))
+                                  (after-timestamp? y m)
+                                  ((mapping 4) m)) 
+                          d (range 1 (inc (core/days-in-month m (core/leap-year? y))))
                           :when (and
-                                    (after-this-moment? y m d)
-                                    (valid-element? d (day-time-mapping 2))
-                                    (valid-element? (t/day-of-week (t/date-time y m d)) day-of-the-week-mapping))
+                                  (after-timestamp? y m d)
+                                  ((mapping 5) (-> (core/date y m d) core/date->value core/day?))
+                                  ((mapping 3) d)) 
                           h (range 24)
                           :when (and
-                                  (after-this-moment? y m d h)
-                                  (valid-element? h (day-time-mapping 3)))
+                                  (after-timestamp? y m d h)
+                                  ((mapping 2) h)) 
                           minutes (range 60)
                           :when (and
-                                    (valid-element? minutes (day-time-mapping 4))
-                                    (after-this-moment? y m d h minutes))
+                                  (after-timestamp? y m d h minutes)
+                                  ((mapping 1) minutes)) 
                           s (range 60)
                           :when (and
-                                  (valid-element? s (day-time-mapping 5))
-                                  (t/after? (to-local-date-time (t/date-time y m d h minutes s)) timestamp))]
-                      (list y m d h minutes s))
-        found-date (first found-dates)]
-    (when found-date (to-local-date-time (apply t/date-time found-date)))))
+                                  (after-timestamp? y m d h minutes s)
+                                  ((mapping 0) s))]
+                      (core/date y m d h minutes s))]
+    (first found-dates)))
+
+
+(comment
+  (next-timestamp (core/date 2018 2 9 15 50 30) "0,3,20/10 0 0 3-20/10 * * *"))

@@ -1,29 +1,28 @@
 (ns vura.sync.jobs
   (:require
-    [clj-time.core :as t]
-    [clj-time.local :refer (local-now)]
+    [vura.core :as core]
     [dreamcatcher.util :refer [has-transition?
                                get-transition
                                get-validators
                                get-states]]
-    [dreamcatcher.core :refer :all]
-    [taoensso.timbre :as timbre :refer (info debug warn)])
+    [dreamcatcher.core :refer :all])
   (:import [java.util.concurrent LinkedBlockingQueue Executors TimeUnit SynchronousQueue]))
 
 (def ^:private blank-job-machine
   (make-state-machine
-    [:initialize :start (fn [x] (assoc-in x [:data "*started-at*"] (local-now)))
+    [:initialize :start (fn [x] (assoc-in x [:data "*started-at*"] (core/date)))
      :start :end identity
      :end :finished (fn [x] (-> x
-                                (assoc-in [:data "*ended-at*"] (local-now))
+                                (assoc-in [:data "*ended-at*"] (core/date))
                                 (assoc-in [:data "*running*"] false)))]))
 
 (defn job-life [x]
   (if (get-in x [:data "*running*"])
     (if (= :finished (state? x))
       (do
-        (when *agent*
-          (debug "Job with phases " (-> x stm? keys)  " is finished... Setting *running* to false!"))
+        ;; TODO - include logging
+        ; (when *agent*
+        ;   (debug "Job with phases " (-> x stm? keys)  " is finished... Setting *running* to false!"))
         (send-off *agent* #'job-life)
         (assoc-in x [:data "*running*"] false))
       (do
@@ -136,8 +135,8 @@
   (ended-at? [this] (-> @job-agent data? (get "*ended-at*")))
   (started? [this] (not= :start (.at-phase? this)))
   (finished? [this] (= :finished (state? @job-agent)))
-  (duration? [this] (if (.finished? this)
-                      (-> (t/interval (.started-at? this) (.ended-at? this)) t/in-millis)))
+  (duration? [this] (when (.finished? this)
+                      (apply - (map core/date->value [(.ended-at? this) (.started-at? this)]))))
   (in-error? [this] (agent-error job-agent))
   (active? [this] (-> @job-agent data? (get "*running*") boolean))
   JobActions

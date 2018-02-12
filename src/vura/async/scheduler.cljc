@@ -3,20 +3,29 @@
                             [cljs.core.async.macros :refer [go go-loop]]))
   (:require
     #?(:clj [dreamcatcher.core :refer [safe]])
-    [vura.cron :refer [next-timestamp valid-timestamp?]]
-    [vura.async.jobs :refer [start! stop! make-job
-                             started? started-at?
-                             finished? active?] :as j]
-    #?(:clj [clojure.core.async :refer [go go-loop <! put! chan timeout alts! close!] :as async]
-            :cljs [cljs.core.async :refer [<! put! chan timeout alts! close!] :as async])
+    [vura.cron 
+     :refer [next-timestamp valid-timestamp?]]
+    [vura.async.jobs 
+     :refer [start! stop! make-job
+             started? started-at?
+             finished? active?] :as j]
+    #?(:clj [clojure.core.async 
+             :refer [go go-loop <! put! chan 
+                     timeout alts! close!] :as async]
+            :cljs [cljs.core.async 
+                   :refer [<! put! chan 
+                           timeout alts! close!] :as async])
     #?(:clj [clj-time.core :as t]
             :cljs [cljs-time.core :as t])
-    #?(:clj [clj-time.local :refer (local-now)]
-            :cljs [cljs-time.local :refer (local-now)])))
+    #?(:clj [clj-time.local 
+             :refer (local-now)]
+            :cljs [cljs-time.local 
+                   :refer (local-now)])))
 
 
-(def ^:dynamic *scheduler-exception-fn* (fn [job-name job-definition exception]
-                                          (println job-name ": " (.getMessage exception))))
+(def ^:dynamic *scheduler-exception-fn* 
+  (fn [job-name job-definition exception]
+    (println job-name ": " (.getMessage exception))))
 
 
 ;; Schedule definitions
