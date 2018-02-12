@@ -10,6 +10,7 @@
      :refer [start! stop! make-job
              started? started-at?
              finished? active?] :as j]
+    ; #?(:clj [clojure.tools.logging :as log])
     #?(:clj [clojure.core.async 
              :refer [go go-loop <! put! chan 
                      timeout alts! close!] :as async]
@@ -70,8 +71,9 @@
                     (get-job [this job] (-> @schedule-data (get job) ::job))
                     (get-jobs [this] (-> @schedule-data keys))
                     (get-schedule [this job] (-> @schedule-data (get job) ::schedule))
-                    (get-schedules [this] (let [jobs (-> @schedule-data keys)]
-                                            (reduce merge (for [x jobs] (hash-map x (-> @schedule-data (get x) ::schedule))))))
+                    (get-schedules [this] 
+                      (let [jobs (-> @schedule-data keys)]
+                        (reduce merge (for [x jobs] (hash-map x (-> @schedule-data (get x) ::schedule))))))
                     ScheduleActions
                     (add-job [this job-name job s]
                       (assert (satisfies? j/JobInfo job) "Every instance of jobs has to implement JobInfo protocol.")
@@ -100,36 +102,37 @@
                     (disable-dispatcher [_] (close! control-channel)))]
      ;; Schedule life cycle
      (go-loop []
-              (let [[control-data] (alts! [control-channel
-                                           (go
-                                             ;; Checkout if schedueler has next-wakeup
-                                             ;; If empty schedule, than return value is nil
-                                             ;; but it doesn't mean that it will be empty forever
-                                             ;; So next wake-up check is done in 10s.
-                                             ;; This means that it is possible to add jobs regardless
-                                             ;; start-disptaching! was started or not
-                                             (if-let [next-wakeup (wake-up-at?  schedule)]
-                                               (<! (timeout (core/interval (core/date) next-wakeup)))
-                                               (<! (timeout 10000))) ::TIMEOUT)])]
-                (when-not (nil? control-data)
-                  (if-not @dispatch?
-                    ;; If dispatcher is disabled and timeout occured
-                    ;; wait for ::START
-                    (if (= ::START (<! control-channel))
-                      (do
-                        (reset! dispatch? true)
-                        (recur))
-                      (recur))
-                    ;; If dispatcher is running
-                    (let [candidates (-> schedule job-candidates?)]
-                      (doseq [x candidates]
-                        (try
-                          (start! (get-job schedule x))
-                          #?(:clj
-                              (catch Exception e (*scheduler-exception-fn* x (get-job schedule x) e))
-                              :cljs
-                              (catch :default e (*scheduler-exception-fn* x (get-job schedule x) e)))))
-                      (recur))))))
+       (let [[control-data] (alts! [control-channel
+                                    (go
+                                      ;; Checkout if schedueler has next-wakeup
+                                      ;; If empty schedule, than return value is nil
+                                      ;; but it doesn't mean that it will be empty forever
+                                      ;; So next wake-up check is done in 10s.
+                                      ;; This means that it is possible to add jobs regardless
+                                      ;; start-disptaching! was started or not
+                                      (if-let [next-wakeup (wake-up-at?  schedule)]
+                                        (<! (timeout (core/interval (core/date) next-wakeup)))
+                                        (<! (timeout 10000))) ::TIMEOUT)])]
+         (println "Control data: " control-data)
+         (when-not (nil? control-data)
+           (if-not @dispatch?
+             ;; If dispatcher is disabled and timeout occured
+             ;; wait for ::START
+             (if (= ::START (<! control-channel))
+               (do
+                 (reset! dispatch? true)
+                 (recur))
+               (recur))
+             ;; If dispatcher is running
+             (let [candidates (-> schedule job-candidates?)]
+               (doseq [x candidates]
+                 (try
+                   (start! (get-job schedule x))
+                   #?(:clj
+                      (catch Exception e (*scheduler-exception-fn* x (get-job schedule x) e))
+                      :cljs
+                      (catch :default e (*scheduler-exception-fn* x (get-job schedule x) e)))))
+               (recur))))))
      schedule))
   ([& jobs]
    (let [args (vec (partition 3 jobs))
@@ -144,60 +147,32 @@
 (comment
   (def test-job (make-job
                   [:telling (safe
-                              (println (local-now))
-                              (println "Telling!"))
-                   :throwning (safe (println "Throwing..."))]))
+                              (log/info "Telling!!! " (core/date)))
+                   :throwning (safe (log/error "Throwing..."))]))
 
   (def another-job1 (make-job
                       [:drinking (safe
-                                   (println (local-now))
+                                   (println (core/date))
                                    (println  "job1 drinking"))
                        :going-home (safe (println "job1 going home"))]))
 
-  #?(:clj
-      (def long-job (make-job
-                      [:phuba (safe
-                                (println (local-now))
-                                (println "Going from phuba!")
-                                (async/<!! (timeout 2000)))
-                       :letovanic (safe
-                                    (println "paryting in Letovanic")
-                                    (async/<!! (timeout 5000)))])))
+  (def long-job (make-job
+                  [:phuba (safe
+                            (println (core/date))
+                            (println "Going from phuba!")
+                            (async/<!! (timeout 2000)))
+                   :letovanic (safe
+                                (println "paryting in Letovanic")
+                                (async/<!! (timeout 5000)))]))
 
 
   (def test-schedule (make-schedule
                        :test-job test-job "4/10 * * * * * *"
-                       #?@(:clj [:long-job long-job "*/2 * * * * * *"])
+                       :long-job long-job "*/2 * * * * * *"
                        :another another-job1 "*/15 * * * * * *"))
 
-  (def t (make-schedule
-           :t test-job "0 0/20 * * * * *"))
+  (def t (make-schedule :t test-job "*/10"))
 
   (def suicide-job (make-job
                      [:buying-rope (safe (println "@" (local-now)) (println "Suicide is buying a rope! Watch out!"))
                       :suicide (safe (println "Last goodbay!"))])))
-
-
-(comment
-  (defschedule test-schedule
-    [:test-job test-job "0/10 * * * * * *"])
-
-  (defjob another-job1 [:drinking (safe (println "job1 drinking"))
-                        :going-home (safe (println "job1 going home")) (wait-for 1000)])
-
-  (defjob suicide-job [:buying-rope (safe (println "Suicide is buying a rope! Watch out!"))
-                       :suicide (safe (println "Last goodbay!"))])
-
-  (defjob test-job [:test1 (safe (println "Testis 1"))
-                    :test2 (safe (println "Testis 2")) (wait-for 3000)
-                    :test3 (safe (println "Testis 3"))])
-
-  (defschedule s [:t test-job "5 * * * * * *"
-                  :a another-job1 "*/10 * * * * * *"
-                  :s suicide-job "*/4 * * * * * *"])
-
-  (defschedule t [:t test-job "0 0/20 * * * * *"])
-
-  (def test-schedule (make-schedule
-                           (:test-job test-job "* * * * * * *")
-                           (:another another-job1 "* 1 * * * * *"))))

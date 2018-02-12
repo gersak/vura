@@ -153,6 +153,7 @@
 
   (def test-dispatcher (make-dispatcher test-schedule))
   (start-dispatching! test-dispatcher)
+  (stop-dispatching! test-dispatcher)
 
   (defjob another-job1 [:drinking (safe (println "job1 drinking"))
                         :going-home (safe (println "job1 going home")) (wait-for 1000)])

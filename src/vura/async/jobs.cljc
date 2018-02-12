@@ -1,6 +1,6 @@
 (ns vura.async.jobs
   #?(:cljs
-      (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
+     (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
   (:require
     [vura.core :as core]
     [dreamcatcher.util 
@@ -13,7 +13,7 @@
     [dreamcatcher.async :refer [wrap-async-machine suck inject disable ]]
     [dreamcatcher.core
      :refer [make-state-machine
-             #?(:clj with-stm)
+             #?@(:clj [with-stm])
              add-state
              add-transition
              add-validator
