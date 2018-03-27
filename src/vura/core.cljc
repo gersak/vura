@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [second format])
   #?(:cljs 
      (:require 
-       [[vura.format :refer [get-date-symbols]]]))
+       [vura.format :refer [get-date-symbols]]))
   #?(:clj
      (:import
        [java.time Instant LocalDateTime]
@@ -572,5 +572,3 @@ of keys:
                 *locale* locale
                 *format* format]
         ~@body)))
-
-

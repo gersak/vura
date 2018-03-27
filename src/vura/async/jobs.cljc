@@ -1,6 +1,7 @@
 (ns vura.async.jobs
   #?(:cljs
-     (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
+     (:require-macros 
+       [clojure.core.async.macros :refer [go go-loop]]))
   (:require
     [vura.core :as core]
     [dreamcatcher.util 
@@ -22,7 +23,7 @@
              remove-state]
      #?@(:cljs [:refer-macros [with-stm]])]
     #?@(:clj [[clojure.core.async :refer [go go-loop chan <! mult mix admix timeout]]])
-    #?@(:cljs [[cljs.core.async :refer [chan <! mult mix admix timeout]]])))
+    #?@(:cljs [[clojure.core.async :refer [chan <! mult mix admix timeout]]])))
 
 (def ^:private start-mark "*started-at*")
 (def ^:private end-mark "*ended-at*")

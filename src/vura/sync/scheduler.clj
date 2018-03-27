@@ -145,11 +145,6 @@
 
 
 (comment
-  (defjob test-job [:telling (safe (println "starting over"))
-                    :throwning (safe (throw (Exception. "Fucking...")))])
-
-  (defschedule test-schedule
-    [:test-job test-job "0/10 *"])
 
   (def test-dispatcher (make-dispatcher test-schedule))
   (start-dispatching! test-dispatcher)

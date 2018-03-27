@@ -1,14 +1,13 @@
 (set-env!
   :source-paths #{"src"}
-  :dependencies '[[adzerk/boot-cljs "1.7.228-1" :scope "test"]
-                  [adzerk/boot-reload "0.4.2" :scope "test"]
-                  [adzerk/bootlaces "0.1.13" :scope "test"]
-                  [pandeiro/boot-http "0.7.3" :scope "test"]
-                  [org.clojure/tools.logging "0.4.0" :scope "test"]
+  :dependencies '[[adzerk/boot-cljs "2.1.4" :scope "test"]
+                  [adzerk/boot-reload "0.5.2" :scope "test"]
+                  [pandeiro/boot-http "0.8.3" :scope "test"]
+                  [org.clojure/tools.logging "0.5.0-alpha" :scope "test"]
                   [org.clojure/clojure "1.8.0"]
-                  [kovacnica/dreamcatcher "1.0.4"]
-                  [org.clojure/core.async "0.1.346.0-17112a-alpha"]
-                  [org.clojure/clojurescript "1.7.145"]])
+                  [kovacnica/dreamcatcher "1.0.7-SNAPSHOT"]
+                  [org.clojure/core.async "0.4.474"]
+                  [org.clojure/clojurescript "1.10.238"]])
 
 (require '[adzerk.boot-cljs :refer [cljs]])
 (require '[pandeiro.boot-http :refer [serve]])

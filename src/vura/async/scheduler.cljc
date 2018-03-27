@@ -113,7 +113,7 @@
                                       (if-let [next-wakeup (wake-up-at?  schedule)]
                                         (<! (timeout (core/interval (core/date) next-wakeup)))
                                         (<! (timeout 10000))) ::TIMEOUT)])]
-         (println "Control data: " control-data)
+         ; (println "Control data: " control-data)
          (when-not (nil? control-data)
            (if-not @dispatch?
              ;; If dispatcher is disabled and timeout occured
