@@ -14,12 +14,10 @@
 ; (require '[adzerk.boot-reload :refer [reload]])
 ; (require '[adzerk.bootlaces :refer :all])
 
-(def +version+ "0.5.3-SNAPSHOT")
+(def +version+ "0.5.2-SNAPSHOT")
 
 (task-options!
-  push {:repo-map 
-        {:url "https://clojars.org/kovacnica/vura"}}
-  pom {:project 'kovacnica/dreamcatcher
+  pom {:project 'kovacnica/vura
        :version +version+}
   jar {:manifest {"created-by" "Robert Gersak"}})
 
@@ -34,9 +32,9 @@
   (comp (pom) (jar) (install)))
 
 (deftask deploy []
-  (set-env! 
-    :resource-paths #{"src-cljc"})
+  (set-env! :resource-paths #{"src"})
   (comp 
-    (build)
+    (pom)
+    (jar)
     (push :repo "clojars"
           :gpg-sign (not (.endsWith +version+ "-SNAPSHOT")))))

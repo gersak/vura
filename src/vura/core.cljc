@@ -53,13 +53,13 @@
 (def day (* 24 hour))
 (def week (* 7 day))
 
-(def ^:dynamic *offset*
-  #?(:cljs (.getTimezoneOffset (js/Date.))
-     :clj (.getTimezoneOffset (java.util.Date.))))
+
+(def ^:dynamic *offset* nil)
 
 (defn get-offset [date]
-  #?(:cljs (.getTimezoneOffset date)
-     :clj (.getTimezoneOffset date)))
+  #?(:cljs (or *offset* (.getTimezoneOffset date))
+     :clj (or *offset* (.getTimezoneOffset date))))
+
 
 (def ^:dynamic *locale* "en")
 (def ^:dynamic *format* "d. MMMM',' yyyy. HH:mm")
@@ -344,7 +344,7 @@
   (inc
     (mod
       (+
-       (if (neg? *offset*) 3 4)
+       (if ((comp neg? get-offset value->date) value) 3 4)
        (/ (round-number value day :floor) day))
       7)))
 
@@ -495,10 +495,9 @@ of keys:
                       (* hour' hour)
                       (* minute' minute)
                       (* second' second)
-                      (* millisecond' millisecond)
-                      (* minute *offset*)])]
-       #?(:clj (java.util.Date. (long (* 1000 seconds)))
-          :cljs (js/Date. (long (* 1000 seconds))))))))
+                      (* millisecond' millisecond)])]
+       #?(:clj (java.util.Date. (long (* 1000 (->local seconds))))
+          :cljs (js/Date. (long (* 1000 (->local seconds)))))))))
 
 (defn period
   "Returns number of seconds of all input arguments added together"
@@ -527,7 +526,7 @@ of keys:
      (long (* 1000 (->local value))))))
 
 (defn date->value
-  "Returns value of Date instance in seconds. Value is localized to *offset*"
+  "Returns value of Date instance in seconds. Value is localized to offset"
   ([t]
    (when t
      (<-local
@@ -555,16 +554,16 @@ of keys:
 
 
 #?(:clj 
-   (defmacro with-time-configuration [{:keys [offset 
+   (defmacro with-time-configuration [{:keys [offset
                                               weekend-days
                                               week-days
                                               locale
                                               format]
-                                       :or {offset *offset*
-                                            weekend-days *weekend-days*
+                                       :or {weekend-days *weekend-days*
                                             week-days *weekend-days*
                                             locale *locale*
-                                            format *format*}}
+                                            format *format*
+                                            *offset* nil}}
                                       & body]
      `(binding [*offset* offset
                 *weekend-days* weekend-days

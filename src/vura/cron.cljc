@@ -28,7 +28,7 @@
                 (> interval max-)
                 (< interval min-)
                 (zero? interval)))
-        (throw (ex-info ("Out of bounds. Interval cannot be outside " [min- max-])
+        (throw (ex-info (str "Out of bounds. Interval cannot be outside " [min- max-])
                         {:min min-
                          :max max-
                          :interval interval})))
@@ -108,8 +108,8 @@
       (partition 2 (interleave constraints elements)))))
 
 (defn next-timestamp
-  "Return next valid timestamp after input
-  timestamp"
+  "Return next valid timestamp after input timestamp. If there is no such timestamp,
+   than nil is returned."
   [timestamp cron-string]
   (let [mapping (parse-cron-string cron-string)
         timestamp-value (core/date->value timestamp)
@@ -132,7 +132,9 @@
                              (core/date->value (apply core/date args))
                              (get timestamp-min-values (count args))))
         found-dates (for [y (iterate inc (core/year? timestamp-value))
-                          :when ((get mapping 6 (constantly true)) y) 
+                          :while (>= y (first timestamp-elements))
+                          :when (and
+                                  (get mapping 6 (constantly true)) y) 
                           m (range 1 13)
                           :when (and
                                   (after-timestamp? y m)
@@ -159,11 +161,14 @@
                                     (+ timestamp-value core/second)) 
                                   ((get mapping 0 (constantly true)) s))]
                       (core/date y m d h minutes s))]
-    (first found-dates)))
+    (when-let [t (first found-dates)]
+      (when (valid-timestamp? t cron-string)
+        t))))
 
 
 (comment
   (next-timestamp (core/date) "*/10")
+  (next-timestamp (core/date) "0 0 0 1 1 * 2018")
   (parse-cron-string "*/10 *")
   (next-timestamp (core/date 2018 2 9 15 50 30) "*/10")
   (next-timestamp (core/date 2018 2 9 15 50 30) "15 10 13 29 2 4 *")

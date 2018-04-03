@@ -46,7 +46,9 @@
 (defn wake-up-at? [schedule]
   (let [schedules (get-schedules schedule)
         timestamp (core/date) 
-        next-timestamps (for [[job-name job] schedules] (next-timestamp timestamp job))]
+        next-timestamps (remove 
+                          nil? 
+                          (for [[job-name job] schedules] (next-timestamp timestamp job)))]
     (first (sort-by #(core/interval timestamp %) next-timestamps))))
 
 (defn job-candidates? [schedule]
@@ -54,7 +56,16 @@
         candidates (remove 
                      nil? 
                      (for [[job-name job] (get-schedules schedule)]
-                       (when (valid-timestamp? timestamp job) job-name))) ]
+                       (when (valid-timestamp? timestamp job) job-name)))]
+    candidates))
+
+(defn stale-jobs? [schedule]
+  (let [timestamp (core/date) 
+        candidates (keep
+                     (fn [[job-name cron]]
+                       (when (nil?  (next-timestamp timestamp cron))
+                         job-name))
+                     (get-schedules schedule))]
     candidates))
 
 (defn make-schedule
@@ -124,7 +135,15 @@
                  (recur))
                (recur))
              ;; If dispatcher is running
-             (let [candidates (-> schedule job-candidates?)]
+             (let [candidates (-> schedule job-candidates?)
+                   stale-jobs (stale-jobs? schedule)]
+               (doseq [s stale-jobs]
+                 (try
+                   (remove-job schedule s)
+                   #?(:clj
+                      (catch Throwable e (*scheduler-exception-fn* s (get-job schedule s) e))
+                      :cljs
+                      (catch :default e (*scheduler-exception-fn* s (get-job schedule s) e)))))
                (doseq [x candidates]
                  (try
                    (start! (get-job schedule x))
@@ -147,8 +166,8 @@
 (comment
   (def test-job (make-job
                   [:telling (safe
-                              (log/info "Telling!!! " (core/date)))
-                   :throwning (safe (log/error "Throwing..."))]))
+                              (println "Telling!!! " (core/date)))
+                   :throwning (safe (println "Throwing..."))]))
 
   (def another-job1 (make-job
                       [:drinking (safe
@@ -170,6 +189,15 @@
                        :test-job test-job "4/10 * * * * * *"
                        :long-job long-job "*/2 * * * * * *"
                        :another another-job1 "*/15 * * * * * *"))
+
+  (def new-job (make-job [:execute-task (safe (println "Executing new job"))]))
+
+  (add-job test-schedule [:id 10] new-job "0 0 0 1 1 * 2018")
+  (job-candidates? test-schedule)
+  (get-schedules test-schedule)
+  (start-dispatching! test-schedule)
+  (stop-dispatching! test-schedule)
+  (stale-jobs? test-schedule)
 
   (def t (make-schedule :t test-job "*/10"))
 
