@@ -10,33 +10,34 @@
 
 (def ^:private blank-job-machine
   (make-state-machine
-    [:initialize :start (fn [x] (assoc-in x [:data "*started-at*"] (core/date)))
+    [:initialize :start (fn [x] (update-data! x assoc "*started-at*" (core/date)))
      :start :end identity
-     :end :finished (fn [x] (-> x
-                                (assoc-in [:data "*ended-at*"] (core/date))
-                                (assoc-in [:data "*running*"] false)))]))
+     :end :finished (fn [x] 
+                      (-> x
+                        (update-data! assoc "*ended-at*" (core/date))
+                        (update-data! assoc "*running*" false)))]))
 
 (defn job-life [x]
   (if (get-in x [:data "*running*"])
-    (if (= :finished (state? x))
+    (if (= :finished (state x))
       (do
         ;; TODO - include logging
         ; (when *agent*
         ;   (debug "Job with phases " (-> x stm? keys)  " is finished... Setting *running* to false!"))
         (send-off *agent* #'job-life)
-        (assoc-in x [:data "*running*"] false))
+        (update-data! x assoc "*running*" false))
       (do
         (send-off *agent* #'job-life)
         (act! x)))
     x))
 
 (defn- get-next-phase [job phase]
-  (let [job (assoc job :state phase)
+  (let [job (set-state! job phase)
         t (-> job choices?)]
     (when (seq t) (first t))))
 
 (defn- get-job-phases [job]
-  (let [job (assoc job :state :start)]
+  (let [job (set-state! job :start)]
     (loop [phase :start
            phases nil]
       (if (= phase :end) (-> phases reverse rest)
@@ -119,8 +120,8 @@
   JobInfo
   (get-phases [this] (-> @job-agent get-job-phases))
   (at-phase? [this] (or
-                      (get-next-phase @job-agent (state? @job-agent))
-                      (state? @job-agent)))
+                      (get-next-phase @job-agent (state @job-agent))
+                      (state @job-agent)))
   (before-phase? [this phase] (let [phases (.get-phases this)
                                     current (.at-phase? this)]
                                 (or
@@ -131,28 +132,31 @@
                                (or
                                  (boolean (#{:finished :end} current))
                                  (> (.indexOf phases current) (.indexOf phases phase)))))
-  (started-at? [this] (-> @job-agent data? (get "*started-at*")))
-  (ended-at? [this] (-> @job-agent data? (get "*ended-at*")))
-  (started? [this] (not= :start (.at-phase? this)))
-  (finished? [this] (= :finished (state? @job-agent)))
+  (started-at? [this] (-> @job-agent data (get "*started-at*")))
+  (ended-at? [this] (-> @job-agent data (get "*ended-at*")))
+  (started? [this] (not= :start (at-phase? this)))
+  (finished? [this] (= :finished (state @job-agent)))
   (duration? [this] (when (.finished? this)
-                      (apply - (map core/date->value [(.ended-at? this) (.started-at? this)]))))
+                      (apply - (map core/date->value [(ended-at? this) (started-at? this)]))))
   (in-error? [this] (agent-error job-agent))
-  (active? [this] (-> @job-agent data? (get "*running*") boolean))
+  (active? [this] (-> @job-agent data (get "*running*") boolean))
   JobActions
   (start! [this] (do
-                   (send-off job-agent #(assoc-in % [:data "*running*"] true))
+                   (send-off job-agent #(update-data! % assoc "*running*" true))
                    (send-off job-agent job-life)))
-  (stop! [this] (send-off job-agent #(assoc-in % [:data "*running*"] false)))
-  (reset-job! [this] (.reset-job! this nil))
+  (stop! [this] (send-off job-agent #(update-data! % assoc "*running*" false)))
+  (reset-job! [this] (reset-job! this nil))
   (reset-job! [this params]
     (if (agent-error job-agent)
       (restart-agent job-agent (-> @job-agent
-                                   (update :data dissoc (-> @job-agent data? keys))
-                                   (reset-state! :initialize)))
+                                   (update-data! dissoc (-> @job-agent data keys))
+                                   (set-state! :initialize)))
       (letfn [(initialize-params [x params]
-                (assoc x  :data params :state :initialize))]
-        (.stop! this)
+                (->
+                  x
+                  (set-state! :initialize)
+                  (set-data! params)))]
+        (stop! this)
         (send-off job-agent initialize-params params)))))
 
 ;; Functions allow mutable job definition

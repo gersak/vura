@@ -1,14 +1,5 @@
 (ns vura.core
-  (:refer-clojure :exclude [second format])
-  #?(:cljs 
-     (:require 
-       [vura.format :refer [get-date-symbols]]))
-  #?(:clj
-     (:import
-       [java.time Instant LocalDateTime]
-       [java.time.format DateTimeFormatter]
-       [java.text DateFormat SimpleDateFormat]
-       [java.util TimeZone Locale])))
+  (:refer-clojure :exclude [second]))
 
 (defn round-number
   "Function returns round whole number that is devidable by target-number.
@@ -43,6 +34,7 @@
 
 (def ^:dynamic *weekend-days* #{6 7})
 (def ^:dynamic *week-days* #{1 2 3 4 5})
+(def ^:dynamic *holiday?* (fn [_] false))
 
 (def second 1)
 (def millisecond (/ second 1000))
@@ -53,35 +45,10 @@
 (def day (* 24 hour))
 (def week (* 7 day))
 
-
 (def ^:dynamic *offset* nil)
 
 (defn get-offset [date]
-  #?(:cljs (or *offset* (.getTimezoneOffset date))
-     :clj (or *offset* (.getTimezoneOffset date))))
-
-
-(def ^:dynamic *locale* "en")
-(def ^:dynamic *format* "d. MMMM',' yyyy. HH:mm")
-
-(defn datetime-formatter
-      ([] (datetime-formatter *format* *locale*))
-      ([pattern] (datetime-formatter pattern *locale*))
-      ([pattern locale]
-        #?(:clj  (java.text.SimpleDateFormat.
-                   pattern
-                   (java.util.Locale. *locale*))
-           :cljs (let [symbols (get-date-symbols locale)
-                       formatter (goog.i18n.DateTimeFormat.
-                                   pattern
-                                   (get-date-symbols *locale*))]
-                      formatter))))
-
-(defn format 
-  "Function calls format function of given formatter. Formatter itself
-   can be crated through datetime-formatter function."
-  [formatter date]
-  (.format formatter date))
+  (or *offset* (.getTimezoneOffset date)))
 
 (def month-values
   {:january 1
@@ -325,6 +292,23 @@
     (+ 1 (- relative-day (first-day-in-month month leap-year?)))))
 
 
+(defn first-day-in-month? 
+  "Returns true if value in seconds belongs to first day in month."
+  [value]
+  (= 1 (day-in-month? value)))
+
+(defn last-day-in-month?
+  "Returns true if value in seconds belongs to last day in month."
+  [value]
+  (let [day-in-month (day-in-month? value)
+        days-in-month' (days-in-month (month? value) (leap-year? value))]
+    (= days-in-month' day-in-month)))
+
+(defn weekend? 
+  "Returns true if value in seconds belongs to *weekend-days*"
+  [value]
+  (boolean (*weekend-days* (day? value))))
+
 (defn month? 
   "Returns which month (Gregorian) does input value belongs to. For example
    for date 15.02.2015 it will return number 2"
@@ -401,57 +385,10 @@
       0
       (+ (/ week-in-year week) 1))))
 
-
-(defmulti calendar-frame 
-  "Returns sequence of days for given value that are contained in that month. List is consisted
-of keys:
-
-   value
-   day
-   week
-   month
-   day-in-month
-   
-   for Gregorian calendar."
-  (fn [value frame-type & options] frame-type))
-
-(defmethod calendar-frame :month [value _]
-  (let [year (year? value)
-        month (month? value) 
-        leap-year (leap-year? year)
-        current-day-in-month (day-in-month? value)
-        current-day (midnight value)
-        first-day (- 
-                    current-day 
-                    (days (dec current-day-in-month)))]
-
-    (map
-      #(zipmap
-         [:value :day :week :month :day-in-month]
-         ((juxt identity day? week-in-year? month? day-in-month?) %))
-      (range 
-        first-day 
-        (+ first-day (days (days-in-month month leap-year)))
-        day))))
-
-(defmethod calendar-frame "month" [value _]
-  (calendar-frame value :month))
-
-(defmethod calendar-frame :week [value _]
-  (let [w (week-in-year? value)]
-    ;; TODO fix-this to support border weeks
-    (filter
-      (comp #{w} :week)
-      (calendar-frame value :month))))
-
-(defmethod calendar-frame "week" [value _]
-  (calendar-frame value :week))
-
-
 (defn date
   "Constructs new Date object.
-  Months: 1-12
-  Days: 1-7 (1 is Monday)"
+   Months: 1-12
+   Days: 1-7 (1 is Monday)"
   ([] #?(:cljs (js/Date.)
          :clj (java.util.Date.)))
   ([year] (date year 1 ))
@@ -478,14 +415,14 @@ of keys:
      (assert (and
                (< 0 day')
                (<= day' (days-in-month month leap-year?)))
-       (str  "Day " day' " is out of range: 1-" (days-in-month month leap-year?) " for year " year))
+             (str  "Day " day' " is out of range: 1-" (days-in-month month leap-year?) " for year " year))
      (let [years-period (if (>= year unix-epoch-year)
                           (gregorian-year-period unix-epoch-year year)
                           (* -1 (gregorian-year-period year unix-epoch-year)))
            months-period (reduce + 0
-                           (map
-                             #(* day (days-in-month % leap-year?))
-                             (range 1 month)))
+                                 (map
+                                   #(* day (days-in-month % leap-year?))
+                                   (range 1 month)))
            seconds (reduce
                      +
                      0
@@ -532,8 +469,6 @@ of keys:
      (<-local
        (/ (.getTime t) 1000)))))
 
-
-
 (defn intervals
   "Given sequence of timestamps (Date) values returns period values between each timestamp
    value in milliseconds"
@@ -555,19 +490,94 @@ of keys:
 
 #?(:clj 
    (defmacro with-time-configuration [{:keys [offset
+                                              holiday?
                                               weekend-days
-                                              week-days
-                                              locale
-                                              format]
+                                              week-days]
                                        :or {weekend-days *weekend-days*
                                             week-days *weekend-days*
-                                            locale *locale*
-                                            format *format*
-                                            *offset* nil}}
+                                            holiday? *holiday?*
+                                            offset nil}}
                                       & body]
      `(binding [*offset* offset
                 *weekend-days* weekend-days
-                *week-days* week-days
-                *locale* locale
-                *format* format]
+                *holiday?* holiday?
+                *week-days* week-days]
         ~@body)))
+
+
+;; TIME FRAMES
+
+(defmulti calendar-frame 
+  "Returns sequence of days for given value that are contained in that frame-type. List is consisted
+   of keys:
+
+   value
+   day
+   week
+   month
+   day-in-month
+   weekend?
+   first-day-in-month?
+   last-day-in-month?
+
+   for Gregorian calendar. Frame types can be extened by implementing different calendar-frame functions.
+   Vura supports calendar-frames for:
+    * year
+    * month
+    * week"
+  (fn [value frame-type & options] frame-type))
+
+(defn day-context [value]
+  (zipmap
+    [:value :day :week :month :day-in-month :weekend? 
+     :last-day-in-month? :first-day-in-month?]
+    ((juxt identity day? week-in-year? month? day-in-month? 
+           weekend? last-day-in-month? first-day-in-month?) value)))
+
+(defn time-context [value]
+  (zipmap
+    [:value :hour :minute :second :millisecond]
+    ((juxt identity hour? minute? second? millisecond?) value)))
+
+(defn day-time-context 
+  [value]
+  (merge (day-context value) (time-context value)))
+
+(defmethod calendar-frame :year [value _]
+  (let [year (year? value)
+        first-day (date->value (date year 1 1))]
+    (map
+      day-context
+      (range first-day (+ first-day (days (if (leap-year? year) 367 366))) day))))
+
+(defmethod calendar-frame "year" [value _]
+  (calendar-frame value :year))
+
+(defmethod calendar-frame :month [value _]
+  (let [year (year? value)
+        leap-year (leap-year? value)
+        month (month? value) 
+        current-day-in-month (day-in-month? value)
+        current-day (midnight value)
+        first-day (- 
+                    current-day 
+                    (days (dec current-day-in-month)))]
+
+    (map
+      day-context
+      (range 
+        first-day 
+        (+ first-day (days (days-in-month month leap-year)))
+        day))))
+
+(defmethod calendar-frame "month" [value _]
+  (calendar-frame value :month))
+
+(defmethod calendar-frame :week [value _]
+  (let [w (week-in-year? value)]
+    (filter
+      (comp #{w} :week)
+      (calendar-frame value :month))))
+
+(defmethod calendar-frame "week" [value _]
+  (calendar-frame value :week))

@@ -1,7 +1,10 @@
 (ns vura.async.jobs
   #?(:cljs
      (:require-macros 
-       [clojure.core.async.macros :refer [go go-loop]]))
+       [clojure.core.async.macros 
+        :refer [go go-loop]]
+       [dreamcatcher.core 
+        :refer [with-stm]]))
   (:require
     [vura.core :as core]
     [dreamcatcher.util 
@@ -10,11 +13,16 @@
              get-transition
              get-validators
              get-states]]
-    [dreamcatcher.util :refer [get-transitions get-transition get-validators has-transition?]]
-    [dreamcatcher.async :refer [wrap-async-machine suck inject disable ]]
+    [dreamcatcher.async 
+     :refer [wrap-async-machine 
+             suck 
+             inject 
+             disable]]
     [dreamcatcher.core
      :refer [make-state-machine
              #?@(:clj [with-stm])
+             data
+             update-data!
              add-state
              add-transition
              add-validator
@@ -34,24 +42,29 @@
 
 (def ^:private blank-job-machine
   (make-state-machine
-    [::initialize ::start (fn [x] (assoc-in x [:data start-mark] (core/date)))
-     ::start ::finished (fn [x] (-> x
-                                (assoc-in [:data end-mark] (core/date))
-                                (assoc-in [:data running-mark] false)))]))
+    [::initialize ::start (fn [x] 
+                            (update-data! x assoc start-mark (core/date)))
+     ::start ::finished (fn [x] 
+                          (update-data! x merge {end-mark core/date
+                                                 running-mark false}))]))
 
 ;; Helper function for job phase buildup
 (defn- get-next-phase [job phase]
   (-> job (get-transitions phase) keys first))
 
 (defn- get-job-phases [job]
-  (let [job (assoc job :state ::start)]
-    (loop [phase ::start
-           phases nil]
-      (if (= phase ::finished) (-> phases reverse rest)
-        (recur (get-next-phase job phase) (conj phases phase))))))
+  (loop [phase ::start
+         phases nil]
+    (if (= phase ::finished) (-> phases reverse rest)
+      (recur (get-next-phase job phase) (conj phases phase)))))
 
 (defn- get-previous-phase [job phase]
-  (or (first (filter #(has-transition? job % phase) (get-job-phases job))) ::start))
+  (or 
+    (first 
+      (filter 
+        #(has-transition? job % phase)
+        (get-job-phases job))) 
+    ::start))
 
 
 ;; Job definition manipulation
@@ -67,9 +80,9 @@
      (add-state job new-phase)
      (add-transition job last-phase new-phase function)
      (when validator (add-validator job last-phase new-phase validator))
-     (add-transition job new-phase ::finished (fn [x] (-> x
-                                                          (assoc-in [:data end-mark] (core/date))
-                                                          (assoc-in [:data running-mark] false))))
+     (add-transition job new-phase ::finished (fn [x] 
+                                                (update-data! x merge {end-mark (core/date)
+                                                                       running-mark false})))
      job)))
 
 (defn insert-phase
@@ -151,7 +164,7 @@
             1
             (map
               (with-stm x
-                (swap! job-data assoc start-mark (get-in x [:data start-mark]))
+                (swap! job-data assoc start-mark (get (data x) start-mark))
                 true))))
     (admix
       end-collector
@@ -160,7 +173,7 @@
             1
             (map
               (with-stm x
-                (swap! job-data assoc end-mark (get-in x [:data end-mark]))
+                (swap! job-data assoc end-mark (get (data x) end-mark))
                 (swap! job-data assoc running-mark false)
                 true))))
     ;; For state monitoring
@@ -170,7 +183,7 @@
       JobInfo
       (dreamcatcher [_] state-machine-instance)
       (get-phases [this]
-        (let [job (assoc state-machine-shell :state ::initialize)]
+        (let [job state-machine-shell]
           (loop [phase ::initialize phases nil]
             (if (= phase ::finished) (-> phases (conj ::finished) reverse)
               (recur (get-next-phase job phase) (conj phases phase))))))
