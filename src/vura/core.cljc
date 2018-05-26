@@ -244,7 +244,7 @@
   leap-year-day-mapping
   (year-day-mapping true))
 
-(defn- find-year
+(defn ^:dynamic *find-year*
   "Finds a year for given value. Returns
   {:year x
    :seconds x}
@@ -276,25 +276,19 @@
 (defn millisecond? 
   "Returns which millisecond in day does input value belongs to. For example
   for date 15.02.2015 it will return number 0"
-  [^long value]
-  (int
-    (*
-      1000
-      (mod
-        value
-        1))))
+  [value]
+  (int (* 1000 (mod value 1))))
 
 (defn second? 
   "Returns which second in day does input value belongs to. For example
   for date 15.02.2015 it will return number 0"
-  [^long value]
-  (int
-    (mod value 60)))
+  [value]
+  (int (mod value 60)))
 
 (defn minute? 
   "Returns which hour in day does input value belongs to. For example
   for date 15.02.2015 it will return number 0"
-  [^long value]
+  [value]
   (int
     (mod
       (/ (round-number value minute :floor) minute)
@@ -303,7 +297,7 @@
 (defn hour? 
   "Returns which hour in day does input value belongs to. For example
   for date 15.02.2015 it will return number 0"
-  [^long value]
+  [value]
   (int
     (mod
       (/ (round-number value hour :floor) hour)
@@ -312,7 +306,7 @@
 (defn day? 
   "Returns which day in week does input value belongs to. For example
   for date 15.02.2015 it will return number 7"
-  [^long value]
+  [value]
   (inc
     (mod
       (+
@@ -328,7 +322,7 @@
 (defn day-in-year?
   "Returns day in year period (1 - 366)"
   [value]
-  (let [{year :year year-start :seconds} (find-year value)
+  (let [{year :year year-start :seconds} (*find-year* value)
         relative-day (quot (- value year-start) day)]
     relative-day))
 
@@ -337,7 +331,7 @@
   "Returns which week in year does input value belongs to. For example
   for date 15.02.2015 it will return number 6"
   [value]
-  (let [{year :year year-start :seconds} (find-year value)
+  (let [{year :year year-start :seconds} (*find-year* value)
         value (midnight value)
         first-monday (first
                        (filter
@@ -354,8 +348,8 @@
 (defn month? 
   "Returns which month (Gregorian) does input value belongs to. For example
   for date 15.02.2015 it will return number 2"
-  [^long value]
-  (let [{year :year year-start :seconds} (find-year value)
+  [value]
+  (let [{year :year year-start :seconds} (*find-year* value)
         relative-day (inc (quot (- value year-start) day))]
     (get
       (if (leap-year? year)
@@ -378,8 +372,8 @@
 (defn day-in-month? 
   "Returns which day (Gregorian) in month input value belongs to. For example
   for date 15.02.2015 it will return number 15"
-  [^long value]
-  (let [{year :year year-start :seconds} (find-year value)
+  [value]
+  (let [{year :year year-start :seconds} (*find-year* value)
         relative-day (inc (quot (- value year-start) day))
         leap-year? (leap-year? year)
         month (get
@@ -410,7 +404,7 @@
 (defn year?
   "For given value year? returns year that value belogs to."
   [value]
-  ((comp :year) (find-year value)))
+  ((comp :year) (*find-year* value)))
 
 (defn date
   "Constructs new Date object.
@@ -569,17 +563,19 @@
     :first-day-in-month?
     :last-day-in-month?"
   [value]
-  (let [context (zipmap
-                  [:value :day :week :month :day-in-month :weekend? 
-                   :last-day-in-month? :first-day-in-month?]
-                  ((juxt identity day? week-in-year? month? day-in-month? 
-                         weekend? last-day-in-month? first-day-in-month?) value))]
-    (assoc context :holiday? (*holiday?* context))))
+  (binding [*find-year* (memoize *find-year*)] 
+    (let [context (zipmap
+                    [:value :day :week :month :day-in-month :weekend? 
+                     :last-day-in-month? :first-day-in-month?]
+                    ((juxt identity day? week-in-year? month? day-in-month? 
+                           weekend? last-day-in-month? first-day-in-month?) value))]
+      (assoc context :holiday? (*holiday?* context)))))
 
 (defn time-context [value]
-  (zipmap
-    [:value :hour :minute :second :millisecond]
-    ((juxt identity hour? minute? second? millisecond?) value)))
+  (binding [*find-year* (memoize *find-year*)] 
+    (zipmap
+      [:value :hour :minute :second :millisecond]
+      ((juxt identity hour? minute? second? millisecond?) value))))
 
 (defn day-time-context 
   [value]

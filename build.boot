@@ -21,8 +21,8 @@
 
 (deftask dev []
   (comp
-    (repl :server true)
     (wait)))
+    (repl :server true)
 
 (deftask build
   "Build vura and install localy"
