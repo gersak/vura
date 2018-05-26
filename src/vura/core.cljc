@@ -1,6 +1,8 @@
 (ns vura.core
   (:refer-clojure :exclude [second]))
 
+(declare date->value)
+
 (defn round-number
   "Function returns round whole number that is devidable by target-number.
   Rounding strategy can be specified in round-how? options:
@@ -20,7 +22,7 @@
            base (if (>= target-number 1)
                   (* target-number (quot number target-number))
                   (- number diff))
-           limit (* 0.5 0.5 target-number target-number)
+           limit (* 0.25 target-number target-number)
            compare-fn (case round-how?
                         :floor (constantly false)
                         :ceil (constantly (not (zero? diff)))
@@ -30,8 +32,6 @@
         base
         (if (compare-fn limit (* diff diff)) target-number 0))))))
 
-(declare date->value)
-
 (def ^:dynamic *weekend-days* #{6 7})
 (def ^:dynamic *week-days* #{1 2 3 4 5})
 (def ^{:dynamic true
@@ -39,7 +39,7 @@
   macro. Specify function that calculates if given day-context is
   holiday or not. Look @ \"day-context\" Returns boolean"} 
   *holiday?* 
-  (fn [_] false))
+  (constantly false))
 
 (def second 1)
 (def millisecond (/ second 1000))
@@ -177,6 +177,7 @@
 
 (def normal-year-seconds (* 365 day))
 (def leap-year-seconds (* 366 day))
+(def average-year-seconds (* 365.25 day))
 
 (defn- gregorian-year-period 
   [start-year end-year]
@@ -250,10 +251,27 @@
   for given value where seconds is number of seconds of start of the year
   relative to unix-epoch-year"
   [value]
-  ;; TODO - optimize this
-  (if (pos? value)
-    (last (take-while #(<= (:seconds %) value) future-years))
-    (first (drop-while #(> (:seconds %) value) past-years))))
+  (loop [position 0]
+    (let [{:keys [year seconds]
+           :as target} (if (pos? value) 
+                         (nth future-years position)
+                         (nth past-years position))
+          diff (if (pos? value)
+                 (- value seconds)
+                 (- seconds value))
+          step (/ diff normal-year-seconds)]
+      (if (zero? diff) target
+        (if (pos? diff)
+          (if (< 
+                diff 
+                (if (leap-year? year) 
+                  leap-year-seconds
+                  normal-year-seconds))
+            (if (pos? value) 
+              target 
+              (nth (if (pos? value) future-years past-years) (inc position)))
+            (recur (round-number (+ position step) 1 (if (pos? diff) :ceil :floor))))
+          (recur (round-number (+ position step) 1 (if (pos? diff) :ceil :floor))))))))
 
 (defn millisecond? 
   "Returns which millisecond in day does input value belongs to. For example

@@ -11,8 +11,6 @@
 
 (require '[adzerk.boot-cljs :refer [cljs]])
 (require '[pandeiro.boot-http :refer [serve]])
-; (require '[adzerk.boot-reload :refer [reload]])
-; (require '[adzerk.bootlaces :refer :all])
 
 (def +version+ "0.5.2-SNAPSHOT")
 
@@ -23,7 +21,7 @@
 
 (deftask dev []
   (comp
-    (repl :server true :port 54321)
+    (repl :server true)
     (wait)))
 
 (deftask build
