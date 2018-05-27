@@ -146,7 +146,7 @@
   "Function calculates value of midnight for given value. For example
   if some date value is inputed it will round-number to the begining of
   that day."
-  [^long value]
+  [value]
   (round-number value day :floor))
 
 (defn leap-year? 

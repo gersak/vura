@@ -36,3 +36,20 @@
     (jar)
     (push :repo "clojars"
           :gpg-sign (not (.endsWith +version+ "-SNAPSHOT")))))
+
+
+(deftask deploy-core []
+  (set-env! 
+    :dependencies '[[org.clojure/clojure "1.8.0" :scope "provided"]]
+    :resource-paths #{"src"})
+  (comp
+    (sift 
+      :include #{#"vura/core.cljc"})
+    (pom 
+      :project 'kovacnica/vura.core
+      :version +version+)
+    (jar
+      :manifest {"created-by" "Robert Gersak"
+                 "version" +version+})
+    (push :repo "clojars"
+          :gpg-sign (not (.endsWith +version+ "-SNAPSHOT")))))
