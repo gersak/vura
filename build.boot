@@ -22,7 +22,7 @@
 (deftask dev []
   (comp
     (wait)))
-    (repl :server true)
+    (repl :server true :port 54321)
 
 (deftask build
   "Build vura and install localy"

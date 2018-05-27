@@ -394,6 +394,7 @@
   [value]
   (= 1 (day-in-month? value)))
 
+
 (defn last-day-in-month?
   "Returns true if value in seconds belongs to last day in month."
   [value]
@@ -516,7 +517,7 @@
                                               week-days]
                                        :or {weekend-days *weekend-days*
                                             week-days *weekend-days*
-                                            holiday? *holiday?*
+                                            holiday? (fn [_] false)
                                             offset nil}}
                                       & body]
      `(binding [vura.core/*offset* ~offset
@@ -565,11 +566,13 @@
   [value]
   (binding [*find-year* (memoize *find-year*)] 
     (let [context (zipmap
-                    [:value :day :week :month :day-in-month :weekend? 
+                    [:value :day :week :month :year :day-in-month :weekend? 
                      :last-day-in-month? :first-day-in-month?]
-                    ((juxt identity day? week-in-year? month? day-in-month? 
+                    ((juxt identity day? week-in-year? month? year? day-in-month? 
                            weekend? last-day-in-month? first-day-in-month?) value))]
-      (assoc context :holiday? (*holiday?* context)))))
+      (if (fn? *holiday?*) 
+        (assoc context :holiday? (*holiday?* context))
+        context))))
 
 (defn time-context [value]
   (binding [*find-year* (memoize *find-year*)] 
@@ -619,3 +622,70 @@
 
 (defmethod calendar-frame "week" [value _]
   (calendar-frame value :week))
+
+
+(comment
+  (def hr-holidays 
+    #{[1 1]
+      [6 1]
+      [1 5]
+      [22 6]
+      [25 6]
+      [5 8]
+      [15 8]
+      [8 10]
+      [1 11]
+      [25 12]
+      [26 12]})
+
+  (def vacation-start (date 2030 6 15 8 0 0))
+
+  (with-time-configuration
+    {:weekend-days #{5 6 7}
+     :week-days #{1 2 3 4}
+     :holiday? (fn [{:keys [day-in-month month]}]
+                 (boolean (hr-holidays [day-in-month month])))}
+    (->>
+      (iterate (partial + day) (date->value vacation-start))
+      (take 20)
+      ;; Be carefull if this is not realized in with-time-configuration
+      ;; configuration bindings won't work. Use mapv instead map
+      (mapv day-context)
+      (remove :holiday?)
+      (remove :weekend?)
+      count
+      time))
+
+
+  (def some-day (date 2030 6 15 8 15 20 300))
+  (def some-day-value (date->value some-day))
+  (def other-day-value (-> some-day 
+                           date->value 
+                           (+ (period {:weeks 26 
+                                       :days 3 
+                                       :hours 82 
+                                       :minutes 5000 
+                                       :seconds 1000 
+                                       :milliseconds -800}))))
+  ;; 3848643839/2
+
+  (def other-day (value->date other-day-value)) ;; #inst "2030-12-24T04:51:59.500-00:00"
+
+  (def day-difference (- other-day-value some-day-value)) ;; 82900996/5
+
+  ;; Lets round how many hours have passed with rounding strategy :ceil
+  ;; that will round number up even if millisecond has passed in current hour
+
+  (round-number (/ day-difference hour) 1 :ceil) ;; 4606N
+
+  (with-time-configuration {:offset 0}  
+    (-> other-day-value (round-number (hours 6) :ceil) value->date)) ;; #inst "2030-12-24T06:00:00.000-00:00"
+
+  (with-time-configuration {:offset -240}  
+    (-> 
+      other-day-value                 ;; 3848643839/2
+      (round-number (hours 2) :floor) ;; 1924315200N
+      value->date                     ;; #inst "2030-12-24T03:00:00.000-00:00"
+      get-offset))                    ;; -240
+
+)
