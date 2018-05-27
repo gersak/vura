@@ -162,7 +162,7 @@ How about... I've used to have alot of problems working with calendar, calculati
 
 And most important of them all is *with-time-configuration* macro.
 
-``` clojure
+```clojure
 (require '[vura.core :refer [date day day-context with-time-configuration date->value]])
 
 
@@ -232,7 +232,7 @@ After that everything else is simple. We just remove :holiday? and :weekend? and
 Let's play a while. We'll try to round-number on couple of examples.
 
 
-``` clojure
+```clojure
 (def some-day (date 2030 6 15 8 15 20 300))
   (def some-day-value (date->value some-day))
   (def other-day-value (-> some-day 
