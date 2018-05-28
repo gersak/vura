@@ -4,11 +4,21 @@
 
 
 Vura is small clojure/script **zero dependency** time computation and manipulation library. Library uses numeric representation of
-time to compute Gregorian calendar years, months and so on. Library calculates time with system offset by transforming local 
-timestamp value to UTC value at given time with function **date->value** after which time is just number. When computation/manipulation
+time to compute Gregorian calendar years, months and so on. Vura calculates time with current system offset by transforming local 
+timestamp value to UTC value at given time with function **date->value** that returns plain number of seconds. When computation/manipulation
 is over numeric value of time should be transformed to Date representation by caling **value->date**.
 
 
+
+## Why?
+
+* Immutability
+* Zero dependency
+* Simple and familiar algebra in number domain
+* Both Clojure and Clojurescript library with same 99% of code
+
+
+## How?
 Heart of this library is round-number function.
 
 ``` clojure
@@ -64,7 +74,9 @@ vura.core=> (time (round-number 182.8137172 0.25 :floor))
 
 ```
 
-Rounding strategy :floor and :ceil are selfexplanatory. :up and :down are differnt in that :up will round number up if value is exactly half of target-number and :down will round number down. Otherwise value will be rounded to nearest value. I.E.
+Rounding strategy :floor and :ceil are selfexplanatory. :up and :down are different in that :up will 
+round number up if value is exactly half of target-number and :down will round number down. 
+Otherwise value will be rounded to nearest value. I.E.
 
 ``` clojure
 
@@ -82,7 +94,9 @@ vura.core=> (time (round-number 182.625 0.25 :up))
 
 ## Choices and assumptions
 
-Values of timestamps are normalized to Greenwich Mean Time. As base unit of time **vura** uses **second**. This is very unusual from programmers perspective but not that unusual for anyone else that is using [SI](https://en.wikipedia.org/wiki/SI_base_unit). So bare with me it doesn't matter in the end anyway.
+Values of timestamps are normalized to Greenwich Mean Time. As base unit of time **vura** uses **second**. 
+This is not usual choice from programmers perspective but not that unusual for anyone else that is using 
+[SI](https://en.wikipedia.org/wiki/SI_base_unit). So bare with me it doesn't matter in the end anyway.
 
 ```clojure
 (def second 1)
@@ -103,11 +117,11 @@ Time constructs defined this way can be easly added, subtracted, multiplied, dev
   [n]
   (* n second))
 
-
-(defn days 
-  "Function returns value of n days as number."
-  [n]
-  (* n day))
+(defn second? 
+  "Returns which second in day does input value belongs to. For example
+  for date 15.02.2015 it will return number 0"
+  [value]
+  (int (mod value 60)))
 
 (defn midnight 
   "Function calculates value of midnight for given value. For example
@@ -116,30 +130,6 @@ Time constructs defined this way can be easly added, subtracted, multiplied, dev
   [value]
   (round-number value day :floor))
 
-(defn second? 
-  "Returns which second in day does input value belongs to. For example
-  for date 15.02.2015 it will return number 0"
-  [value]
-  (int (mod value 60)))
-
-(defn minute? 
-  "Returns which hour in day does input value belongs to. For example
-  for date 15.02.2015 it will return number 0"
-  [value]
-  (int
-    (mod
-      (/ (round-number value minute :floor) minute)
-      60)))
-
-(defn hour? 
-  "Returns which hour in day does input value belongs to. For example
-  for date 15.02.2015 it will return number 0"
-  [value]
-  (int
-    (mod
-      (/ (round-number value hour :floor) hour)
-      24)))
-
 ```
 
 Yout get the idea...
@@ -147,20 +137,41 @@ Yout get the idea...
 
 ## What else?
 
-How about... I've used to have alot of problems working with calendar, calculating weekends, working days and holidays, calculating daily wage spent/unused vacation days. Vura offers functions like:
+How about... I've used to have alot of problems working with calendar, calculating weekends, 
+working days and holidays, calculating daily wage or spent/unused vacation days. 
+Vura offers functions like day-(time-)context:
 
-* weekend?
-* day-in-year?
-* week-in-year?
-* first-day-in-month?
-* day-in-month?
-* last-day-in-month?
-* day-context
-* time-context
-* day-time-context
+```clojure
+(->
+    (date 2018 12 25 0 0 0 0)
+    date->value
+    day-time-context)
 
 
-And most important of them all is *with-time-configuration* macro.
+{:day 2, 
+ :hour 0, 
+ :week 52, 
+ :weekend? false, 
+ :first-day-in-month? false, 
+ :second 0, 
+ :value 1545696000, 
+ :month 12, 
+ :year 2018, 
+ :millisecond 0, 
+ :holiday? false, 
+ :last-day-in-month? false, 
+ :day-in-month 25, 
+ :minute 0}
+```
+
+day-(time-)context functions can be mapped to any sequence of vura time values. So it is possible
+to `(iterate (partial + (days 3.5)) (date->value (date 2018)))` to get all dates with interval of 3.5
+days till the end of time and afterwards apply map day-context and take 20 days for example. This is nice
+but how do holidays fit in. Checkout **with-time-configuration** macro for customizing day-context computation.
+
+
+
+## with-time-configuration
 
 ```clojure
 (require '[vura.core :refer [date day day-context with-time-configuration date->value]])
@@ -209,7 +220,9 @@ So how many days did we actually spent?
 
 
 **with-time-configuration** macro allows us to put time values in context. Vura has dynamic variables **\*wekend-days\*, 
-\*week-days\* \*holiday?\*, \*offset\*** that can be used to put values in context. For example if we are interesed for sequence of values what is theirs **day-context** with configuration definition above `(mapv day-context)`  will return vector of maps with following keys:
+\*week-days\* \*holiday?\*, \*offset\*** that can be used to put values in context. For example if we are interesed for 
+sequence of values what is theirs **day-context** with configuration definition above `(mapv day-context)`
+will return vector of maps with following keys:
 
 * value
 * day
@@ -226,43 +239,7 @@ So how many days did we actually spent?
 After that everything else is simple. We just remove :holiday? and :weekend? and we are left with only spent days. That is 11 days.
 
 
-## Don't be shy with round-number
+## Don't forget about round-number
 
-Let's play a while. We'll try to round-number on couple of examples.
-
-
-```clojure
-(def some-day (date 2030 6 15 8 15 20 300))
-  (def some-day-value (date->value some-day))
-  (def other-day-value (-> some-day 
-                           date->value 
-                           (+ (period {:weeks 26 
-                                       :days 3 
-                                       :hours 82 
-                                       :minutes 5000 
-                                       :seconds 1000 
-                                       :milliseconds -800}))))
-;; 3848643839/2
-
-(def other-day (value->date other-day-value)) ;; #inst "2030-12-24T04:51:59.500-00:00"
-
-(def day-difference (- other-day-value some-day-value)) ;; 82900996/5
-
-;; Lets round how many hours have passed with rounding strategy :ceil
-;; that will round number up even if millisecond has passed in current hour
-
-(round-number (/ day-difference hour) 1 :ceil) ;; 4606N
-
-(with-time-configuration {:offset 0}  
-  (-> other-day-value (round-number (hours 6) :ceil) value->date)) ;; #inst "2030-12-24T06:00:00.000-00:00"
-
-(with-time-configuration {:offset -240}  
-  (-> 
-    other-day-value                 ;; 3848643839/2
-    (round-number (hours 2) :floor) ;; 1924315200N
-    value->date                     ;; #inst "2030-12-24T03:00:00.000-00:00"
-    get-offset))                    ;; -240
-
- 
-```
-
+Vura returns Date representations from numeric values and all values can be round-number(ed) so use that. Round 
+values to `(days 3.5)` or `(hours 11)` or maybe `(period {:week 2 :days 3})`

@@ -307,12 +307,13 @@
   "Returns which day in week does input value belongs to. For example
   for date 15.02.2015 it will return number 7"
   [value]
-  (inc
-    (mod
-      (+
-       (if ((comp neg? get-offset value->date) value) 3 4)
-       (/ (round-number value day :floor) day))
-      7)))
+  (int
+    (inc
+      (mod
+        (+
+         (if ((comp neg? get-offset value->date) value) 3 4)
+         (/ (round-number value day :floor) day))
+        7))))
 
 (defn weekend? 
   "Returns true if value in seconds belongs to *weekend-days*"
@@ -323,7 +324,7 @@
   "Returns day in year period (1 - 366)"
   [value]
   (let [{year :year year-start :seconds} (*find-year* value)
-        relative-day (quot (- value year-start) day)]
+        relative-day (int (quot (- value year-start) day))]
     relative-day))
 
 
@@ -342,7 +343,7 @@
     ;; If year startsh with Thursday, Friday, or any above
     (if (neg? time-difference)
       0
-      (+ (/ week-in-year week) 1))))
+      (int (+ (/ week-in-year week) 1)))))
 
 
 (defn month? 
@@ -350,7 +351,7 @@
   for date 15.02.2015 it will return number 2"
   [value]
   (let [{year :year year-start :seconds} (*find-year* value)
-        relative-day (inc (quot (- value year-start) day))]
+        relative-day (int (inc (quot (- value year-start) day)))]
     (get
       (if (leap-year? year)
         leap-year-day-mapping
@@ -374,7 +375,7 @@
   for date 15.02.2015 it will return number 15"
   [value]
   (let [{year :year year-start :seconds} (*find-year* value)
-        relative-day (inc (quot (- value year-start) day))
+        relative-day (int (inc (quot (- value year-start) day)))
         leap-year? (leap-year? year)
         month (get
                 (if leap-year?
@@ -662,6 +663,12 @@
       count
       time))
 
+  (->
+    (date 2018 12 25 0 0 0 0)
+    date->value
+    day-time-context)
+
+  (map day-context (take 20 (iterate (partial + (days 3.5)) (date->value (date 2018)))))
 
   (def some-day (date 2030 6 15 8 15 20 300))
   (def some-day-value (date->value some-day))
