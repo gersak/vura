@@ -7,10 +7,12 @@
                   [org.clojure/clojure "1.8.0"]
                   [kovacnica/dreamcatcher "1.0.7-SNAPSHOT"]
                   [org.clojure/core.async "0.4.474"]
-                  [org.clojure/clojurescript "1.10.238"]])
+                  [org.clojure/clojurescript "1.10.238"]
+                  [boot-codox "0.10.3" :scope "test"]])
 
 (require '[adzerk.boot-cljs :refer [cljs]])
 (require '[pandeiro.boot-http :refer [serve]])
+(require '[codox.boot :refer [codox]])
 
 (def +version+ "0.5.2-SNAPSHOT")
 
@@ -21,13 +23,23 @@
 
 (deftask dev []
   (comp
-    (wait)))
-    (repl :server true :port 54321)
+    (wait)
+    (repl :server true :port 54321)))
 
 (deftask build
   "Build vura and install localy"
   []
   (comp (pom) (jar) (install)))
+
+(deftask build-docs []
+  (comp
+    (codox
+      :name "vura"
+      :description "Zero dependency micro library to compute and manipulate time"
+      :version +version+
+      :filter-namespaces #{'vura.core}
+      :output-path "api")
+    (target)))
 
 (deftask deploy []
   (set-env! :resource-paths #{"src"})

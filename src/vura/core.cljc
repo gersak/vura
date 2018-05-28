@@ -4,7 +4,7 @@
 (declare date->value)
 
 (defn round-number
-  "Function returns round whole number that is devidable by target-number.
+  "Function returns round number that is devidable by target-number.
   Rounding strategy can be specified in round-how? options:
 
    :floor
@@ -32,30 +32,43 @@
         base
         (if (compare-fn limit (* diff diff)) target-number 0))))))
 
-(def ^:dynamic *weekend-days* #{6 7})
-(def ^:dynamic *week-days* #{1 2 3 4 5})
-(def ^{:dynamic true
-       :doc "This variable is supposed to be used through with-time-configuration
+(def 
+  ^{:dynamic true
+    :doc "This variable can be used to customize weekend? function to
+  return true or false for day-context. Function should accept one
+  argument that is supposed to be day [1-7] and return true or false."} 
+  *weekend-days* #{6 7})
+
+(def 
+  ^{:dynamic true
+    :doc "This variable is supposed to be used through with-time-configuration
   macro. Specify function that calculates if given day-context is
   holiday or not. Look @ \"day-context\" Returns boolean"} 
   *holiday?* 
   (constantly false))
 
-(def second 1)
-(def millisecond (/ second 1000))
-(def microsecond (/ millisecond 1000))
-(def nanosecond (/ microsecond 1000))
-(def minute 60)
-(def hour (* 60 minute))
-(def day (* 24 hour))
-(def week (* 7 day))
+(def second "1" 1)
+(def millisecond "0.001" (/ second 1000))
+(def microsecond  "1.0E-6" (/ millisecond 1000))
+(def nanosecond  "1.0E-9" (/ microsecond 1000))
+(def minute  "60" 60)
+(def hour  "3600" (* 60 minute))
+(def day "86400" (* 24 hour))
+(def week "604800" (* 7 day))
 
-(def ^:dynamic *offset* nil)
+(def 
+ ^{:dynamic true
+   :doc "Variable that is used in function get-offset. ->local, <-local and day? funcitons are affected
+   when changing value of this variable. I.E. (binding [*offset* -60] ...) would make all computations
+   in that time zone."} 
+  *offset* nil)
 
-(defn get-offset [date]
+(defn get-offset 
+  "Funciton returns time zone for input Date object"
+  [date]
   (or *offset* (.getTimezoneOffset date)))
 
-(def month-values
+(def ^:no-doc month-values
   {:january 1
    :february 2
    :march 3
@@ -69,7 +82,7 @@
    :november 11
    :december 12})
 
-(def day-values
+(def ^:no-doc day-values
   {:monday 1
    :tuesday 2
    :wednesday 3
@@ -80,42 +93,28 @@
 
 (declare value->date date->value)
 
-(defn utc-date->value [date]
+(defn ^:no-doc utc-date->value [date]
   (when date
     (/ (.getTime date) 1000)))
 
-(defn value->utc-date [value]
+(defn ^:no-doc value->utc-date [value]
   (when value
     (new
       #?(:clj java.util.Date
          :cljs js/Date)
       (long (* 1000 value)))))
 
-(defn- <-local
+(defn- ^:no-doc <-local
   "Given a local timestamp value function normalizes datetime to Greenwich timezone value"
   ([value] (<-local value (get-offset (value->utc-date value))))
   ([value offset]
    (- value (* offset 60))))
 
-(defn- ->local
+(defn- ^:no-doc ->local
   "Given a Greenwich timestamp value function normalizes datetime to local timezone value"
   ([value] (->local value (get-offset (value->utc-date value))))
   ([value offset]
    (+ value (* offset 60))))
-
-
-(defprotocol LegacyDateProtocol
-  (legacy-date [this] "Returns legacy Date."))
-
-(defrecord Date [epoch-seconds]
-  LegacyDateProtocol
-  (legacy-date [_]
-    #?(:clj (-> epoch-seconds (* 1000) long java.util.Date.)
-       :cljs (js/Date. (-> epoch-seconds (* 1000) long js/Date.))))
-  Object
-  (toString [this]
-    (.toString (legacy-date this))))
-
 
 (defn seconds 
   "Function returns value of n seconds as number."
@@ -175,9 +174,8 @@
     11 30
     12 31))
 
-(def normal-year-seconds (* 365 day))
-(def leap-year-seconds (* 366 day))
-(def average-year-seconds (* 365.25 day))
+(def ^:no-doc normal-year-seconds (* 365 day))
+(def ^:no-doc leap-year-seconds (* 366 day))
 
 (defn- gregorian-year-period 
   [start-year end-year]
@@ -189,13 +187,14 @@
     0
     (range start-year end-year)))
 
-(def unix-epoch-year 1970)
-(def unix-epoch-day 4)
+(def ^:no-doc unix-epoch-year 1970)
+(def ^:no-doc unix-epoch-day 4)
 
 
 ;; Lazy sequence of all future years to come according to Gregorian calendar
-(def ^{:doc "Definition of future years. Lazy sequence of all future years from
-            unix-epoch-year according to Gregorian calendar"}
+(def 
+  ^{:doc "Definition of future years. Lazy sequence of all future years from
+  unix-epoch-year according to Gregorian calendar"}
   future-years 
   (iterate
     (fn [{:keys [year seconds]}]
@@ -206,8 +205,9 @@
     {:year 1970
      :seconds 0}))
 
-(def ^{:doc "Definition of past years. Lazy sequence of all past years
-             according to Gregorian calendar from unix-epoch-year"} 
+(def 
+  ^{:doc "Definition of past years. Lazy sequence of all past years
+  according to Gregorian calendar from unix-epoch-year"} 
   past-years 
   (iterate
     (fn [{:keys [year seconds]}]
@@ -511,19 +511,22 @@
 
 
 #?(:clj 
-   (defmacro with-time-configuration [{:keys [offset
-                                              holiday?
-                                              weekend-days
-                                              week-days]
-                                       :or {weekend-days *weekend-days*
-                                            week-days *weekend-days*
-                                            holiday? (fn [_] false)
-                                            offset nil}}
-                                      & body]
+   (defmacro with-time-configuration 
+     "Utility macro to put frame on computation scope. Specify:
+      
+    * offset       - +/- number
+    * holiday?     - (fn [day-context] true | false)
+    * weekend-days - (fn [number] true | false)"
+     [{:keys [offset
+              holiday?
+              weekend-days]
+       :or {weekend-days *weekend-days*
+            holiday? (fn [_] false)
+            offset nil}}
+      & body]
      `(binding [vura.core/*offset* ~offset
                 vura.core/*weekend-days* ~weekend-days
-                vura.core/*holiday?* ~holiday?
-                vura.core/*week-days* ~week-days]
+                vura.core/*holiday?* ~holiday?]
         ~@body)))
 
 
@@ -574,13 +577,16 @@
         (assoc context :holiday? (*holiday?* context))
         context))))
 
-(defn time-context [value]
+(defn time-context 
+  "Similar to day-context only for time values [millisecond, second, minute, hour]"
+  [value]
   (binding [*find-year* (memoize *find-year*)] 
     (zipmap
       [:value :hour :minute :second :millisecond]
       ((juxt identity hour? minute? second? millisecond?) value))))
 
 (defn day-time-context 
+  "Composition of time-context and day-context"
   [value]
   (merge (day-context value) (time-context value)))
 
@@ -650,7 +656,7 @@
       (take 20)
       ;; Be carefull if this is not realized in with-time-configuration
       ;; configuration bindings won't work. Use mapv instead map
-      (mapv day-context)
+      (map day-context)
       (remove :holiday?)
       (remove :weekend?)
       count

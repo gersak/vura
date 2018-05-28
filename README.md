@@ -1,9 +1,9 @@
-# Vura CORE
+# Vura (core)
 
 [![Clojars Project](https://img.shields.io/clojars/v/kovacnica/vura.core.svg)](https://clojars.org/kovacnica/vura.core)
 
 
-Vura is small clojure/script **ZERO DEPENDENCY** time computation and manipulation library. Library uses numeric representation of
+Vura is small clojure/script **zero dependency** time computation and manipulation library. Library uses numeric representation of
 time to compute Gregorian calendar years, months and so on. Library calculates time with system offset by transforming local 
 timestamp value to UTC value at given time with function **date->value** after which time is just number. When computation/manipulation
 is over numeric value of time should be transformed to Date representation by caling **value->date**.
@@ -97,7 +97,7 @@ Values of timestamps are normalized to Greenwich Mean Time. As base unit of time
 
 Time constructs defined this way can be easly added, subtracted, multiplied, devided, round-numbered.
 
-```
+```clojure
 (defn seconds 
   "Function returns value of n seconds as number."
   [n]
@@ -200,7 +200,6 @@ And most important of them all is *with-time-configuration* macro.
 "Elapsed time: 6.397 msecs"
 11
 
-vura.core=>  
 
 ```
 
@@ -209,8 +208,8 @@ well the fact that we are living in socially advanced culture with 3 day weekend
 So how many days did we actually spent?
 
 
-**with-time-configuration** macro allows us to put time values in context. Vura has dynamic variables ***wekend-days*, *week-days*
-*holiday?*, *offset*** that can be used to put values in context. For example if we are interesed for sequence of values what is theirs **day-context** with configuration definition above `(mapv day-context)`  will return vector of maps with following keys:
+**with-time-configuration** macro allows us to put time values in context. Vura has dynamic variables **\*wekend-days\*, 
+\*week-days\* \*holiday?\*, \*offset\*** that can be used to put values in context. For example if we are interesed for sequence of values what is theirs **day-context** with configuration definition above `(mapv day-context)`  will return vector of maps with following keys:
 
 * value
 * day
@@ -243,26 +242,26 @@ Let's play a while. We'll try to round-number on couple of examples.
                                        :minutes 5000 
                                        :seconds 1000 
                                        :milliseconds -800}))))
-  ;; 3848643839/2
+;; 3848643839/2
 
-  (def other-day (value->date other-day-value)) ;; #inst "2030-12-24T04:51:59.500-00:00"
+(def other-day (value->date other-day-value)) ;; #inst "2030-12-24T04:51:59.500-00:00"
 
-  (def day-difference (- other-day-value some-day-value)) ;; 82900996/5
+(def day-difference (- other-day-value some-day-value)) ;; 82900996/5
 
-  ;; Lets round how many hours have passed with rounding strategy :ceil
-  ;; that will round number up even if millisecond has passed in current hour
+;; Lets round how many hours have passed with rounding strategy :ceil
+;; that will round number up even if millisecond has passed in current hour
 
-  (round-number (/ day-difference hour) 1 :ceil) ;; 4606N
+(round-number (/ day-difference hour) 1 :ceil) ;; 4606N
 
-  (with-time-configuration {:offset 0}  
-    (-> other-day-value (round-number (hours 6) :ceil) value->date)) ;; #inst "2030-12-24T06:00:00.000-00:00"
+(with-time-configuration {:offset 0}  
+  (-> other-day-value (round-number (hours 6) :ceil) value->date)) ;; #inst "2030-12-24T06:00:00.000-00:00"
 
-  (with-time-configuration {:offset -240}  
-    (-> 
-      other-day-value                 ;; 3848643839/2
-      (round-number (hours 2) :floor) ;; 1924315200N
-      value->date                     ;; #inst "2030-12-24T03:00:00.000-00:00"
-      get-offset))                    ;; -240
+(with-time-configuration {:offset -240}  
+  (-> 
+    other-day-value                 ;; 3848643839/2
+    (round-number (hours 2) :floor) ;; 1924315200N
+    value->date                     ;; #inst "2030-12-24T03:00:00.000-00:00"
+    get-offset))                    ;; -240
 
  
 ```
