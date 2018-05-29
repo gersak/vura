@@ -19,7 +19,11 @@
 (task-options!
   pom {:project 'kovacnica/vura
        :version +version+}
-  jar {:manifest {"created-by" "Robert Gersak"}})
+  jar {:manifest {"created-by" "Robert Gersak"}}
+  codox {:name "vura"
+         :description "Zero dependency micro library to compute and manipulate time"
+         :version +version+
+         :filter-namespaces #{'vura.core}})
 
 (deftask dev []
   (comp
@@ -30,16 +34,6 @@
   "Build vura and install localy"
   []
   (comp (pom) (jar) (install)))
-
-(deftask build-docs []
-  (comp
-    (codox
-      :name "vura"
-      :description "Zero dependency micro library to compute and manipulate time"
-      :version +version+
-      :filter-namespaces #{'vura.core}
-      :output-path "api")
-    (target)))
 
 (deftask deploy []
   (set-env! :resource-paths #{"src"})
