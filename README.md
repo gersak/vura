@@ -6,7 +6,8 @@
 Vura is small clojure/script **zero dependency** time computation and manipulation library. Library uses numeric representation of
 time to compute Gregorian calendar years, months and so on. Vura calculates time with current system offset by transforming local 
 timestamp value to UTC value at given time with function **date->value** that returns plain number of seconds. When computation/manipulation
-is over numeric value of time should be transformed to Date representation by caling **value->date**.
+is over numeric value of time should be transformed to Date representation by caling **value->date**. 
+For rest of core functions check [API docs](http://gersak.github.io/vura/api/index.html).
 
 
 
@@ -245,7 +246,7 @@ function that can return day-context for whole month or year for given input val
 Multimethod **calendar-frame** provides implementations for :year, :month and :week 
 view for given value. This function might be usefull in frontend for creating different UI components
 with OM or Reagent or some other Clojure/script frontend library. Don't forget to use **with-time-configuration** macro
-to put context on calendar-frame (to define holidays and weekend-days).
+to put context on calendar-frame (to flag holidays and weekend-days).
 
 
 ## Don't forget about round-number
