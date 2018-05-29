@@ -239,6 +239,15 @@ will return vector of maps with following keys:
 After that everything else is simple. We just remove :holiday? and :weekend? and we are left with only spent days. That is 11 days.
 
 
+## Calendar Frame
+**day-context** function solves most of calculation challenges. Still there are some use cases where it is usefull to have
+function that can return day-context for whole month or year for given input value. 
+Multimethod **calendar-frame** provides implementations for :year, :month and :week 
+view for given value. This function might be usefull in frontend for creating different UI components
+with OM or Reagent or some other Clojure/script frontend library. Don't forget to use **with-time-configuration** macro
+to put context on calendar-frame (to define holidays and weekend-days).
+
+
 ## Don't forget about round-number
 
 Vura returns Date representations from numeric values and all values can be round-number(ed) so use that. Round 

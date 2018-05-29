@@ -10,11 +10,17 @@
    :floor
    :ceil
    :up
-   :down"
+   :down
+  
+  Rounding number strategy is symetric to 0. This means that :ceil will round
+  negative numbers to lower target-number. I.E (round-number -9.5 1 :ceil) would return -10.
+  Rounding happens in absolute domain and sign is inserted afterwards.
+   
+  Negative target-numbers are not supported. Can't reason about that yet."
   ([number] (round-number number 1))
   ([number target-number] (round-number number target-number :down))
   ([number target-number round-how?]
-   (assert (pos? target-number) "Target number has to be positive.")
+   {:pre [(pos? target-number)]}
    (case target-number
      0 0
      (let [round-how? (keyword round-how?)
@@ -513,11 +519,12 @@
 
 #?(:clj 
    (defmacro with-time-configuration 
-     "Utility macro to put frame on computation scope. Specify:
+     "Utility macro to put context frame on computation scope. Specify:
       
     * offset       - +/- number
     * holiday?     - (fn [day-context] true | false)
     * weekend-days - (fn [number] true | false)"
+
      [{:keys [offset
               holiday?
               weekend-days]
@@ -562,6 +569,7 @@
     :day
     :week
     :month
+    :year
     :day-in-month
     :weekend?
     :holiday?
