@@ -20,23 +20,35 @@
   ([number] (round-number number 1))
   ([number target-number] (round-number number target-number :down))
   ([number target-number round-how?]
-   {:pre [(pos? target-number)]}
-   (case target-number
-     0 0
-     (let [round-how? (keyword round-how?)
-           diff (rem number target-number)
-           base (if (>= target-number 1)
-                  (* target-number (quot number target-number))
-                  (- number diff))
-           limit (* 0.25 target-number target-number)
-           compare-fn (case round-how?
-                        :floor (constantly false)
-                        :ceil (constantly (not (zero? diff)))
-                        :up <=
-                        <)]
-       ((if (pos? number) + -)
-        base
-        (if (compare-fn limit (* diff diff)) target-number 0))))))
+   {:pre [(or 
+            (zero? target-number)
+            (pos? target-number))]}
+   (letfn [(normalize-number [x]
+             (if (some #(% target-number) [float? double?])
+               (bigdec x)
+               x))]
+     (case target-number
+       0 0
+       ;; First normalize numbers to floating point or integer
+       (let [number (normalize-number number)
+             target-number (normalize-number target-number) 
+             round-how? (keyword round-how?)
+             diff (rem number target-number)
+             base (if (>= target-number 1)
+                    (* target-number (quot number target-number))
+                    (- number diff))
+             limit (* 0.25 target-number target-number)
+             compare-fn (case round-how?
+                          :floor (constantly false)
+                          :ceil (constantly (not (zero? diff)))
+                          :up <=
+                          <)
+             result ((if (pos? number) + -)
+                     base
+                     (if (compare-fn limit (* diff diff)) target-number 0))]
+         (if (some decimal? [target-number number])
+           (double result)
+           result))))))
 
 (def 
   ^{:dynamic true

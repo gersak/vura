@@ -4,7 +4,6 @@
                   [adzerk/boot-reload "0.5.2" :scope "test"]
                   [pandeiro/boot-http "0.8.3" :scope "test"]
                   [org.clojure/tools.logging "0.5.0-alpha" :scope "test"]
-                  [org.clojure/clojure "1.8.0"]
                   [kovacnica/dreamcatcher "1.0.7-SNAPSHOT"]
                   [org.clojure/core.async "0.4.474"]
                   [org.clojure/clojurescript "1.10.238"]
@@ -43,6 +42,10 @@
     (push :repo "clojars"
           :gpg-sign (not (.endsWith +version+ "-SNAPSHOT")))))
 
+
+(deftask dev-test []
+  (set-env! :source-paths #{"src" "test"})
+  (repl))
 
 (deftask deploy-core []
   (set-env! 
