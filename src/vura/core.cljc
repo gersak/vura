@@ -1,7 +1,9 @@
 (ns vura.core
   (:refer-clojure :exclude [second]))
 
+
 (declare date->value)
+
 
 (defn round-number
   "Function returns round number that is devidable by target-number.
@@ -24,9 +26,10 @@
             (zero? target-number)
             (pos? target-number))]}
    (letfn [(normalize-number [x]
-             (if (some #(% target-number) [float? double?])
-               (bigdec x)
-               x))]
+             #?(:clj (if (some #(% target-number) [float? double?])
+                       (bigdec x)
+                       x)
+                :cljs x))]
      (case target-number
        0 0
        ;; First normalize numbers to floating point or integer
@@ -46,9 +49,12 @@
              result ((if (pos? number) + -)
                      base
                      (if (compare-fn limit (* diff diff)) target-number 0))]
-         (if (some decimal? [target-number number])
-           (double result)
-           result))))))
+         #?(:clj 
+            (if (some decimal? [target-number number])
+              (double result)
+              result)
+            :cljs result))))))
+
 
 (def 
   ^{:dynamic true
@@ -57,6 +63,7 @@
   argument that is supposed to be day [1-7] and return true or false."} 
   *weekend-days* #{6 7})
 
+
 (def 
   ^{:dynamic true
     :doc "This variable is supposed to be used through with-time-configuration
@@ -64,6 +71,7 @@
   holiday or not. Look @ \"day-context\" Returns boolean"} 
   *holiday?* 
   (constantly false))
+
 
 (def second "1" 1)
 (def millisecond "0.001" (/ second 1000))
@@ -74,6 +82,7 @@
 (def day "86400" (* 24 hour))
 (def week "604800" (* 7 day))
 
+
 (def 
  ^{:dynamic true
    :doc "Variable that is used in function get-offset. ->local, <-local and day? funcitons are affected
@@ -81,10 +90,12 @@
    in that time zone."} 
   *offset* nil)
 
+
 (defn get-offset 
   "Funciton returns time zone for input Date object"
   [date]
   (or *offset* (.getTimezoneOffset date)))
+
 
 (def ^:no-doc month-values
   {:january 1
@@ -100,6 +111,7 @@
    :november 11
    :december 12})
 
+
 (def ^:no-doc day-values
   {:monday 1
    :tuesday 2
@@ -109,11 +121,14 @@
    :saturday 6
    :sunday 7})
 
+
 (declare value->date date->value)
+
 
 (defn ^:no-doc utc-date->value [date]
   (when date
     (/ (.getTime date) 1000)))
+
 
 (defn ^:no-doc value->utc-date [value]
   (when value
@@ -122,11 +137,13 @@
          :cljs js/Date)
       (long (* 1000 value)))))
 
+
 (defn- ^:no-doc <-local
   "Given a local timestamp value function normalizes datetime to Greenwich timezone value"
   ([value] (<-local value (get-offset (value->utc-date value))))
   ([value offset]
    (- value (* offset 60))))
+
 
 (defn- ^:no-doc ->local
   "Given a Greenwich timestamp value function normalizes datetime to local timezone value"
@@ -134,30 +151,36 @@
   ([value offset]
    (+ value (* offset 60))))
 
+
 (defn seconds 
   "Function returns value of n seconds as number."
   [n]
   (* n second))
+
 
 (defn minutes 
   "Function returns value of n minutes as number."
   [n]
   (* n minute))
 
+
 (defn hours 
   "Function returns value of n hours as number."
   [n]
   (* n hour))
+
 
 (defn days 
   "Function returns value of n days as number."
   [n]
   (* n day))
 
+
 (defn weeks 
   "Function returns value of n weeks as number."
   [n]
   (* 7 n day))
+
 
 (defn midnight 
   "Function calculates value of midnight for given value. For example
@@ -166,6 +189,7 @@
   [value]
   (round-number value day :floor))
 
+
 (defn leap-year? 
   "Calculates if date value belongs to year that is defined as leap year."
   [year]
@@ -173,6 +197,7 @@
     (and (= 0 (mod year 100)) (= 0 (mod year 400))) true
     (and (= 0 (mod year 100))) false
     :else (= 0 (mod year 4))))
+
 
 (defn days-in-month 
   "Mapping for months. Returns how much are there for input month according
@@ -192,8 +217,10 @@
     11 30
     12 31))
 
+
 (def ^:no-doc normal-year-seconds (* 365 day))
 (def ^:no-doc leap-year-seconds (* 366 day))
+
 
 (defn- gregorian-year-period 
   [start-year end-year]
@@ -204,6 +231,7 @@
              normal-year-seconds)))
     0
     (range start-year end-year)))
+
 
 (def ^:no-doc unix-epoch-year 1970)
 (def ^:no-doc unix-epoch-day 4)
@@ -223,6 +251,7 @@
     {:year 1970
      :seconds 0}))
 
+
 (def 
   ^{:doc "Definition of past years. Lazy sequence of all past years
   according to Gregorian calendar from unix-epoch-year"} 
@@ -235,6 +264,7 @@
                   (- seconds normal-year-seconds))})
     {:year 1970
      :seconds 0}))
+
 
 (defn year-day-mapping
   "Calculates day mapping. Keys are days values are months. Function will return map
@@ -254,13 +284,16 @@
               r
               (zipmap month-days (repeat m)))))))))
 
+
 (def ^{:doc "Year day to month mapping calculated during compilation with year-day-mapping function."} 
   normal-year-day-mapping
   (year-day-mapping false))
 
+
 (def ^{:doc "Year day to month mapping calculated during compilation with year-day-mapping function for leap year."}
   leap-year-day-mapping
   (year-day-mapping true))
+
 
 (defn ^:dynamic *find-year*
   "Finds a year for given value. Returns
@@ -291,17 +324,20 @@
             (recur (round-number (+ position step) 1 (if (pos? diff) :ceil :floor))))
           (recur (round-number (+ position step) 1 (if (pos? diff) :ceil :floor))))))))
 
+
 (defn millisecond? 
   "Returns which millisecond in day does input value belongs to. For example
   for date 15.02.2015 it will return number 0"
   [value]
   (int (* 1000 (mod value 1))))
 
+
 (defn second? 
   "Returns which second in day does input value belongs to. For example
   for date 15.02.2015 it will return number 0"
   [value]
   (int (mod value 60)))
+
 
 (defn minute? 
   "Returns which hour in day does input value belongs to. For example
@@ -312,6 +348,7 @@
       (/ (round-number value minute :floor) minute)
       60)))
 
+
 (defn hour? 
   "Returns which hour in day does input value belongs to. For example
   for date 15.02.2015 it will return number 0"
@@ -320,6 +357,7 @@
     (mod
       (/ (round-number value hour :floor) hour)
       24)))
+
 
 (defn day? 
   "Returns which day in week does input value belongs to. For example
@@ -333,10 +371,12 @@
          (/ (round-number value day :floor) day))
         7))))
 
+
 (defn weekend? 
   "Returns true if value in seconds belongs to *weekend-days*"
   [value]
   (boolean (*weekend-days* (day? value))))
+
 
 (defn day-in-year?
   "Returns day in year period (1 - 366)"
@@ -388,6 +428,7 @@
          leap-year-day-mapping
          normal-year-day-mapping)))))
 
+
 (defn day-in-month? 
   "Returns which day (Gregorian) in month input value belongs to. For example
   for date 15.02.2015 it will return number 15"
@@ -408,6 +449,7 @@
                   :relative-day relative-day})))
     (+ 1 (- relative-day (first-day-in-month month leap-year?)))))
 
+
 (defn first-day-in-month? 
   "Returns true if value in seconds belongs to first day in month."
   [value]
@@ -421,10 +463,12 @@
         days-in-month' (days-in-month (month? value) (leap-year? value))]
     (= days-in-month' day-in-month)))
 
+
 (defn year?
   "For given value year? returns year that value belogs to."
   [value]
   ((comp :year) (*find-year* value)))
+
 
 (defn date
   "Constructs new Date object.
@@ -477,6 +521,7 @@
        #?(:clj (java.util.Date. (long (* 1000 (->local seconds))))
           :cljs (js/Date. (long (* 1000 (->local seconds)))))))))
 
+
 (defn period
   "Returns number of seconds of all input arguments added together"
   ([{:keys [weeks days hours seconds minutes milliseconds]
@@ -494,6 +539,7 @@
             (* minutes minute)
             (* milliseconds millisecond)])))
 
+
 (defn value->date
   "Returns Date instance for value in seconds for current. Function first
   transforms value to local *offset* value."
@@ -503,12 +549,14 @@
         :cljs js/Date)
      (long (* 1000 (->local value))))))
 
+
 (defn date->value
   "Returns value of Date instance in seconds. Value is localized to offset"
   ([t]
    (when t
      (<-local
        (/ (.getTime t) 1000)))))
+
 
 (defn intervals
   "Given sequence of timestamps (Date) values returns period values between each timestamp
@@ -551,7 +599,6 @@
 
 
 ;; TIME FRAMES
-
 (defmulti calendar-frame 
   "Returns sequence of days for given value that are contained in that frame-type. List is consisted
   of keys:
@@ -598,6 +645,7 @@
         (assoc context :holiday? (*holiday?* context))
         context))))
 
+
 (defn time-context 
   "Similar to day-context only for time values [millisecond, second, minute, hour]"
   [value]
@@ -606,40 +654,62 @@
       [:value :hour :minute :second :millisecond]
       ((juxt identity hour? minute? second? millisecond?) value))))
 
+
 (defn day-time-context 
   "Composition of time-context and day-context"
   [value]
   (merge (day-context value) (time-context value)))
 
+
 (defmethod calendar-frame :year [value _]
   (let [year (year? value)
+        leap? (leap-year? year) 
         first-day (date->value (date year 1 1))]
-    (map
-      day-context
-      (range first-day (+ first-day (days (if (leap-year? year) 367 366))) day))))
+    (loop [cd first-day
+           m 1
+           r []]
+      (if (> m 12) r
+        (recur 
+          (+ cd (days (days-in-month m leap?)))
+          (inc m)
+          (concat r (calendar-frame cd :month)))))))
 
 (defmethod calendar-frame "year" [value _]
   (calendar-frame value :year))
 
+
 (defmethod calendar-frame :month [value _]
   (let [year (year? value)
-        leap-year (leap-year? value)
+        leap-year (leap-year? year)
         month (month? value) 
+        month-days (days-in-month month leap-year)
         current-day-in-month (day-in-month? value)
         current-day (midnight value)
+        week (week-in-year? value)
         first-day (- 
                     current-day 
-                    (days (dec current-day-in-month)))]
+                    (days (dec current-day-in-month)))
+        first-day-in-week (day? value)]
+    (for [d (range month-days)
+          :let [v (+ first-day (days d))
+                day (mod (+ first-day-in-week d) 7)
+                day (if (zero? day) 7 day)
+                week (+ week (quot (+ d (- 7 first-day-in-week)) 7))]]
 
-    (map
-      day-context
-      (range 
-        first-day 
-        (+ first-day (days (days-in-month month leap-year)))
-        day))))
+      {:value v
+       :month month
+       :year year
+       :week week
+       :day day 
+       :day-in-month (inc d)
+       :first-day-in-month? (= d 1)
+       :last-day-in-month? (= d (dec month-days))
+       :weekend (boolean (*weekend-days* day))})))
+
 
 (defmethod calendar-frame "month" [value _]
   (calendar-frame value :month))
+
 
 (defmethod calendar-frame :week [value _]
   (let [w (week-in-year? value)]
@@ -647,9 +717,87 @@
       (comp #{w} :week)
       (calendar-frame value :month))))
 
+
 (defmethod calendar-frame "week" [value _]
   (calendar-frame value :week))
 
+
+(defprotocol TimeValueProtocol
+  (time->value [this])
+  (value->time [this]))
+
+
+#?(:clj
+   (extend-protocol TimeValueProtocol
+     java.lang.Long
+     (value->time [this] (value->date this))
+     java.lang.Integer
+     (value->time [this] (value->date this))
+     java.lang.Number
+     (value->time [this] (value->date this))
+     java.lang.Float 
+     (value->time [this] (value->date this))
+     java.lang.Double
+     (value->time [this] (value->date this))
+     java.math.BigInteger
+     (value->time [this] (value->date this))
+     java.math.BigDecimal
+     (value->time [this] (value->date this))
+     clojure.lang.BigInt
+     (value->time [this] (value->date this))
+     clojure.lang.Ratio
+     (value->time [this] (value->date this))
+     clojure.lang.ASeq
+     (value->time [this] (map value->time this))
+     (time->value [this] (map time->value this))
+     clojure.lang.APersistentVector
+     (value->time [this] (mapv value->date this))
+     (time->value [this] (mapv time->value this))
+     clojure.lang.APersistentSet
+     (value->time [this] (set (map value->date this)))
+     (time->value[this] (set (map time->value this)))
+     
+     java.util.Date 
+     (time->value [this] (date->value this))
+     java.time.Instant
+     (time->value [this] 
+       (date->value 
+         (java.util.Date/from this))))
+   :cljs
+   (extend-protocol TimeValueProtocol
+     number
+     (value->time [this] (date->value this))
+     js/Date
+     (time->value [this] (date->value this))
+     cljs.core/PersistentVector
+     (value->time [this] (mapv value->time this))
+     (time->value [this] (mapv time->value this))
+     cljs.core/PersistentHashSet
+     (value->time [this] (set (map value->time this)))
+     (time->value [this] (set (map time->value this)))))
+
+
+#?(:clj
+   (defmacro time-as-value 
+     "bindings => [name (time->value x) ...]
+
+     Similar to let or binding. Casts al bound symbol values with
+     function time->value. Then evaluates body."
+     [bindings & body]
+     (assert (vector? bindings) "Bindings should be vector")
+     (assert (even? (count bindings)) "Odd count of bindings. Try to even binding count.")
+     (cond
+       (= (count bindings) 0) `(do ~@body)
+       (symbol? (bindings 0)) (let [bindings (reduce
+                                               (fn [r [s v]]
+                                                 (conj r s (list 'vura.core/time->value v)))
+                                               []
+                                               (partition 2 bindings))] 
+                                `(let ~bindings 
+                                   ~@body))
+       :else (throw 
+               (IllegalArgumentException.
+                 "with-moments only allows Symbols in bindings")))))
 
 (comment
   (def hr-holidays 
@@ -684,9 +832,11 @@
       time))
 
   (->
-    (date 2018 12 25 0 0 0 0)
+    (date 23018)
     date->value
-    day-time-context)
+    (calendar-frame :month)
+    count
+    time)
 
   (map day-context (take 20 (iterate (partial + (days 3.5)) (date->value (date 2018)))))
 
@@ -721,4 +871,11 @@
       value->date                     ;; #inst "2030-12-24T03:00:00.000-00:00"
       get-offset))                    ;; -240
 
+  (time->value (java.time.Instant/now))
+  (time->value (java.sql.Timestamp. 2018))
+
+  (macroexpand-1
+    '(time-as-value [a (date)
+                     b (date 2017)]
+                    (value->time b)))
 )
