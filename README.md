@@ -2,20 +2,29 @@
 
 [![Clojars Project](https://img.shields.io/clojars/v/kovacnica/vura.core.svg)](https://clojars.org/kovacnica/vura.core)
 
-![Alt text](resources/images/infinityclock.jpg?raw=true "Vura")
+![Alt text](resources/images/infinityclock.jpg?style=centerme "Vura")
 
 Vura is small clojure/script **zero dependency** time computation and manipulation library. Library uses numeric representation of
 time to compute Gregorian calendar years, months and so on. Vura calculates time with current system offset by transforming local 
-timestamp value to UTC value at given time with function **date->value** that returns plain number of seconds. When computation/manipulation
-is over numeric value of time should be transformed to Date representation by caling **value->date**. 
-For rest of core functions check [API docs](http://gersak.github.io/vura/api/index.html).
+timestamp value to UTC value at given time with function **time->value** that returns plain number of seconds. When computation/manipulation
+is over numeric value of time should be transformed to Date representation by caling **value->time**. 
+For rest of core functions check [API docs](http://gersak.github.io/vura/api/vura.core.html). 
+
+Usual workflow would be to transform java.util.Date or some other object to numeric value with 
+**time->value** protocol implementation and afterwards do the computation in numeric domain. 
+vura.core offers at par functions to **clj(s)-time** only those functions work in numeric
+domain and are immutable. This means working with numbers instead of objects to compute values. After computation 
+is over if needed use **value->time** implementation of __TimeValueProtocol__ to transform numeric 
+values to java.util.Date, or leave them in numeric form if that fits you. Vura has nice macro
+that transforms Date instances to their value representations and afterwards evaluates body -> **time-as-value**. Use it
+to reduce boilerplate when possible.
 
 
 
 ## Why?
 
 * Immutability
-* Zero dependency
+* **Zero dependency**, only **clojure.core**
 * Simple and familiar algebra in number domain
 * Both Clojure and Clojurescript library with same 99% of code
 
@@ -255,7 +264,7 @@ Vura returns Date representations from numeric values and all values can be roun
 values to `(days 3.5)` or `(hours 11)` or maybe `(period {:week 2 :days 3})`
 
 
-## Use clojure.core/qout
+## Use clojure.core/quot
 
 **quot** is great way to calculate how long did some period(value) last in time units. For example
 ```clojure
