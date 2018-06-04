@@ -2,7 +2,7 @@
 
 [![Clojars Project](https://img.shields.io/clojars/v/kovacnica/vura.core.svg)](https://clojars.org/kovacnica/vura.core)
 
-![Alt text](resources/images/infinityclock.jpg?style=centerme,raw=true "Vura")
+![Alt text](resources/images/infinityclock.jpg?raw=true "Vura")
 
 Vura is small clojure/script **zero dependency** time computation and manipulation library. Library uses numeric representation of
 time to compute Gregorian calendar years, months and so on. Vura calculates time with current system offset by transforming local 
