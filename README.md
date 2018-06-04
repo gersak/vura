@@ -274,3 +274,8 @@ values to `(days 3.5)` or `(hours 11)` or maybe `(period {:week 2 :days 3})`
 
 (qout (vura.core/interval (date 2018) (date 2019)) vura.core/minute) ;; 525600000
 ```
+## License
+
+Copyright © 2018 Robert Gersak
+
+Released under the MIT license.
