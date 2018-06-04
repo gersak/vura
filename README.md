@@ -2,6 +2,7 @@
 
 [![Clojars Project](https://img.shields.io/clojars/v/kovacnica/vura.core.svg)](https://clojars.org/kovacnica/vura.core)
 
+![Alt text](resources/images/infinityclock.jpg?raw=true "Vura")
 
 Vura is small clojure/script **zero dependency** time computation and manipulation library. Library uses numeric representation of
 time to compute Gregorian calendar years, months and so on. Vura calculates time with current system offset by transforming local 
@@ -252,3 +253,13 @@ to put context on calendar-frame (to flag holidays and weekend-days).
 
 Vura returns Date representations from numeric values and all values can be round-number(ed) so use that. Round 
 values to `(days 3.5)` or `(hours 11)` or maybe `(period {:week 2 :days 3})`
+
+
+## Use clojure.core/qout
+
+**quot** is great way to calculate how long did some period(value) last in time units. For example
+```clojure
+(qout (period {:weeks 3 :hours 10 :minutes 11 :seconds 32821}) vura.core/hour) ;; 523
+
+(qout (vura.core/interval (date 2018) (date 2019)) vura.core/minute) ;; 525600000 
+```
