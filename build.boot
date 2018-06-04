@@ -15,7 +15,7 @@
 (require '[codox.boot :refer [codox]])
 (require '[adzerk.boot-test :refer :all])
 
-(def +version+ "0.5.2-SNAPSHOT")
+(def +version+ "0.5.3-SNAPSHOT")
 
 (task-options!
   pom {:project 'kovacnica/vura

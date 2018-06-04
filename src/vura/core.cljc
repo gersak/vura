@@ -628,7 +628,7 @@
    :cljs
    (extend-protocol TimeValueProtocol
      number
-     (value->time [this] (date->value this))
+     (value->time [this] (value->date this))
      js/Date
      (time->value [this] (date->value this))
      cljs.core/PersistentVector
@@ -645,7 +645,7 @@
   value in milliseconds"
   [& timestamps]
   (assert 
-    (every? (partial satisfies? TimeValueProtocol) timestamps) 
+    (every? #(satisfies? TimeValueProtocol %) timestamps) 
     (str "Wrong input value."))
   (let [timestamps' (map time->value timestamps)
         t1 (rest timestamps')
@@ -663,9 +663,9 @@
    (defmacro with-time-configuration 
      "Utility macro to put context frame on computation scope. Specify:
 
-     * holiday?     - (fn [day-context] true | false)
-     * offset       - +/- number
-     * weekend-days - (fn [number] true | false)"
+     :holiday?     - (fn [day-context] true | false)
+     :offset       - +/- number
+     :weekend-days - (fn [number] true | false)"
      [{:keys [offset
               holiday?
               weekend-days]

@@ -1,22 +1,24 @@
+<p align="center">
+  <img width="460" height="300" src="resources/images/infinityclock.jpg" style="border-radius:20px;">
+</p>
+
 # Vura (core)
 
 [![Clojars Project](https://img.shields.io/clojars/v/kovacnica/vura.core.svg)](https://clojars.org/kovacnica/vura.core)
 
-![Alt text](resources/images/infinityclock.jpg?style=centerme "Vura")
-
-Vura is small clojure/script **zero dependency** time computation and manipulation library. Library uses numeric representation of
-time to compute Gregorian calendar years, months and so on. Vura calculates time with current system offset by transforming local 
+Vura is small Clojure/script **zero dependency** time computation and manipulation library. Library uses numeric representation of
+time to compute Gregorian calendar years, months and so on. Vura calculates time with current system offset by transforming local
 timestamp value to UTC value at given time with function **time->value** that returns plain number of seconds. When computation/manipulation
-is over numeric value of time should be transformed to Date representation by caling **value->time**. 
-For rest of core functions check [API docs](http://gersak.github.io/vura/api/vura.core.html). 
+is over numeric value of time should be transformed to Date representation by caling **value->time**.
+For rest of core functions check [API docs](http://gersak.github.io/vura/api/vura.core.html).
 
-Usual workflow would be to transform java.util.Date or some other object to numeric value with 
-**time->value** protocol implementation and afterwards do the computation in numeric domain. 
+Usual workflow would be to transform java.util.Date or some other object to numeric value with
+**time->value** protocol implementation and afterwards do the computation in numeric domain.
 vura.core offers at par functions to **clj(s)-time** only those functions work in numeric
-domain and are immutable. This means working with numbers instead of objects to compute values. After computation 
-is over if needed use **value->time** implementation of __TimeValueProtocol__ to transform numeric 
-values to java.util.Date, or leave them in numeric form if that fits you. Vura has nice macro
-that transforms Date instances to their value representations and afterwards evaluates body -> **time-as-value**. Use it
+domain and on immutable values. This means working with numbers instead of objects to compute values. After computation
+is over if needed use **value->time** implementation of __TimeValueProtocol__ to transform numeric
+values to _java.util.Date_ | _js/Date_, or leave them in numeric form if that fits you. Vura has nice macro
+that transforms __Date__ instances to their value representations and afterwards evaluates body -> **time-as-value**. Use it
 to reduce boilerplate when possible.
 
 
@@ -85,8 +87,8 @@ vura.core=> (time (round-number 182.8137172 0.25 :floor))
 
 ```
 
-Rounding strategy :floor and :ceil are selfexplanatory. :up and :down are different in that :up will 
-round number up if value is exactly half of target-number and :down will round number down. 
+Rounding strategy :floor and :ceil are selfexplanatory. :up and :down are different in that :up will
+round number up if value is exactly half of target-number and :down will round number down.
 Otherwise value will be rounded to nearest value. I.E.
 
 ``` clojure
@@ -105,8 +107,8 @@ vura.core=> (time (round-number 182.625 0.25 :up))
 
 ## Choices and assumptions
 
-Values of timestamps are normalized to Greenwich Mean Time. As base unit of time **vura** uses **second**. 
-This is not usual choice from programmers perspective but not that unusual for anyone else that is using 
+Values of timestamps are normalized to Greenwich Mean Time. As base unit of time **vura** uses **second**.
+This is not usual choice from programmers perspective but not that unusual for anyone else that is using
 [SI](https://en.wikipedia.org/wiki/SI_base_unit). So bare with me it doesn't matter in the end anyway.
 
 ```clojure
@@ -123,18 +125,18 @@ This is not usual choice from programmers perspective but not that unusual for a
 Time constructs defined this way can be easly added, subtracted, multiplied, devided, round-numbered.
 
 ```clojure
-(defn seconds 
+(defn seconds
   "Function returns value of n seconds as number."
   [n]
   (* n second))
 
-(defn second? 
+(defn second?
   "Returns which second in day does input value belongs to. For example
   for date 15.02.2015 it will return number 0"
   [value]
   (int (mod value 60)))
 
-(defn midnight 
+(defn midnight
   "Function calculates value of midnight for given value. For example
   if some date value is inputed it will round-number to the begining of
   that day."
@@ -148,8 +150,8 @@ Yout get the idea...
 
 ## What else?
 
-How about... I've used to have alot of problems working with calendar, calculating weekends, 
-working days and holidays, calculating daily wage or spent/unused vacation days. 
+How about... I've used to have alot of problems working with calendar, calculating weekends,
+working days and holidays, calculating daily wage or spent/unused vacation days.
 Vura offers functions like day-(time-)context:
 
 ```clojure
@@ -159,19 +161,19 @@ Vura offers functions like day-(time-)context:
     day-time-context)
 
 
-{:day 2, 
- :hour 0, 
- :week 52, 
- :weekend? false, 
- :first-day-in-month? false, 
- :second 0, 
- :value 1545696000, 
- :month 12, 
- :year 2018, 
- :millisecond 0, 
- :holiday? false, 
- :last-day-in-month? false, 
- :day-in-month 25, 
+{:day 2,
+ :hour 0,
+ :week 52,
+ :weekend? false,
+ :first-day-in-month? false,
+ :second 0,
+ :value 1545696000,
+ :month 12,
+ :year 2018,
+ :millisecond 0,
+ :holiday? false,
+ :last-day-in-month? false,
+ :day-in-month 25,
  :minute 0}
 ```
 
@@ -188,7 +190,7 @@ but how do holidays fit in. Checkout **with-time-configuration** macro for custo
 (require '[vura.core :refer [date day day-context with-time-configuration date->value]])
 
 
-(def hr-holidays 
+(def hr-holidays
     #{[1 1]
       [6 1]
       [1 5]
@@ -225,12 +227,12 @@ but how do holidays fit in. Checkout **with-time-configuration** macro for custo
 ```
 
 What happend here? Lets say that we want to go on vacation from 15 of June for 20 days. There are some holidays in June as
-well the fact that we are living in socially advanced culture with 3 day weekend that is Friday, Saturday and Sunday. 
-So how many days did we actually spent?
+well the fact that we are living in socially advanced culture with 3 day weekend that is Friday, Saturday and Sunday.
+So how many days have we actually spent?
 
 
-**with-time-configuration** macro allows us to put time values in context. Vura has dynamic variables **\*wekend-days\*, 
-\*week-days\* \*holiday?\*, \*offset\*** that can be used to put values in context. For example if we are interesed for 
+**with-time-configuration** macro allows us to put time values in context. Vura has dynamic variables **\*wekend-days\*,
+\*week-days\* \*holiday?\*, \*offset\*** that can be used to put values in context. For example if we are interesed for
 sequence of values what is theirs **day-context** with configuration definition above `(mapv day-context)`
 will return vector of maps with following keys:
 
@@ -251,24 +253,24 @@ After that everything else is simple. We just remove :holiday? and :weekend? and
 
 ## Calendar Frame
 **day-context** function solves most of calculation challenges. Still there are some use cases where it is usefull to have
-function that can return day-context for whole month or year for given input value. 
-Multimethod **calendar-frame** provides implementations for :year, :month and :week 
-view for given value. This function might be usefull in frontend for creating different UI components
+function that can return day-context for whole month or year for given input value.
+Multimethod **calendar-frame** provides implementations for **:year, :month** and **:week**
+view for given value and can be extended to other frame types. This function might be usefull in frontend for creating different UI components
 with OM or Reagent or some other Clojure/script frontend library. Don't forget to use **with-time-configuration** macro
 to put context on calendar-frame (to flag holidays and weekend-days).
 
 
 ## Don't forget about round-number
 
-Vura returns Date representations from numeric values and all values can be round-number(ed) so use that. Round 
+Vura returns Date representations from numeric values and all values can be round-number(ed) so use that. Round
 values to `(days 3.5)` or `(hours 11)` or maybe `(period {:week 2 :days 3})`
 
 
-## Use clojure.core/quot
+## Use clojure.core functions
 
 **quot** is great way to calculate how long did some period(value) last in time units. For example
 ```clojure
 (qout (period {:weeks 3 :hours 10 :minutes 11 :seconds 32821}) vura.core/hour) ;; 523
 
-(qout (vura.core/interval (date 2018) (date 2019)) vura.core/minute) ;; 525600000 
+(qout (vura.core/interval (date 2018) (date 2019)) vura.core/minute) ;; 525600000
 ```
