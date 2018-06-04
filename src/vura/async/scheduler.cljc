@@ -10,7 +10,6 @@
      :refer [start! stop! make-job
              started? started-at?
              finished? active?] :as j]
-    ; #?(:clj [clojure.tools.logging :as log])
     #?(:clj [clojure.core.async 
              :refer [go go-loop <! put! chan 
                      timeout alts! close!] :as async]

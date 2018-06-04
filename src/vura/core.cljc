@@ -29,10 +29,14 @@
              #?(:clj (if (some #(% target-number) [float? double?])
                        (bigdec x)
                        x)
+                ;; TODO - implement normalization for Clojurescript?
                 :cljs x))]
      (case target-number
        0 0
-       ;; First normalize numbers to floating point or integer
+       ;; Try (* 101 0.1) that should be equal to 10.1 bot instead
+       ;; java rounds doubles to 10.100000000000001 
+       ;; TO overcome this normalize floats and doubles to bigdec
+       ;; and return double as result
        (let [number (normalize-number number)
              target-number (normalize-number target-number) 
              round-how? (keyword round-how?)
@@ -193,10 +197,10 @@
 (defn leap-year? 
   "Calculates if date value belongs to year that is defined as leap year."
   [year]
-  (cond
-    (and (= 0 (mod year 100)) (= 0 (mod year 400))) true
-    (and (= 0 (mod year 100))) false
-    :else (= 0 (mod year 4))))
+  (if ((comp not zero?) (mod year 4)) false
+    (if (comp not zero? (mod year 100)) true
+      (if ((comp not zero?) (mod year 400)) true
+        true))))
 
 
 (defn days-in-month 
@@ -378,6 +382,12 @@
   (boolean (*weekend-days* (day? value))))
 
 
+(defn year?
+  "For given value year? returns year that value belogs to."
+  [value]
+  ((comp :year) (*find-year* value)))
+
+
 (defn day-in-year?
   "Returns day in year period (1 - 366)"
   [value]
@@ -460,14 +470,8 @@
   "Returns true if value in seconds belongs to last day in month."
   [value]
   (let [day-in-month (day-in-month? value)
-        days-in-month' (days-in-month (month? value) (leap-year? value))]
+        days-in-month' (days-in-month (month? value) (leap-year? (year? value)))]
     (= days-in-month' day-in-month)))
-
-
-(defn year?
-  "For given value year? returns year that value belogs to."
-  [value]
-  ((comp :year) (*find-year* value)))
 
 
 (defn date
@@ -540,6 +544,28 @@
             (* milliseconds millisecond)])))
 
 
+(defn period?
+  "Returns duration of for input value in form of map with keys:
+
+   :weeks
+   :days
+   :hours
+   :minutes
+   :seconds
+   :milliseconds"
+  [value]
+  (letfn [(round-period [value limit]
+            (let [r (round-number value limit :floor)]
+              [(- value r) (int (quot r limit))]))]
+    (let [[r w] (round-period value week)
+          [r d] (round-period r day)
+          [r h] (round-period r hour)
+          [r m] (round-period r minute)
+          [r s] (round-period r second)
+          [r ms] (round-period r millisecond)]
+      {:weeks w :hours h :days d :minutes m :seconds s :milliseconds ms})))
+
+
 (defn value->date
   "Returns Date instance for value in seconds for current. Function first
   transforms value to local *offset* value."
@@ -558,14 +584,70 @@
        (/ (.getTime t) 1000)))))
 
 
+(defprotocol TimeValueProtocol
+  (time->value [this] "Return numeric value for given object.")
+  (value->time [this] "Returns Date for given value."))
+
+
+#?(:clj
+   (extend-protocol TimeValueProtocol
+     java.lang.Long
+     (value->time [this] (value->date this))
+     java.lang.Integer
+     (value->time [this] (value->date this))
+     java.lang.Number
+     (value->time [this] (value->date this))
+     java.lang.Float 
+     (value->time [this] (value->date this))
+     java.lang.Double
+     (value->time [this] (value->date this))
+     java.math.BigInteger
+     (value->time [this] (value->date this))
+     java.math.BigDecimal
+     (value->time [this] (value->date this))
+     clojure.lang.BigInt
+     (value->time [this] (value->date this))
+     clojure.lang.Ratio
+     (value->time [this] (value->date this))
+     clojure.lang.ASeq
+     (value->time [this] (map value->time this))
+     (time->value [this] (map time->value this))
+     clojure.lang.APersistentVector
+     (value->time [this] (mapv value->date this))
+     (time->value [this] (mapv time->value this))
+     clojure.lang.APersistentSet
+     (value->time [this] (set (map value->date this)))
+     (time->value[this] (set (map time->value this)))
+     
+     java.util.Date 
+     (time->value [this] (date->value this))
+     java.time.Instant
+     (time->value [this] 
+       (date->value 
+         (java.util.Date/from this))))
+   :cljs
+   (extend-protocol TimeValueProtocol
+     number
+     (value->time [this] (date->value this))
+     js/Date
+     (time->value [this] (date->value this))
+     cljs.core/PersistentVector
+     (value->time [this] (mapv value->time this))
+     (time->value [this] (mapv time->value this))
+     cljs.core/PersistentHashSet
+     (value->time [this] (set (map value->time this)))
+     (time->value [this] (set (map time->value this)))))
+
+
+
 (defn intervals
   "Given sequence of timestamps (Date) values returns period values between each timestamp
   value in milliseconds"
   [& timestamps]
   (assert 
-    (every? (partial instance? #?(:clj java.util.Date :cljs js/Date)) timestamps) 
+    (every? (partial satisfies? TimeValueProtocol) timestamps) 
     (str "Wrong input value."))
-  (let [timestamps' (map date->value timestamps)
+  (let [timestamps' (map time->value timestamps)
         t1 (rest timestamps')
         t2 (butlast timestamps')]
     (map (partial * 1000) (map - t1 t2))))
@@ -577,14 +659,13 @@
   (first (intervals start end)))
 
 
-#?(:clj 
+#?(:clj
    (defmacro with-time-configuration 
      "Utility macro to put context frame on computation scope. Specify:
-      
-    * offset       - +/- number
-    * holiday?     - (fn [day-context] true | false)
-    * weekend-days - (fn [number] true | false)"
 
+     * holiday?     - (fn [day-context] true | false)
+     * offset       - +/- number
+     * weekend-days - (fn [number] true | false)"
      [{:keys [offset
               holiday?
               weekend-days]
@@ -664,7 +745,7 @@
 (defmethod calendar-frame :year [value _]
   (let [year (year? value)
         leap? (leap-year? year) 
-        first-day (date->value (date year 1 1))]
+        first-day (time->value (date year 1 1))]
     (loop [cd first-day
            m 1
            r []]
@@ -722,60 +803,6 @@
   (calendar-frame value :week))
 
 
-(defprotocol TimeValueProtocol
-  (time->value [this])
-  (value->time [this]))
-
-
-#?(:clj
-   (extend-protocol TimeValueProtocol
-     java.lang.Long
-     (value->time [this] (value->date this))
-     java.lang.Integer
-     (value->time [this] (value->date this))
-     java.lang.Number
-     (value->time [this] (value->date this))
-     java.lang.Float 
-     (value->time [this] (value->date this))
-     java.lang.Double
-     (value->time [this] (value->date this))
-     java.math.BigInteger
-     (value->time [this] (value->date this))
-     java.math.BigDecimal
-     (value->time [this] (value->date this))
-     clojure.lang.BigInt
-     (value->time [this] (value->date this))
-     clojure.lang.Ratio
-     (value->time [this] (value->date this))
-     clojure.lang.ASeq
-     (value->time [this] (map value->time this))
-     (time->value [this] (map time->value this))
-     clojure.lang.APersistentVector
-     (value->time [this] (mapv value->date this))
-     (time->value [this] (mapv time->value this))
-     clojure.lang.APersistentSet
-     (value->time [this] (set (map value->date this)))
-     (time->value[this] (set (map time->value this)))
-     
-     java.util.Date 
-     (time->value [this] (date->value this))
-     java.time.Instant
-     (time->value [this] 
-       (date->value 
-         (java.util.Date/from this))))
-   :cljs
-   (extend-protocol TimeValueProtocol
-     number
-     (value->time [this] (date->value this))
-     js/Date
-     (time->value [this] (date->value this))
-     cljs.core/PersistentVector
-     (value->time [this] (mapv value->time this))
-     (time->value [this] (mapv time->value this))
-     cljs.core/PersistentHashSet
-     (value->time [this] (set (map value->time this)))
-     (time->value [this] (set (map time->value this)))))
-
 
 #?(:clj
    (defmacro time-as-value 
@@ -796,8 +823,11 @@
                                 `(let ~bindings 
                                    ~@body))
        :else (throw 
-               (IllegalArgumentException.
-                 "with-moments only allows Symbols in bindings")))))
+               #?(:clj 
+                  (IllegalArgumentException.
+                    "time-as-value only allows Symbols in bindings")
+                  :cljs
+                  (js/Error. "time-as-value allows only Symbols in bindings"))))))
 
 (comment
   (def hr-holidays 
@@ -821,7 +851,7 @@
      :holiday? (fn [{:keys [day-in-month month]}]
                  (boolean (hr-holidays [day-in-month month])))}
     (->>
-      (iterate (partial + day) (date->value vacation-start))
+      (iterate (partial + day) (time->value vacation-start))
       (take 20)
       ;; Be carefull if this is not realized in with-time-configuration
       ;; configuration bindings won't work. Use mapv instead map
@@ -833,17 +863,17 @@
 
   (->
     (date 23018)
-    date->value
-    (calendar-frame :month)
+    time->value 
+    (calendar-frame :year)
     count
     time)
 
-  (map day-context (take 20 (iterate (partial + (days 3.5)) (date->value (date 2018)))))
+  (map day-context (take 20 (iterate (partial + (days 3.5)) (time->value (date 2018)))))
 
-  (def some-day (date 2030 6 15 8 15 20 300))
-  (def some-day-value (date->value some-day))
+  (def some-day (date 2018 5 30 23 59 23 128))
+  (def some-day-value (time->value some-day))
   (def other-day-value (-> some-day 
-                           date->value 
+                           time->value
                            (+ (period {:weeks 26 
                                        :days 3 
                                        :hours 82 
@@ -872,7 +902,7 @@
       get-offset))                    ;; -240
 
   (time->value (java.time.Instant/now))
-  (time->value (java.sql.Timestamp. 2018))
+  (value->time (time->value (java.sql.Timestamp. (.getTime (date 2018)))))
 
   (macroexpand-1
     '(time-as-value [a (date)

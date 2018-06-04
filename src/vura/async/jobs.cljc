@@ -2,9 +2,7 @@
   #?(:cljs
      (:require-macros 
        [clojure.core.async.macros 
-        :refer [go go-loop]]
-       [dreamcatcher.core 
-        :refer [with-stm]]))
+        :refer [go go-loop]]))
   (:require
     [vura.core :as core]
     [dreamcatcher.util 
@@ -20,7 +18,6 @@
              disable]]
     [dreamcatcher.core
      :refer [make-state-machine
-             #?@(:clj [with-stm])
              data
              update-data!
              add-state
@@ -28,18 +25,18 @@
              add-validator
              remove-transition
              remove-validator
-             remove-state]
-     #?@(:cljs [:refer-macros [with-stm]])]
+             remove-state]]
     #?@(:clj [[clojure.core.async :refer [go go-loop chan <! mult mix admix timeout]]])
     #?@(:cljs [[clojure.core.async :refer [chan <! mult mix admix timeout]]])))
+
 
 (def ^:private start-mark "*started-at*")
 (def ^:private end-mark "*ended-at*")
 (def ^:private running-mark "*running*")
 (def ^:private disabled-mark "*disabled*")
 
-;; Basic state machine for linear job execution
 
+;; Basic state machine for linear job execution
 (def ^:private blank-job-machine
   (make-state-machine
     [::initialize ::start (fn [x] 
@@ -52,11 +49,13 @@
 (defn- get-next-phase [job phase]
   (-> job (get-transitions phase) keys first))
 
+
 (defn- get-job-phases [job]
   (loop [phase ::start
          phases nil]
     (if (= phase ::finished) (-> phases reverse rest)
       (recur (get-next-phase job phase) (conj phases phase)))))
+
 
 (defn- get-previous-phase [job phase]
   (or 
@@ -85,6 +84,7 @@
                                                                        running-mark false})))
      job)))
 
+
 (defn insert-phase
   "Inserts new phase after at-phase"
   ([job new-phase at-phase function validator]
@@ -100,6 +100,7 @@
      (when validator (add-validator job new-phase next-phase validator))
      (when p-validator (add-validator job at-phase new-phase validator))
      job)))
+
 
 (defn remove-phase
   "Removes phase from job"
@@ -138,6 +139,7 @@
   If validator doesn't allow execution to continue than Job is stoped
   at current phase."))
 
+
 (defn make-job-shell [phases]
   (let [job (atom blank-job-machine)]
     (loop [phases phases]
@@ -151,6 +153,7 @@
 
 (defn make-job [phases]
   (let [job-data (atom nil)
+        ;; Create \"collector\" that will monitor start and end state 
         ground-channel (chan 1)
         end-collector (mix ground-channel)
         state-machine-shell (make-job-shell phases)
@@ -163,19 +166,19 @@
             ::start
             1
             (map
-              (with-stm x
-                (swap! job-data assoc start-mark (get (data x) start-mark))
-                true))))
+              #(as-> % x
+                 (swap! x job-data assoc start-mark (get (data x) start-mark))
+                 true))))
     (admix
       end-collector
       (suck state-machine-instance
             ::finished
             1
             (map
-              (with-stm x
-                (swap! job-data assoc end-mark (get (data x) end-mark))
-                (swap! job-data assoc running-mark false)
-                true))))
+              #(as-> % x
+                 (swap! job-data assoc end-mark (get (data x) end-mark))
+                 (swap! job-data assoc running-mark false)
+                 true))))
     ;; For state monitoring
     ;; Can't see a way to properly monitor which
     ;; phase is currently active

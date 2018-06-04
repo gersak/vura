@@ -195,7 +195,6 @@ but how do holidays fit in. Checkout **with-time-configuration** macro for custo
 
 (with-time-configuration
     {:weekend-days #{5 6 7}
-     :week-days #{1 2 3 4}
      :holiday? (fn [{:keys [day-in-month month]}]
                  (boolean (hr-holidays [day-in-month month])))}
     (->>

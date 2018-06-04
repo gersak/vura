@@ -2,6 +2,7 @@
   :source-paths #{"src"}
   :dependencies '[[adzerk/boot-cljs "2.1.4" :scope "test"]
                   [adzerk/boot-reload "0.5.2" :scope "test"]
+                  [adzerk/boot-test "1.2.0" :scope "test"]
                   [pandeiro/boot-http "0.8.3" :scope "test"]
                   [org.clojure/tools.logging "0.5.0-alpha" :scope "test"]
                   [kovacnica/dreamcatcher "1.0.7-SNAPSHOT"]
@@ -12,6 +13,7 @@
 (require '[adzerk.boot-cljs :refer [cljs]])
 (require '[pandeiro.boot-http :refer [serve]])
 (require '[codox.boot :refer [codox]])
+(require '[adzerk.boot-test :refer :all])
 
 (def +version+ "0.5.2-SNAPSHOT")
 
@@ -45,7 +47,10 @@
 
 (deftask dev-test []
   (set-env! :source-paths #{"src" "test"})
-  (repl))
+  (comp 
+    (watch)
+    (test)
+    (repl :server true)))
 
 (deftask deploy-core []
   (set-env! 

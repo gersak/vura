@@ -8,6 +8,7 @@
     [dreamcatcher.core :refer :all])
   (:import [java.util.concurrent LinkedBlockingQueue Executors TimeUnit SynchronousQueue]))
 
+
 (def ^:private blank-job-machine
   (make-state-machine
     [:initialize :start (fn [x] (update-data! x assoc "*started-at*" (core/date)))
@@ -17,13 +18,12 @@
                         (update-data! assoc "*ended-at*" (core/date))
                         (update-data! assoc "*running*" false)))]))
 
+
 (defn job-life [x]
   (if (get-in x [:data "*running*"])
     (if (= :finished (state x))
       (do
         ;; TODO - include logging
-        ; (when *agent*
-        ;   (debug "Job with phases " (-> x stm? keys)  " is finished... Setting *running* to false!"))
         (send-off *agent* #'job-life)
         (update-data! x assoc "*running*" false))
       (do
@@ -31,10 +31,12 @@
         (act! x)))
     x))
 
+
 (defn- get-next-phase [job phase]
   (let [job (set-state! job phase)
         t (-> job choices?)]
     (when (seq t) (first t))))
+
 
 (defn- get-job-phases [job]
   (let [job (set-state! job :start)]
@@ -43,8 +45,10 @@
       (if (= phase :end) (-> phases reverse rest)
         (recur (get-next-phase job phase) (conj phases phase))))))
 
+
 (defn- get-previous-phase [job phase]
   (or (first (filter #(has-transition? job % phase) (get-job-phases job))) :start))
+
 
 (defn add-phase
   "Functions adds phase to the end
@@ -60,6 +64,7 @@
      (when validator (add-validator job last-phase new-phase validator))
      (add-transition job new-phase :end identity)
      job)))
+
 
 (defn insert-phase
   "Inserts new phase after at-phase"
@@ -77,6 +82,7 @@
      (when p-validator (add-validator job at-phase new-phase validator))
      job)))
 
+
 (defn remove-phase
   "Removes phase from job"
   [^clojure.lang.Atom job phase]
@@ -92,6 +98,7 @@
     (add-validator job previous-phase next-phase vp)
     job))
 
+
 (defprotocol JobInfo
   (at-phase? [this] "Returns current phase that job-agent is working on")
   (before-phase? [this phase] "Returns boolean true if current phase that job-agent is working on is before input phase")
@@ -104,6 +111,7 @@
   (active? [this] "Returns true if job is running")
   (duration? [this] "Returns duration of job in milliseconds")
   (in-error? [this] "Returns error exception if it happend. Otherwise nil"))
+
 
 (defprotocol JobActions
   (start! [this] "Starts Job. That is sends-off job-agent to do the job. If Job
@@ -158,6 +166,7 @@
                   (set-data! params)))]
         (stop! this)
         (send-off job-agent initialize-params params)))))
+
 
 ;; Functions allow mutable job definition
 ;; Job shell returns job phases that can
@@ -217,12 +226,14 @@
   jobs."
   [check-timer & jobs] (fn [_] (Thread/sleep check-timer) (every? finished? jobs)))
 
+
 (defn start-jobs
   "Returns function that takes one parameter
   and returns the same parameter. In mean time
   it starts all jobs that are put in as jobs
   argument of this function"
   [& jobs] (fn [x] (doseq [j jobs] (start! j)) x))
+
 
 (defn reset-jobs
   "Returns function that takes one parameter
@@ -231,6 +242,7 @@
   argument of this function"
   [& jobs] (fn [x] (doseq [j jobs] (reset-job! j)) x))
 
+
 (defn stop-jobs
   "Returns function that takes one parameter
   and returns the same parameter. In mean time
@@ -238,11 +250,13 @@
   argument of this function"
   [& jobs] (fn [x] (doseq [j jobs] (stop! j)) x))
 
+
 (defn restart-job!
   "Restarts job combining functions stop! restart-job!
   start!"
   [job]
   (comp start! reset-job! stop!))
+
 
 (defn restart-jobs
   "Returns function that takes one parameter
@@ -251,6 +265,7 @@
   argument of this function"
   [& jobs]
   (fn [x] (doseq [j jobs] (restart-job! j)) x))
+
 
 (defn wait-for
   "Wait for is another wrapper that can
