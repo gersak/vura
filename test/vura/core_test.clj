@@ -84,7 +84,7 @@
                   holiday?
                   first-day-in-month?
                   last-day-in-month?]} (day-time-context (date->value (date 2018 5 30 23 59 0 0)))]
-      (is (= value 1527724740))
+      (is (= value 1527724740000))
       (is (= day 3))
       (is (= month 5))
       (is (= year 2018))
@@ -100,7 +100,7 @@
     (let [{:keys [day
                   year
                   day-in-month]} (day-time-context (time->value (date 1900 2 28)))]
-      (is (= 2 day) "Wrong day for ")))
+      (is (= 3 day) "Wrong day for ")))
   (testing "Testing day-time-context with-time-configuration" 
     (let [{:keys [value
                   day
@@ -125,7 +125,7 @@
                                                           (#{30} day-in-month))))}
                                          (day-time-context 
                                            (date->value (date 2018 5 30 23 59 0 0))))]
-      (is (= value 1527724740))
+      (is (= value 1527724740000))
       (is (= day 3))
       (is (= week 22))
       (is (= month 5))

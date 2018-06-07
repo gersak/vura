@@ -2,7 +2,7 @@
   (:refer-clojure :exclude [second]))
 
 
-(declare date->value)
+(declare date->value minutes value->date)
 
 
 (defn round-number
@@ -77,11 +77,11 @@
   (constantly false))
 
 
-(def second "1" 1)
-(def millisecond "0.001" (/ second 1000))
+(def millisecond "1" 1)
 (def microsecond  "1.0E-6" (/ millisecond 1000))
 (def nanosecond  "1.0E-9" (/ microsecond 1000))
-(def minute  "60" 60)
+(def second "1000" (* 1000 millisecond))
+(def minute  "60" (* 60 second))
 (def hour  "3600" (* 60 minute))
 (def day "86400" (* 24 hour))
 (def week "604800" (* 7 day))
@@ -91,14 +91,14 @@
  ^{:dynamic true
    :doc "Variable that is used in function get-offset. ->local, <-local and day? funcitons are affected
    when changing value of this variable. I.E. (binding [*offset* -60] ...) would make all computations
-   in that time zone."} 
+   in that time zone (offset)."} 
   *offset* nil)
 
 
 (defn get-offset 
   "Funciton returns time zone for input Date object"
   [date]
-  (or *offset* (.getTimezoneOffset date)))
+  (or *offset* (* (.getTimezoneOffset date) minute)))
 
 
 (def ^:no-doc month-values
@@ -126,34 +126,35 @@
    :sunday 7})
 
 
-(declare value->date date->value)
-
-
-(defn ^:no-doc utc-date->value [date]
-  (when date
-    (/ (.getTime date) 1000)))
-
-
-(defn ^:no-doc value->utc-date [value]
-  (when value
-    (new
-      #?(:clj java.util.Date
-         :cljs js/Date)
-      (long (* 1000 value)))))
-
-
 (defn- ^:no-doc <-local
   "Given a local timestamp value function normalizes datetime to Greenwich timezone value"
-  ([value] (<-local value (get-offset (value->utc-date value))))
+  ([value] (<-local value 
+                    (get-offset 
+                      (when value
+                        (new
+                          #?(:clj java.util.Date
+                             :cljs js/Date)
+                          (long value))))))
   ([value offset]
-   (- value (* offset 60))))
+   (- value offset)))
 
 
 (defn- ^:no-doc ->local
   "Given a Greenwich timestamp value function normalizes datetime to local timezone value"
-  ([value] (->local value (get-offset (value->utc-date value))))
+  ([value] (->local value 
+                    (get-offset 
+                      (when value
+                        (new
+                          #?(:clj java.util.Date
+                             :cljs js/Date)
+                          (long value))))))
   ([value offset]
-   (+ value (* offset 60))))
+   (+ value offset)))
+
+(defn milliseconds 
+  "Function returns value of n seconds as number."
+  [n]
+  (* n second))
 
 
 (defn seconds 
@@ -198,8 +199,8 @@
   "Calculates if date value belongs to year that is defined as leap year."
   [year]
   (if ((comp not zero?) (mod year 4)) false
-    (if (comp not zero? (mod year 100)) true
-      (if ((comp not zero?) (mod year 400)) true
+    (if ((comp not zero?) (mod year 100)) true
+      (if ((comp not zero?) (mod year 400)) false
         true))))
 
 
@@ -333,14 +334,17 @@
   "Returns which millisecond in day does input value belongs to. For example
   for date 15.02.2015 it will return number 0"
   [value]
-  (int (* 1000 (mod value 1))))
+  (mod value 1))
 
 
 (defn second? 
   "Returns which second in day does input value belongs to. For example
   for date 15.02.2015 it will return number 0"
   [value]
-  (int (mod value 60)))
+  (int 
+    (mod
+      (/ (round-number value minute :floor) second)
+      60)))
 
 
 (defn minute? 
@@ -367,13 +371,8 @@
   "Returns which day in week does input value belongs to. For example
   for date 15.02.2015 it will return number 7"
   [value]
-  (int
-    (inc
-      (mod
-        (+
-         (if ((comp neg? get-offset value->date) value) 3 4)
-         (/ (round-number value day :floor) day))
-        7))))
+  (let [move-days (/ (round-number value day (if (neg? value) :ceil :floor)) day)]
+    (inc (mod (+ 3 move-days) 7))))
 
 
 (defn weekend? 
@@ -512,18 +511,18 @@
                                  (map
                                    #(* day (days-in-month % leap-year?))
                                    (range 1 month)))
-           seconds (reduce
-                     +
-                     0
-                     [years-period
-                      months-period
-                      (* day (dec day'))
-                      (* hour' hour)
-                      (* minute' minute)
-                      (* second' second)
-                      (* millisecond' millisecond)])]
-       #?(:clj (java.util.Date. (long (* 1000 (->local seconds))))
-          :cljs (js/Date. (long (* 1000 (->local seconds)))))))))
+           date-value (reduce
+                        +
+                        0
+                        [years-period
+                         months-period
+                         (days (dec day'))
+                         (hours hour')
+                         (minutes minute')
+                         (seconds second')
+                         (milliseconds millisecond')])]
+       #?(:clj (java.util.Date. (->local date-value))
+          :cljs (js/Date. (->local date-value)))))))
 
 
 (defn period
@@ -573,15 +572,13 @@
    (new
      #?(:clj java.util.Date
         :cljs js/Date)
-     (long (* 1000 (->local value))))))
+     (long (->local value)))))
 
 
 (defn date->value
   "Returns value of Date instance in seconds. Value is localized to offset"
   ([t]
-   (when t
-     (<-local
-       (/ (.getTime t) 1000)))))
+   (when t (<-local (.getTime t)))))
 
 
 (defprotocol TimeValueProtocol

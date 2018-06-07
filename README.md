@@ -250,6 +250,27 @@ will return vector of maps with following keys:
 
 After that everything else is simple. We just remove :holiday? and :weekend? and we are left with only spent days. That is 11 days.
 
+### Dragons
+When using **with-time-configuration** values are calculated using defined **\*offset\***. This is computation scope and if you wan't
+to use vura.core functions with above scope keep your computation in the scope, don't mix it with functions/values out of **with-time-configuration** scope. For example:
+
+``` Clojure
+(def formater (java.text.SimpleDateFormat. "EEE, d MMM yyyy HH:mm:ss Z"))
+
+;; GOOD
+(.format formater (with-time-configuration {:offset -60} (-> (date) date->value midnight time->value)))   ;; Tue, 5 Jun 2018 01:00:00 +0200
+;; BAD!
+(.format formater (value->time (with-time-configuration {:offset -60} (-> (date) date->value midnight)))) ;; Tue, 5 Jun 2018 00:00:00 +0200
+
+;; GOOD
+(with-time-configuration  {:offset 60} (-> (date) date->value midnight day?))   ;; 3
+;; BAD!
+(day? (with-time-configuration  {:offset 60} (-> (date) date->value midnight))) ;; 2
+
+```
+As mentioned Vura normalizes **time->value** to UTC, and does computations afterwards. When using **value->time**, **\*offset\*** dynamic
+variable is used to return computed value to bound offset. By default **\*offset\*** is set to OS offset.
+
 
 ## Calendar Frame
 **day-context** function solves most of calculation challenges. Still there are some use cases where it is usefull to have
