@@ -101,6 +101,9 @@
   (or *offset* (* (.getTimezoneOffset date) minute)))
 
 
+
+
+
 (def ^:no-doc month-values
   {:january 1
    :february 2
@@ -154,7 +157,7 @@
 (defn milliseconds 
   "Function returns value of n seconds as number."
   [n]
-  (* n second))
+  (* n millisecond))
 
 
 (defn seconds 
@@ -369,7 +372,7 @@
 
 (defn day? 
   "Returns which day in week does input value belongs to. For example
-  for date 15.02.2015 it will return number 7"
+   for date 15.02.2015 it will return number 7"
   [value]
   (let [move-days (/ (round-number value day (if (neg? value) :ceil :floor)) day)]
     (inc (mod (+ 3 move-days) 7))))
@@ -904,5 +907,4 @@
   (macroexpand-1
     '(time-as-value [a (date)
                      b (date 2017)]
-                    (value->time b)))
-)
+                    (value->time b))))
