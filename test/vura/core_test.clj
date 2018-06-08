@@ -145,7 +145,7 @@
       (is (= p (period? p'))  "period and period? not bidirectional"))))
 
 
-(deftest DST-and-TimeZone
+#_(deftest DST-and-TimeZone
   (testing "Day Time Savings - Only system default timezone"
     (is 
       (=

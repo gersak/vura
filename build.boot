@@ -1,5 +1,6 @@
 (set-env!
   :source-paths #{"src"}
+  :resource-paths #{"resources/timezones"}
   :dependencies '[[adzerk/boot-cljs "2.1.4" :scope "test"]
                   [adzerk/boot-reload "0.5.2" :scope "test"]
                   [adzerk/boot-test "1.2.0" :scope "test"]
@@ -8,6 +9,7 @@
                   [kovacnica/dreamcatcher "1.0.7-SNAPSHOT"]
                   [org.clojure/core.async "0.4.474"]
                   [org.clojure/clojurescript "1.10.238"]
+                  [instaparse "1.4.9" :scope "test"]
                   [boot-codox "0.10.3" :scope "test"]])
 
 (require '[adzerk.boot-cljs :refer [cljs]])

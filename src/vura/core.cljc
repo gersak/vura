@@ -1,8 +1,10 @@
 (ns vura.core
+  (:require
+    [vura.timezones.wiki :as zones])
   (:refer-clojure :exclude [second]))
 
 
-(declare date->value minutes value->date)
+(declare date->value value->date minutes dst-season?)
 
 
 (defn round-number
@@ -78,8 +80,8 @@
 
 
 (def millisecond "1" 1)
-(def microsecond  "1.0E-6" (/ millisecond 1000))
-(def nanosecond  "1.0E-9" (/ microsecond 1000))
+(def microsecond  "1.0E-3" (/ millisecond 1000))
+(def nanosecond  "1.0E-6" (/ microsecond 1000))
 (def second "1000" (* 1000 millisecond))
 (def minute  "60" (* 60 second))
 (def hour  "3600" (* 60 minute))
@@ -90,19 +92,38 @@
 (def 
  ^{:dynamic true
    :doc "Variable that is used in function get-offset. ->local, <-local and day? funcitons are affected
-   when changing value of this variable. I.E. (binding [*offset* -60] ...) would make all computations
+   when changing value of this variable. I.E. (binding [*timezone* :hr] ...) would make all computations
    in that time zone (offset)."} 
-  *offset* nil)
+  *timezone* nil)
 
 
 (defn get-offset 
   "Funciton returns time zone for input Date object"
   [date]
-  (or *offset* (* (.getTimezoneOffset date) minute)))
+  (if (nil? *timezone*) 
+    (* (.getTimezoneOffset date) minute)
+    (let [{:keys [dst offset]} *timezone*] 
+      (if (zero? dst)
+        offset 
+        offset))))
 
+(defn get-locale-timezone [locale]
+  (if-let [l (get
+               zones/locales
+               (clojure.string/upper-case (name locale)))]
+    l
+    (throw
+      (ex-info "There is no offset definied for input locale."
+               {:locale locale
+                :locales (keys zones/locales)}))))
 
-
-
+(defn get-timezone [zone] 
+  (if-let [z (get zones/timezones zone)]
+    z
+    (throw
+      (ex-info "There is no offset defined for input zone."
+               {:zone zone
+                :zones (keys zones/timezones)}))))
 
 (def ^:no-doc month-values
   {:january 1
@@ -570,7 +591,7 @@
 
 (defn value->date
   "Returns Date instance for value in seconds for current. Function first
-  transforms value to local *offset* value."
+  transforms value to local *timezone* value."
   ([value]
    (new
      #?(:clj java.util.Date
@@ -673,7 +694,7 @@
             holiday? (fn [_] false)
             offset nil}}
       & body]
-     `(binding [vura.core/*offset* ~offset
+     `(binding [vura.core/*timezone* ~offset
                 vura.core/*weekend-days* ~weekend-days
                 vura.core/*holiday?* ~holiday?]
         ~@body)))
