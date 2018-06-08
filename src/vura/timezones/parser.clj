@@ -57,10 +57,13 @@
    "Nov" 11
    "Dec" 12})
 
-(def from-to-grammar
+
+(def zone-grammar
   "number = #'[0-9]+'
+   <comment> = #'#.*'
    <word> = #'[a-zA-Z]+'
-   <space> = #'\\s+'
+   <space> = #'[\\s\\t]+'
+   <newline>= '\\n' | '\\n\\r'
    year = number
    month-name = 'Jan' | 'Feb' | 'Mar' | 'Apr' | 'May' | 'Jun' | 'Jul' | 'Aug' | 'Sep' | 'Oct' | 'Nov' | 'Dec'
    month = month-name
@@ -69,9 +72,61 @@
    minute = number
    hour = number 
    time-suffix = #'s|g|u|z'
-   time = hour <':'> minute (<':'> second)? time-suffix")
+   time = hour <':'> minute (<':'> second)? time-suffix?
+
+   <zone-start> =  'Zone'
+   sign = '+' | '-'
+   gmtoff = sign? hour ':' minute (':' second)? 
+   zone-name = #'[a-zA-Z/_\\-]+'
+   zone-rule = #'[a-zA-Z\\-]+' 
+   zone-format = #'[A-Z\\-/%s]+'
+   zone-until = year (<space> month <space> day)? (<space> time)?
+   zone-row = <space> gmtoff <space> zone-rule <space> zone-format (<space> zone-until <newline>?)?
+   zone-definition = <zone-start> <space> zone-name zone-row+ 
+   
+   link-alias = zone-name 
+   link-canonical = zone-name
+   link-definition = <'Link'> <space> link-canonical <space> link-alias <newline>
+
+   rule-name = #'[a-zA-Z\\-_]+'
+   rule-type = '-' | word
+   rule-from = year
+   rule-to = year | 'only'
+   rule-in = month
+   rule-on = day
+   rule-at = time
+   rule-save = time
+   rule-letters = word
+   rule-definition = <'Rule'> <space> rule-name <space> rule-from <space> rule-to <space> rule-type <space> rule-in <space> rule-on <space> rule-at <space> rule-save <space> rule-letters
+   <empty-space> = (<space> <newline> | <newline>)+
+   timezone = (rule-definition /  zone-definition / link-definition)+")
+
+(def zone-definition 
+  "# Summer Time Order 1997 (S.I. 1997/2982)
+# See EU for rules starting in 1996.
+#
+# Use Europe/London for Jersey, Guernsey, and the Isle of Man.
+
+# Zone	NAME		GMTOFF	RULES	FORMAT	[UNTIL]
+Zone	Europe/London	-0:01:15 -	LMT	1847 Dec  1  0:00s
+			0:00	GB-Eire	%s	1968 Oct 27
+			1:00	-	BST	1971 Oct 31  2:00u
+			0:00	GB-Eire	%s	1996
+			0:00	EU	GMT/BST")
 
 
+(def rule-definition "Rule	GB-Eire	1916	only	-	May	21	2:00s	1:00	BST")
+(def zone-parser (insta/parser zone-grammar))
+
+(comment
+  (zone-parser rule-definition :start :rule-definition)
+  (->
+    zone-definition
+    (clojure.string/replace #"#.*" "")
+    clojure.string/split-lines
+    (#(remove (comp empty? clojure.string/trim) %))
+    (#(clojure.string/join "\n" %))
+    (zone-parser :start :zone-definition)))
 
 (defn until->date [text]
   (let [grammar (apply str
