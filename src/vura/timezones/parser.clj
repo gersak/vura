@@ -1,52 +1,18 @@
 (ns vura.timezones.parser
   (:refer-clojure :exclude [second])
-  (:require [vura.core :refer :all]
-            [instaparse.core :as insta]))
+  (:require 
+    [dreamcatcher.core :as dreamcatcher]
+    [vura.core :refer :all]
+    [instaparse.core :as insta]))
 
 (def zones ["europe" "africa" "northamerica" "pacificnew" "southamerica" "asia" "australasia"])
 
 (defn zone-definition [zone]
   (slurp (clojure.java.io/resource (str "tzdb-2018e/" (name zone)))))
 
-(defn break-timezone-db 
-  "Breaks timezone text to zones, rules and links"
-  [text]
-  (letfn [(read-zone-definition [rlines]
-            (loop [lines rlines
-                   definition []]
-              (let [[line & rlines] lines] 
-                (if (or
-                      (empty? line)
-                      (clojure.string/starts-with? line "Link")
-                      (clojure.string/starts-with? line "Zone"))
-                  [definition rlines]
-                  (recur rlines (conj definition line))))))] 
-    (let [text (clojure.string/replace text #"#.*" "")
-          lines (clojure.string/split-lines text)]
-      (loop [lines lines
-             zones []
-             links []
-             rules []]
-        (if (empty? lines) {:zones zones
-                            :links links
-                            :rules rules}
-          (let [[line & rlines] lines]
-            (cond
-              ;;
-              (clojure.string/starts-with? line "Zone")
-              (let [[definition rlines] (read-zone-definition rlines)]
-                (recur rlines (conj zones (concat [line] definition)) links rules))
-              ;;
-              (clojure.string/starts-with? line "Link")
-              (recur rlines zones (conj links line) rules)
-              ;;
-              (clojure.string/starts-with? line "Rule")
-              (recur rlines zones links (conj rules line))
-              ;;
-              :else
-              (recur rlines zones links rules))))))))
+(def zone-target "resources/timezones/tzdb-2018e/tz.edn")
 
-(def months
+(def months-mapping
   {"Jan" 1
    "Feb" 2
    "Mar" 3
@@ -59,6 +25,15 @@
    "Oct" 10
    "Nov" 11
    "Dec" 12})
+
+(def days-mapping
+  {"Mon" 1
+   "Tue" 2
+   "Wed" 3
+   "Thu" 4
+   "Fri" 5
+   "Sat" 6
+   "Sun" 7})
 
 
 (def zone-grammar
@@ -80,30 +55,31 @@
 
    <zone-start> =  'Zone'
    sign = '+' | '-'
-   gmtoff = sign? hour <':'> minute (<':'> second)? | number
-   zone-name = #'[a-zA-Z/_\\-0-9]+'
+   gmtoff = sign? hour <':'> minute (<':'> second)? | hour 
+   <zone-name> = #'[a-zA-Z/_\\-0-9]+'
    zone-rule = #'[a-zA-Z\\-_]+'  | gmtoff
    zone-format = #'[A-Z\\-/%s\\+0-9a-z]+'
-   zone-until = year (<space> month)? (<space> day | <space> floating-day)? (<space> time)?
-   zone-row = <space> gmtoff <space> zone-rule <space> zone-format (<space> zone-until <space>? <newline> | <space> <newline>)?
-   zone-definition = <zone-start> <space> zone-name zone-row+ <space>? <newline>?
+   zone-until = <space> year (<space> month)? (<space> day | <space> floating-day)? (<space> time)?
+   zone-offset = gmtoff
+   zone-row = <space> zone-offset <space> zone-rule <space> zone-format (zone-until / <space>?) <space>? (<newline> | Epsilon)
+   zone-definition = <zone-start> <space> zone-name zone-row+
    
    link-alias = zone-name 
    link-canonical = zone-name
-   link-definition = <'Link'> <space>+ link-canonical <space> link-alias <space>? <newline>?
+   link-definition = <'Link'> <space>+ link-canonical <space> link-alias <space>? (<newline> | Epsilon)
 
    rule-name = #'[a-zA-Z\\-_]+'
    rule-type = '-' | word
    rule-from = year
    rule-to = year | 'only' | 'max'
    rule-in = month
-   rule-on = day | word | floating-day 
+   rule-on = day | floating-day 
    rule-at = time
    rule-save = gmtoff | number
    rule-letters = #'[a-zA-Z\\+\\-0-9]+' | '-'
    rule-definition = <'Rule'> <space> rule-name <space> rule-from <space> rule-to <space> 
                      rule-type <space> rule-in <space> rule-on <space> rule-at <space> 
-                     rule-save <space> rule-letters <space>? <newline>?
+                     rule-save <space> rule-letters <space>? (<newline> | Epsilon)
 
 
    <empty-space> = (<space> <newline> | <newline>)+
@@ -113,21 +89,324 @@
 (def zone-parser (insta/parser zone-grammar))
 
 (defn read-zone [zone]
-  (->
-    (zone-definition zone)
-    (clojure.string/replace #"#.*" "")
-    clojure.string/split-lines
-    (#(remove (comp empty? clojure.string/trim) %))
-    (#(clojure.string/join "\n" %))
-    (zone-parser :start :timezone)))
+  (insta/transform
+    {:number #(Integer/parseInt %)
+     :month-name months-mapping
+     :time (fn [& args] (vector :time (reduce conj {} args)))
+     :gmtoff (fn [& args]
+               (let [{:keys [hour minute sign second]
+                      :or {sign "+"
+                           hour 0
+                           minute 0
+                           second 0} :as all} (reduce conj {} args)]
+                 (* (if (= sign "-") -1 1) 
+                    (+ 
+                      (hours hour)
+                      (minutes minute)
+                      (seconds second)))))
+     :zone-until (fn [& args] 
+                   (let [time (reduce conj {} args)]
+                     [:until (if (empty? time) nil time)]))
+     :zone-row (fn [& args]
+                 (let [[[_ offset]
+                        [_ rule]
+                        [_ format]
+                        [_ until]] args]
+                   {:offset offset
+                    :rule rule
+                    :format format
+                    :until until}))
+     :rule-definition (fn [[_ rule-name] & args]
+                        [:rule (vector rule-name (reduce conj {} args))])
+     :link-definition (fn [& args] 
+                       [:link (reduce conj {} args)])}
+    (->
+      (zone-definition zone)
+      (clojure.string/replace #"#.*" "")
+      clojure.string/split-lines
+      (#(remove (comp empty? clojure.string/trim) %))
+      (#(clojure.string/join "\n" %))
+      (zone-parser :start :timezone))))
+
+(defn extract-zones [parsed-data]
+  (let [timezone (rest parsed-data)
+        zones (filter (comp #{:zone-definition} first) timezone)
+        links (filter (comp #{:link} first) timezone)
+        zones' (reduce
+                 (fn [r [_ zname & rows]]
+                   (assoc r zname rows))
+                 {}
+                 zones)]
+    (reduce
+      (fn [r [_ {:keys [link-alias link-canonical]}]]
+        (assoc r link-alias link-canonical))
+      zones'
+      links)))
+
+(defn extract-rules [parsed-data]
+  (let [timezone (rest parsed-data)
+        rules (map clojure.core/second (filter (comp #{:rule} first) timezone))]
+    (reduce
+      (fn [r [k v]]
+        (assoc r k (mapv clojure.core/second v)))
+      {}
+      (group-by first rules))))
+
+(defn extract-data [parsed-data]
+  {:zones (extract-zones parsed-data)
+   :rules (extract-rules parsed-data)})
+
+(defn- until-date [{:keys [year month day floating-day] :as until
+                     :or {day 1
+                          month 1}}]
+  ;; Find calendar frame for this month
+  (when until
+    (let [{:keys [hour minute]
+           :or {hour 0 minute 0}} (:time until)
+          frame (->
+                  (date year month)
+                  time->value
+                  (calendar-frame :month))] 
+      (if floating-day 
+        (if (clojure.string/starts-with? floating-day "last")
+          ;; Floating day is last something
+          (let [day' (days-mapping (subs floating-day 4))]
+            (value->date
+             (:value 
+              (last
+                (filter
+                  #(= day' (:day %))
+                  frame)))))
+          ;; Floating day is higher than
+          (let [day' (days-mapping (subs floating-day 0 3))
+                operator (case (subs floating-day 3 5)
+                           ">=" >=)
+                day-in-month' (Integer/parseInt (subs floating-day 5))]
+            (value->date
+              (:value 
+                (first
+                  (filter
+                    #(operator (:day-in-month %) day-in-month')
+                    frame))))))
+        (date year month day hour minute)))))
+
+(defn process-zone [rules]
+  (loop [rules rules 
+         history []]
+    (if (empty? rules)
+      (let [current (dissoc (last history) :until)
+            history (vec (butlast history))] 
+        ;; Return result in form of actual current timezone
+        ;; and previous history
+        {:current (assoc current :from (:until (last history)))
+         :history history})
+      (if (empty? history)
+        ;; If there is nothing in history, than create one
+        (let [[current & rules] rules
+              ;; Use current rule
+              current (update 
+                        current
+                        :until
+                        ;; And update until with UTC value
+                        (fn [{:keys [year month day]
+                              :or {day 1 month 1}
+                              :as until}]
+                          (when until 
+                            (date->value (date year month day)))))]
+          ;; Recur on rest of rules with new history
+          (recur rules (conj history current)))
+        ;; There is history so we can compare previous offset
+        (let [[current & rules] rules
+              {previous-offset :offset
+               :or {previous-offset 0}} (last history)]
+          (recur
+            rules
+            (conj
+              history
+              (update 
+                (case (-> current :until :time :time-suffix)
+                  ;; If it is standard clock time than use previous offset to
+                  ;; calculate exact UTC time.... TODO - maybe include rules if not to complicated for now
+                  "s" (binding [*offset* previous-offset]
+                        (update current :until until-date))
+                  ;; Otherwise use 0 offset for UTC
+                  ("u" "g" "z") (binding [*offset* 0]
+                                  (update current :until until-date))
+                  (update current :until until-date))
+                :until date->value))))))))
+
+(defn savings-rule? [{:keys [rule-save]}] 
+  (when (and rule-save (number? rule-save)) 
+    (not (zero? rule-save))))
+
+(def ^:private MAX_YEAR 10000)
+(def ^:private MAX_YEAR_VALUE (-> MAX_YEAR date time->value))
+
+(defn rule-until? [{[_ from :as rule-from] :rule-from 
+                    [_ to :as rule-to] :rule-to}]
+  (case rule-to
+    "only" from
+    "max" MAX_YEAR
+    to))
+
+(defn rule-interval [{[_ from] :rule-from
+                      [_ to :as rule-to] :rule-to}]
+  (case rule-to
+    "only" [(-> (date from) time->value)
+            (-> from inc date time->value)]
+    "max" [(-> from date time->value)
+           MAX_YEAR_VALUE]
+    [(-> from date time->value) (-> to inc date time->value)]))
+
+
+(defn rule-interval [{[_ from] :rule-from
+                      [_ to :as rule-to] :rule-to}]
+  (case rule-to
+    "only" [from 
+            (inc from)]
+    "max" [from
+           MAX_YEAR_VALUE]
+    [from (inc from)]))
+
+
+(defn rule-data [{:keys [rule-from rule-on rule-save rule-at rule-in]}]
+  (let [timestamp (reduce
+                    conj
+                    {}
+                    [rule-from rule-on rule-at rule-in])]
+    [((comp date->value until-date) timestamp) 
+     (case (:time-suffix (:time timestamp))
+       "s" :standard
+       :utc)
+     (->
+       timestamp
+       (assoc :save rule-save)
+       (dissoc :year))]))
+
+(defn pair-rule [{[_ rule-from] :rule-from :as rule} rest-rules]
+  (let [target (if (savings-rule? rule) 
+                 (complement savings-rule?)
+                 savings-rule?)]
+    (letfn [(pair? [rule]
+              (and
+                (target rule)
+                (>= (rule-until? rule) rule-from)))] 
+      (first 
+        (filter
+          pair?
+          rest-rules)))))
+
+
+(defn process-rules [rules]
+  (letfn [(active-rule? [{:keys [rule-to]}]
+            (= "max" rule-to))]
+   (loop [[rule & rest-rules] (sort-by rule-until? rules)
+         history []
+         active nil]
+     (if (empty? rule) {:current active
+                        :history history} 
+      (if (active-rule? rule) 
+        (recur
+          rest-rules
+          history
+          (let [[start clock rule'] (rule-data rule)]
+            (assoc 
+              active 
+              (if (savings-rule? rule) :daylight-savings :standard)
+              (merge 
+                {:from start 
+                 :clock? clock}
+                rule'))))
+        (if-let [rule-pair (pair-rule rule rest-rules)]
+          (recur
+            rest-rules
+            (let [[start clock rule] (rule-data rule)
+                  [end clock'] (rule-data rule-pair)]
+              (conj history
+                    [[{:utc start :clock? clock} 
+                      {:utc end :clock? clock'}] 
+                     rule]))
+            active)
+          (recur rest-rules history active)))))))
+
+(def timezone-data 
+  (reduce
+    (fn [r zone]
+      (let [{:keys [zones rules]} (extract-data (read-zone zone))]
+        (let [zones' (reduce
+                       (fn [result [zone rules]]
+                         (assoc result 
+                           zone 
+                           (if (string? rules) rules (process-zone rules))))
+                       {}
+                       zones)
+              rules' (reduce
+                       (fn [result [rule-name rules]]
+                         (assoc result 
+                           rule-name
+                           (process-rules rules)))
+                       {}
+                       rules)]
+          (->
+            r
+            (update :zones merge zones')
+            (update :rules merge rules')))))
+    {}
+    [:europe
+     #_:africa
+     #_:northamerica
+     #_:southamerica
+     #_:asia
+     #_:australasia]))
+
+(clojure.pprint/pprint
+  timezone-data
+  (clojure.java.io/writer zone-target))
 
 (comment
-  (zone-parser rule-definition :start :rule-definition)
-  (zone-parser
-    "\t\t\t 0:00\tGB-Eire\t%s\t1921 Dec  6 \n"
-    :start :zone-row)
-  (read-zone :pacificnew)
+  (def test-zone 
+    "Zone	Europe/Dublin	-0:25:00 -	LMT	1880 Aug  2
+     -0:25:21 -	DMT	1916 May 21  2:00s
+     -0:25:21 1:00	IST	1916 Oct  1  2:00s
+     0:00	GB-Eire	%s	1921 Dec  6 
+     0:00	GB-Eire	GMT/IST	1940 Feb 25  2:00s
+     0:00	1:00	IST	1946 Oct  6  2:00s
+     0:00	-	GMT	1947 Mar 16  2:00s
+     0:00	1:00	IST	1947 Nov  2  2:00s
+     0:00	-	GMT	1948 Apr 18  2:00s
+     0:00	GB-Eire	GMT/IST	1968 Oct 27")
+
+
+  (def test-zone
+    "Zone	Europe/Minsk	1:50:16 -	LMT	1880
+     1:50	-	MMT	1924 May  2 
+     2:00	-	EET	1930 Jun 21
+     3:00	-	MSK	1941 Jun 28
+     1:00	C-Eur	CE%sT	1944 Jul  3
+     3:00	Russia	MSK/MSD	1990
+     3:00	-	MSK	1991 Mar 31  2:00s
+     2:00	Russia	EE%sT	2011 Mar 27  2:00s
+     3:00	-	+03")
+  (extract-zones [:timezone (zone-parser test-zone :start :zone-definition)])
+  (def europe (read-zone :europe))
   (zone-definition :europe)
+  (extract-zones europe)
+  (extract-rules europe)
+  (def data (extract-data europe))
+  (get-zone "Europe/Belgrade")
+  (get-zone "Africa/Algiers")
+  (get-zone "Europe/Riga")
+  (get-rule "C-Eur")
+  (set
+    (map
+      (comp :rule-at)
+      (reduce
+        concat
+        (-> timezone-data :rules vals))))
+  (-> timezone-data :rules clojure.pprint/pprint)
+  (filter #(clojure.string/starts-with? (key %) "Europe") (-> timezone-data :zones ))
+  (doseq [[zone rules] (:zones timezone-data)]
+    (println {zone (when-not (string? rules) (mapv :until rules))}))
   (->
     europe
     (clojure.string/replace #"#.*" "")
@@ -135,54 +414,3 @@
     (#(remove (comp empty? clojure.string/trim) %))
     (#(clojure.string/join "\n" %))
     (zone-parser :start :timezone)))
-
-; (defn until->date [text]
-;   (let [grammar (apply str
-;                        "until = year (<space> month <space> day)? (<space> time)?\n"
-;                        from-to-grammar)
-;         parser (insta/parser grammar)
-;         result (parser text)]
-;     (insta/transform
-;       {:number #(Integer/parseInt %)
-;        :month-name months
-;        :time (fn [& args] (reduce conj {} args))
-;        :until (fn [& args] (reduce conj {} args))}
-;       result)))
-
-; (defn parse-zone-definition [lines]
-;   (let [[zd & zdl] lines
-;         [_ zname gmtoff zformat zuntil] (clojure.string/split zd #"\t")
-;         [gmtoff rule] (clojure.string/split gmtoff #"\s+")
-;         definition {:name zname
-;                     :history [{:offset gmtoff :rule rule :format zformat :until zuntil}]}]
-;     (if (empty? zdl) definition
-;       (reduce 
-;         (fn [r [gmt rule zformat until]]
-;           (update r :history conj 
-;             {:offset gmt :rule rule :format zformat :until until}))
-;         definition
-;         (map
-;           #(clojure.string/split (clojure.string/trim %) #"\t")
-;           zdl)))))
-
-
-; (defn parse-link-definition [line]
-;   (let [[_ from to] (clojure.string/split line #"[\t\s]+")]
-;     [to from]))
-
-; (defn parse-rule-definition [line]
-;   (let [[_ & data] (clojure.string/split line #"[\t\s]+")]
-;     (zipmap 
-;       [:name :from :to :type :in :on :at :save :letter]
-;       data)))
-
-
-
-; (comment
-;   (def ise (break-timezone-db europe))
-;   (:links ise)
-;   (:rules ise)
-;   (def until (-> ise :zones first parse-zone-definition :history first))
-;   (re-find #"(\d+)\s+(\w+)\s+(\d+)\s+(\d+):(\d+[sguz])" "1847 Dec  1  0:00s")
-;   (-> ise :links first parse-link-definition)
-;   (-> ise :rules first parse-rule-definition))

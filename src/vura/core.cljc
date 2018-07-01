@@ -1,11 +1,63 @@
 (ns vura.core
   (:require
-    [vura.timezones.wiki :as zones])
+    [vura.timezones.wiki :as zones]
+    [vura.timezones.db :refer [get-zone get-rule]])
   (:refer-clojure :exclude [second]))
 
 
-(declare date->value value->date minutes dst-season?)
+; (defn round-number
+;   "Function returns round number that is devidable by target-number.
+;   Rounding strategy can be specified in round-how? options:
 
+;    :floor
+;    :ceil
+;    :up
+;    :down
+  
+;   Rounding number strategy is symetric to 0. This means that :ceil will round
+;   negative numbers to lower target-number. I.E (round-number -9.5 1 :ceil) would return -10.
+;   Rounding happens in absolute domain and sign is inserted afterwards.
+   
+;   Negative target-numbers are not supported. Can't reason about that yet."
+;   ([number] (round-number number 1))
+;   ([number target-number] (round-number number target-number :down))
+;   ([number target-number round-how?]
+;    {:pre [(or 
+;             (zero? target-number)
+;             (pos? target-number))]}
+;    (letfn [(normalize-number [x]
+;              #?(:clj (if (some #(% target-number) [float? double?])
+;                        (bigdec x)
+;                        x)
+;                 ;; TODO - implement normalization for Clojurescript?
+;                 :cljs x))]
+;      (case target-number
+;        0 0
+;        ;; Try (* 101 0.1) that should be equal to 10.1 bot instead
+;        ;; java rounds doubles to 10.100000000000001 
+;        ;; TO overcome this normalize floats and doubles to bigdec
+;        ;; and return double as result
+;        (let [number (normalize-number number)
+;              target-number (normalize-number target-number) 
+;              round-how? (keyword round-how?)
+;              diff (rem number target-number)
+;              base (if (>= target-number 1)
+;                     (* target-number (quot number target-number))
+;                     (- number diff))
+;              limit (* 0.25 target-number target-number)
+;              compare-fn (case round-how?
+;                           :floor (constantly false)
+;                           :ceil (constantly (not (zero? diff)))
+;                           :up <=
+;                           <)
+;              result ((if (pos? number) + -)
+;                      base
+;                      (if (compare-fn limit (* diff diff)) target-number 0))]
+;          #?(:clj 
+;             (if (some decimal? [target-number number])
+;               (double result)
+;               result)
+;             :cljs result))))))
 
 (defn round-number
   "Function returns round number that is devidable by target-number.
@@ -31,14 +83,10 @@
              #?(:clj (if (some #(% target-number) [float? double?])
                        (bigdec x)
                        x)
-                ;; TODO - implement normalization for Clojurescript?
                 :cljs x))]
      (case target-number
        0 0
-       ;; Try (* 101 0.1) that should be equal to 10.1 bot instead
-       ;; java rounds doubles to 10.100000000000001 
-       ;; TO overcome this normalize floats and doubles to bigdec
-       ;; and return double as result
+       ;; First normalize numbers to floating point or integer
        (let [number (normalize-number number)
              target-number (normalize-number target-number) 
              round-how? (keyword round-how?)
@@ -96,16 +144,44 @@
    in that time zone (offset)."} 
   *timezone* nil)
 
+(def 
+ ^{:dynamic true
+   :doc "Variable that is used in function get-offset. ->local, <-local and day? funcitons are affected
+   when changing value of this variable. I.E. (binding [*offset* (hours -2)] ...) would make all computations
+   in that offset from UTC."} 
+  *offset* nil)
+
+(defn get-timezone-attribute [value timezone attribute]
+  (let [{:keys [current history]} (get-zone timezone)]
+    (if (>= value (:from current))
+      (get current attribute)
+      (get
+        (last
+          (filter
+            #(> (:until %) value)
+            (reverse history)))
+        attribute))))
+
+(defn get-timezone-offset [value timezone]
+  (get-timezone-attribute value timezone :offset))
+
+(defn get-timezone-rule [value timezone]
+  (when-let [rule (get-timezone-attribute value timezone :rule)]
+    (when-let [rule-name (case rule
+                           "-" nil
+                           rule)]
+      (take 2 (reverse (get-rule rule-name))))))
+
+
 
 (defn get-offset 
   "Funciton returns time zone for input Date object"
   [date]
-  (if (nil? *timezone*) 
-    (* (.getTimezoneOffset date) minute)
-    (let [{:keys [dst offset]} *timezone*] 
-      (if (zero? dst)
-        offset 
-        offset))))
+  (if (nil? *offset*) 
+    (if (nil? *timezone*) 
+      (* (.getTimezoneOffset date) minute)
+      (get-timezone-offset (.getTime date) *timezone*))
+    *offset*))
 
 (defn get-locale-timezone [locale]
   (if-let [l (get
@@ -517,7 +593,7 @@
      (assert (not (or (neg? day') (zero? day'))) "There is no 0 or negative day in month.")
      (assert (and
                (<= 0 hour')
-               (> 24 hour')) "Hour should be in range 0-23")
+               (> 25 hour')) "Hour should be in range 0-24")
      (assert (and
                (<= 0 minute')
                (> 60 minute')) "Minute should be in range 0-59")
@@ -607,7 +683,9 @@
 
 (defprotocol TimeValueProtocol
   (time->value [this] "Return numeric value for given object.")
-  (value->time [this] "Returns Date for given value."))
+  (value->time [this] "Returns Date for given value.")
+  (teleport [this timezone] "Teleports value to different timezone.")
+  (time-travel [this destination] "Travels in time in current zone to given date. Remaining in that zone(place)."))
 
 
 #?(:clj
@@ -685,16 +763,19 @@
      "Utility macro to put context frame on computation scope. Specify:
 
      :holiday?     - (fn [day-context] true | false)
-     :offset       - +/- number
+     :timezone     - timezone-name or +/- number
      :weekend-days - (fn [number] true | false)"
-     [{:keys [offset
+     [{:keys [timezone
               holiday?
+              offset
               weekend-days]
        :or {weekend-days *weekend-days*
             holiday? (fn [_] false)
+            timezone nil
             offset nil}}
       & body]
-     `(binding [vura.core/*timezone* ~offset
+     `(binding [vura.core/*timezone* ~timezone
+                vura.core/*offset* ~offset
                 vura.core/*weekend-days* ~weekend-days
                 vura.core/*holiday?* ~holiday?]
         ~@body)))
@@ -829,7 +910,7 @@
    (defmacro time-as-value 
      "bindings => [name (time->value x) ...]
 
-     Similar to let or binding. Casts al bound symbol values with
+     Similar to let or binding. Casts all bound symbol values with
      function time->value. Then evaluates body."
      [bindings & body]
      (assert (vector? bindings) "Bindings should be vector")

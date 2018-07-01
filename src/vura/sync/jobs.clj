@@ -1,10 +1,11 @@
 (ns vura.sync.jobs
   (:require
     [vura.core :as core]
-    [dreamcatcher.util :refer [has-transition?
-                               get-transition
-                               get-validators
-                               get-states]]
+    [dreamcatcher.core 
+     :refer [has-transition?
+             get-transition
+             get-validators
+             get-states]]
     [dreamcatcher.core :refer :all])
   (:import [java.util.concurrent LinkedBlockingQueue Executors TimeUnit SynchronousQueue]))
 

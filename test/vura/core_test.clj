@@ -50,11 +50,11 @@
     (is 
       (and
         (not=
-          (with-time-configuration {:offset 0} (value->date (date->value (date 2018))))
-          (with-time-configuration {:offset -300} (value->date (date->value (date 2018)))))
+          (with-time-configuration {:timezone 0} (value->date (date->value (date 2018))))
+          (with-time-configuration {:timezone -300} (value->date (date->value (date 2018)))))
         (= 
-          (with-time-configuration {:offset 0} (date->value (date 2018)))
-          (with-time-configuration {:offset -300} (date->value (date 2018))))) "Offset affects value! This shouldn't happen"))
+          (with-time-configuration {:timezone 0} (date->value (date 2018)))
+          (with-time-configuration {:timezone -300} (date->value (date 2018))))) "Offset affects value! This shouldn't happen"))
   (testing "Testing ? functions"
    (let [test-date (date->value (date 2018 5 30 23 59 0 0))]
     (is (= 2018 (year? test-date)) "Wrong year computed")
@@ -117,7 +117,7 @@
                   first-day-in-month?
                   last-day-in-month?]} (with-time-configuration
                                          {:weekend-days #{3}
-                                          :offset -180
+                                          :timezone -180
                                           :holiday? (fn [{:keys [day-in-month month]}]
                                                       (boolean 
                                                         (and
@@ -164,31 +164,31 @@
     (is (= 82 (day-in-year? (time->value (date 2018 3 24 23 59 59 999)))))
     (is (= 83 (day-in-year? (time->value (date 2018 3 25 0 0 1))))))
   
-  (testing "offset"
-    (let [value (with-time-configuration {:offset 0} 
+  (testing "Timezones"
+    (let [value (with-time-configuration {:timezone 0} 
                   (->
                     (date 2018 3 24 23 59 59 999)
                     time->value))
           minus-wtc-value (with-time-configuration 
-                            {:offset (hours -1)}
+                            {:timezone (hours -1)}
                             (->
                               (date 2018 3 24 23 59 59 999)
                               time->value))
           plus-wtc-value (with-time-configuration 
-                           {:offset (hours 1)}
+                           {:timezone (hours 1)}
                            (->
                              (date 2018 3 24 23 59 59 999)
                              time->value))
           value' (time->value
-                   (with-time-configuration {:offset 0} 
+                   (with-time-configuration {:timezone 0} 
                      (date 2018 3 24 23 59 59 999)))
           minus-value (time->value
                         (with-time-configuration 
-                          {:offset (hours -1)}
+                          {:timezone (hours -1)}
                           (date 2018 3 24 23 59 59 999)))
           plus-value (time->value 
                        (with-time-configuration 
-                         {:offset (hours 1)}
+                         {:timezone (hours 1)}
                          (date 2018 3 24 23 59 59 999)))]
       (is (= minus-wtc-value value plus-wtc-value) "Midnight value should be same for all offsets inside with-time-configuration scope")
       (is (< minus-value value' plus-value) "When time->value is used out of wtc scope *offset* fallbacks to system offset if not nested no other *offset* is bound."))))

@@ -5,19 +5,18 @@
         :refer [go go-loop]]))
   (:require
     [vura.core :as core]
-    [dreamcatcher.util 
-     :refer [has-transition?
-             get-transitions
-             get-transition
-             get-validators
-             get-states]]
     [dreamcatcher.async 
      :refer [wrap-async-machine 
              suck 
              inject 
              disable]]
     [dreamcatcher.core
-     :refer [make-state-machine
+     :refer [has-transition?
+             get-transitions
+             get-transition
+             get-validators
+             get-states
+             make-state-machine
              data
              update-data!
              add-state

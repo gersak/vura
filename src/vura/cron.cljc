@@ -3,11 +3,11 @@
 
 (defn cron-element-parserer
   "Parses CRON like element. Elements are in form
-   1-25/0
-   1,5,40/10
-   1,20,40
-   20-40/5
-   */2 etc."
+  1-25/0
+  1,5,40/10
+  1,20,40
+  20-40/5
+  */2 etc."
   [element [min- max-]]
   (letfn [(parse-number [x]
             #?(:clj (Integer/valueOf x)
@@ -52,12 +52,12 @@
 (defn parse-cron-string
   "Parses CRON string e.g.
 
-   \"0,3,20/20 0 0 3-20/10 * * *\"
+  \"0,3,20/20 0 0 3-20/10 * * *\"
 
-   If record is not valid assertion will
-   be thrown. Returned data is sequence
-   of cron-mappings that define what time
-   is valid to execute Job."
+  If record is not valid assertion will
+  be thrown. Returned data is sequence
+  of cron-mappings that define what time
+  is valid to execute Job."
   [^String cron-record]
   (letfn [(transform-interval [x]
             (cond-> x
