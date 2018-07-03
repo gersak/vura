@@ -146,11 +146,15 @@
       (is (= p (period? p'))  "period and period? not bidirectional"))))
 
 
-(deftest DST-and-TimeZone
+(deftest TimezoneNormalization
   (testing "Day Time Savings - Only system default timezone"
     (is (= 7 (day? (time->value (date 2018 3 25)))))
     (is (= 7 (day? (time->value (date 2018 3 25 3)))))
     (is (= 25 (day-in-month? (time->value (date 2018 3 25 23 59 59 999)))))
+    (is (= 23 (hour? (time->value (date 2018 3 24 23 59 59 999)))))
+    (is (= 59 (minute? (time->value (date 2018 3 24 23 59 59 999)))))
+    (is (= 59 (second? (time->value (date 2018 3 24 23 59 59 999)))))
+    (is (= 999 (millisecond? (time->value (date 2018 3 24 23 59 59 999)))))
     (is (= 6 (day? (time->value (date 2018 3 24 23 59 59 999)))))
     (is (= 24 (day-in-month? (time->value (date 2018 3 24 23 59 59 999)))))
     (is (= 6 (day? (time->value (date 2018 3 24 23 59 59 999)))))
@@ -188,40 +192,29 @@
 
 
 (deftest LeapTests
-  (testing  "Leap times in Northern hemisphere")
-  (let [[summer-before summer-at summer-after] (with-time-configuration
-                                                 {:timezone "Europe/Zagreb"}
-                                                 [(date 2018 3 25 1 59 59 999)
-                                                  (date 2018 3 25 2)
-                                                  (date 2018 3 25 3)])
-        [winter-before winter-at] (with-time-configuration
-                                    {:timezone "Europe/Zagreb"}
-                                    [(date 2018 10 28 2 59 59 999)
-                                     (date 2018 10 28 3)])]
-    
-    (map
-      ; value->date
-      (comp hour? date->value)
-      [(date 2018 3 25 1)
-       (date 2018 3 25 2)
-       (date 2018 3 25 3)
-       (date 2018 3 25 4)])
-    (map 
-      value->date
-      [(utc-date-value 2018 10 28 1)
-       (utc-date-value 2018 10 28 2)
-       (utc-date-value 2018 10 28 3)
-       (utc-date-value 2018 10 28 4)])
-    (is (= summer-before (-> summer-before date->value value->date)) "date->value->date")
-    (is (= summer-at (-> summer-at date->value value->date)) "date->value->date")
-    (is (= winter-before (-> winter-before date->value value->date)) "date->value->date")
-    (is (= winter-at (-> winter-at date->value value->date)) "date->value->date")
-    (id (= ))
-    (is (= 
-          (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 3 25 2 1 0 0 (ZoneId/of "Europe/Zagreb"))))
-          (date 2018 3 25 3 1 0 0)))
-    ; (is (= (get-offset summer-before false) -3600000) "Spring leap wrong before value")
-    ; (is (= (get-offset summer-at false) -7200000) "Spring leap wrong at value")
-    ; (is (= (get-offset winter-at false) -3600000) "Spring leap wrong before value")
-    ; (is (= (get-offset winter-before false) -7200000) "Spring leap wrong at value")
-    ))
+  (testing  "Leap times in Northern hemisphere"
+    (let [[summer-before summer-at summer-after] (with-time-configuration
+                                                   {:timezone "Europe/Zagreb"}
+                                                   [(date 2018 3 25 1 59 59 999)
+                                                    (date 2018 3 25 2)
+                                                    (date 2018 3 25 3)])
+          [winter-before winter-at] (with-time-configuration
+                                      {:timezone "Europe/Zagreb"}
+                                      [(date 2018 10 28 2 59 59 999)
+                                       (date 2018 10 28 3)])]
+
+      (is (= summer-before (-> summer-before date->value value->date)) "date->value->date")
+      (is (= summer-at (-> summer-at date->value value->date)) "date->value->date")
+      (is (= winter-before (-> winter-before date->value value->date)) "date->value->date")
+      (is (= winter-at (-> winter-at date->value value->date)) "date->value->date")
+      (is (= 
+            (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 3 25 3 0 0 0 (ZoneId/of "Europe/Zagreb"))))
+            (date 2018 3 25 3 0 0 0)))
+      (is (= 
+            (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 3 25 1 59 0 0 (ZoneId/of "Europe/Zagreb"))))
+            (date 2018 3 25 1 59 0 0)))
+      ; (is (= (get-offset summer-before false) -3600000) "Spring leap wrong before value")
+      ; (is (= (get-offset summer-at false) -7200000) "Spring leap wrong at value")
+      ; (is (= (get-offset winter-at false) -3600000) "Spring leap wrong before value")
+      ; (is (= (get-offset winter-before false) -7200000) "Spring leap wrong at value")
+      )))

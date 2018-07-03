@@ -538,7 +538,7 @@
   "Returns which millisecond in day does input value belongs to. For example
   for date 15.02.2015 it will return number 0"
   [value]
-  (mod value 1))
+  (mod value 1000))
 
 
 (defn second? 
@@ -547,7 +547,7 @@
   [value]
   (int 
     (mod
-      (/ (round-number value minute :floor) second)
+      (/ (round-number value second :floor) second)
       60)))
 
 
@@ -565,15 +565,10 @@
   "Returns which hour in day does input value belongs to. For example
   for date 15.02.2015 it will return number 0"
   [value]
-  (let [offset (get-offset value false)
-        offset' (get-offset (midnight value) false)
-        value (if-not (= offset offset')
-                (- value (- offset offset'))
-                value)]
-   (int
+  (int
     (mod
       (/ (round-number value hour :floor) hour)
-      24))))
+      24)))
 
 
 (defn day? 
@@ -747,7 +742,15 @@
   ([year month day hour minute] (date year month day hour minute 0))
   ([year month day hour minute second] (date year month day hour minute second 0))
   ([year month day' hour' minute' second' millisecond']
-   (value->utc-date (->local (utc-date-value year month day' hour' minute' second' millisecond')))))
+   (let [value (utc-date-value year month day' hour' minute' second' millisecond')
+         ; offset (get-offset value false)
+         ; offset' (get-offset (midnight value) false)
+         ; offset' (get-offset (- value hour) false)
+         ; value (if-not (= offset offset')
+         ;         (- value (- offset offset'))
+         ;         value)
+         ]
+     (value->utc-date (->local value)))))
 
 
 (defn period
@@ -1072,13 +1075,13 @@
     (date->utc-value (utc-date 2018 3 25 2))
     false)
 
-  (doseq [h (range 10) :let [ d (date 2018 10 28)
-                             ; d (date 2018 3 25)
+  (doseq [h (range 10) :let [; d (date 2018 10 28)
+                             d (date 2018 10 27 22)
                              ; d (date 2018 3 24)
                              dv (+ (date->value d) (hours h))]]
-    (println (value->utc-date dv))
+    ; (println (value->utc-date dv))
+    ; (println (value->date dv))
     (println (value->date dv))
-    ; (println (date 2018 10 28 h))
     (println (hour? dv)))
 
   (def hr-holidays 
