@@ -142,7 +142,9 @@
    :doc "Variable that is used in function get-offset. ->local, <-local and day? funcitons are affected
    when changing value of this variable. I.E. (binding [*timezone* :hr] ...) would make all computations
    in that time zone (offset)."} 
-  *timezone* nil)
+  *timezone* 
+  #?(:clj (.(java.util.TimeZone/getDefault) (getID))
+     :cljs (Intl.DateTimeFormat().resolvedOptions().timeZone )))
 
 (def 
  ^{:dynamic true
@@ -151,37 +153,152 @@
    in that offset from UTC."} 
   *offset* nil)
 
-(defn get-timezone-attribute [value timezone attribute]
+
+;; TODO - enable this for conform with history rules not just current one
+;; SUPPORT ONLY LATEST TZ DB
+(defn- get-timezone-attribute [timezone attribute]
   (let [{:keys [current history]} (get-zone timezone)]
-    (if (>= value (:from current))
-      (get current attribute)
-      (get
-        (last
-          (filter
-            #(> (:until %) value)
-            (reverse history)))
-        attribute))))
+    (get current attribute)
+    #_(if (>= value (:from current))
+        (get current attribute)
+        (get
+          (last
+            (filter
+              #(> (:until %) value)
+              (reverse history)))
+          attribute))))
 
-(defn get-timezone-offset [value timezone]
-  (get-timezone-attribute value timezone :offset))
+(defn- get-timezone-offset [timezone]
+  (get-timezone-attribute timezone :offset))
 
-(defn get-timezone-rule [value timezone]
-  (when-let [rule (get-timezone-attribute value timezone :rule)]
+(defn- get-timezone-rule [timezone]
+  (when-let [rule (get-timezone-attribute timezone :rule)]
     (when-let [rule-name (case rule
                            "-" nil
                            rule)]
-      (take 2 (reverse (get-rule rule-name))))))
+      (:current (get-rule rule-name)))))
 
+(declare date hours minutes calendar-frame date->value value->date hour? day-in-month? month? minute?)
 
+(defn system-timezone [] nil)
+
+(defn value->utc-date [value]
+  #?(:cljs (js/Date. value)
+     :clj (java.util.Date. (long value))))
+
+(defn date->utc-value [date] (.getTime date))
+
+(defn until-value 
+  [{:keys [year month day floating-day] :as until
+    :or {day 1
+         month 1}}]
+  ;; Find calendar frame for this month
+  (when until
+    (let [days-mapping
+          {"Mon" 1
+           "Tue" 2
+           "Wed" 3
+           "Thu" 4
+           "Fri" 5
+           "Sat" 6
+           "Sun" 7}
+          {:keys [hour minute]
+           :or {hour 0 minute 0}} (:time until)
+          frame (->
+                  (date year month)
+                  date->value
+                  (calendar-frame :month))] 
+      (if floating-day 
+        (if (clojure.string/starts-with? floating-day "last")
+          ;; Floating day is last something
+          (let [day' (days-mapping (subs floating-day 4))
+                value (:value 
+                        (last
+                          (filter
+                            #(= day' (:day %))
+                            frame)))]
+            value
+            (+ value (minutes minute) (hours hour)))
+          ;; Floating day is higher than
+          (let [day' (days-mapping (subs floating-day 0 3))
+                operator (case (subs floating-day 3 5)
+                           ">=" >=)
+                day-in-month' (Integer/parseInt (subs floating-day 5))
+                value (:value 
+                        (first
+                          (filter
+                            #(operator (:day-in-month %) day-in-month')
+                            frame)))]
+            (+ value (hours hour) (minutes minute))))
+        (date->utc-value (date year month day hour minute))))))
 
 (defn get-offset 
-  "Funciton returns time zone for input Date object"
-  [date]
-  (if (nil? *offset*) 
-    (if (nil? *timezone*) 
-      (* (.getTimezoneOffset date) minute)
-      (get-timezone-offset (.getTime date) *timezone*))
-    *offset*))
+  [utc-value utc?]
+  (letfn [(utc-rule? [rule] (if-not (= "s" (-> rule :time :time-suffix)) true false))] 
+    (if (nil? *offset*) 
+      (if (nil? *timezone*)
+        (throw (ex-info "No timezone defined" {:value utc-value}))
+        (- 
+          (let [timezone-offset (get-timezone-offset *timezone*)
+                {dst-rule :daylight-savings 
+                 s-rule :standard} (get-timezone-rule *timezone*)
+                standard-time (- utc-value timezone-offset)
+                month (binding [*offset* 0] (month? standard-time))
+                value (if utc? utc-value standard-time)]
+            (if-not dst-rule timezone-offset
+              (if (< (:month dst-rule) (:month s-rule))
+                ;; Northen hemisphere
+                (cond 
+                  ;; Standard time use timezone offset
+                  (and
+                    (< month (:month s-rule))
+                    (> month (:month dst-rule))) (+ timezone-offset (:save dst-rule))
+                  (or
+                    (< month (:month dst-rule))
+                    (> month (:month s-rule))) timezone-offset
+                  :else
+                  (let [month-frame (calendar-frame value "month")
+                        save-light? (= month (:month dst-rule))
+                        limit (+
+                               (if-not save-light? (hours 1) 0)
+                               (binding [*offset* 0]
+                                  (until-value 
+                                    (assoc 
+                                      (if save-light? 
+                                        dst-rule
+                                        s-rule) 
+                                      :year (:year (first month-frame))))))]
+                    (if ((if save-light? < >=) value limit)
+                      timezone-offset
+                      (+ timezone-offset (:save dst-rule)))))
+                ;; Southern hemisphere
+                (cond 
+                  ;; Standard time use timezone offset
+                  (and
+                    (> month (:month s-rule))
+                    (< month (:month dst-rule))) (+ timezone-offset (:save dst-rule))
+                  (or
+                    (> month (:month dst-rule))
+                    (< month (:month s-rule))) timezone-offset
+                  :else
+                  (let [month-frame (calendar-frame value "month")
+                        limit (+ 
+                                (binding [*offset* 0] 
+                                  (until-value (assoc dst-rule :year (:year (first month-frame)))))
+                                (if (utc-rule? dst-rule) timezone-offset 0))]
+                    (if ((if (= month (:month dst-rule)) < >) value limit)
+                      timezone-offset
+                      (+ timezone-offset (:save dst-rule))))))))))
+      *offset*)))
+
+
+(comment 
+  (def value (with-time-configuration 
+               {:offset 0}
+               (time->value (date 2018 3 25 1))))
+  
+  (with-time-configuration
+    {:timezone  "Europe/Zagreb"}))
 
 (defn get-locale-timezone [locale]
   (if-let [l (get
@@ -228,27 +345,14 @@
 
 (defn- ^:no-doc <-local
   "Given a local timestamp value function normalizes datetime to Greenwich timezone value"
-  ([value] (<-local value 
-                    (get-offset 
-                      (when value
-                        (new
-                          #?(:clj java.util.Date
-                             :cljs js/Date)
-                          (long value))))))
-  ([value offset]
-   (- value offset)))
+  ([value] (<-local value  (get-offset value true)))
+  ([value offset] (- value offset)))
 
 
 (defn- ^:no-doc ->local
   "Given a Greenwich timestamp value function normalizes datetime to local timezone value"
-  ([value] (->local value 
-                    (get-offset 
-                      (when value
-                        (new
-                          #?(:clj java.util.Date
-                             :cljs js/Date)
-                          (long value))))))
-  ([value offset]
+  ([value] (->local value (get-offset value false)))
+  ([value offset] 
    (+ value offset)))
 
 (defn milliseconds 
@@ -461,10 +565,15 @@
   "Returns which hour in day does input value belongs to. For example
   for date 15.02.2015 it will return number 0"
   [value]
-  (int
+  (let [offset (get-offset value false)
+        offset' (get-offset (midnight value) false)
+        value (if-not (= offset offset')
+                (- value (- offset offset'))
+                value)]
+   (int
     (mod
       (/ (round-number value hour :floor) hour)
-      24)))
+      24))))
 
 
 (defn day? 
@@ -572,19 +681,18 @@
         days-in-month' (days-in-month (month? value) (leap-year? (year? value)))]
     (= days-in-month' day-in-month)))
 
-
-(defn date
+(defn utc-date-value
   "Constructs new Date object.
   Months: 1-12
   Days: 1-7 (1 is Monday)"
   ([] #?(:cljs (js/Date.)
          :clj (java.util.Date.)))
-  ([year] (date year 1 ))
-  ([year month] (date year month 1))
-  ([year month day] (date year month day 0))
-  ([year month day hour] (date year month day hour 0))
-  ([year month day hour minute] (date year month day hour minute 0))
-  ([year month day hour minute second] (date year month day hour minute second 0))
+  ([year] (utc-date-value year 1 ))
+  ([year month] (utc-date-value year month 1))
+  ([year month day] (utc-date-value year month day 0))
+  ([year month day hour] (utc-date-value year month day hour 0))
+  ([year month day hour minute] (utc-date-value year month day hour minute 0))
+  ([year month day hour minute second] (utc-date-value year month day hour minute second 0))
   ([year month day' hour' minute' second' millisecond']
    (let [leap-year? (leap-year? year)]
      (assert (and
@@ -621,8 +729,25 @@
                          (minutes minute')
                          (seconds second')
                          (milliseconds millisecond')])]
-       #?(:clj (java.util.Date. (->local date-value))
-          :cljs (js/Date. (->local date-value)))))))
+       date-value))))
+
+
+(def utc-date (comp value->utc-date utc-date-value))
+
+(defn date
+  "Constructs new Date object.
+  Months: 1-12
+  Days: 1-7 (1 is Monday)"
+  ([] #?(:cljs (js/Date.)
+         :clj (java.util.Date.)))
+  ([year] (date year 1 ))
+  ([year month] (date year month 1))
+  ([year month day] (date year month day 0))
+  ([year month day hour] (date year month day hour 0))
+  ([year month day hour minute] (date year month day hour minute 0))
+  ([year month day hour minute second] (date year month day hour minute second 0))
+  ([year month day' hour' minute' second' millisecond']
+   (value->utc-date (->local (utc-date-value year month day' hour' minute' second' millisecond')))))
 
 
 (defn period
@@ -678,7 +803,7 @@
 (defn date->value
   "Returns value of Date instance in seconds. Value is localized to offset"
   ([t]
-   (when t (<-local (.getTime t)))))
+   (when t (<-local (date->utc-value t)))))
 
 
 (defprotocol TimeValueProtocol
@@ -749,7 +874,7 @@
   (let [timestamps' (map time->value timestamps)
         t1 (rest timestamps')
         t2 (butlast timestamps')]
-    (map (partial * 1000) (map - t1 t2))))
+    (map - t1 t2)))
 
 (defn interval
   "Returns period of time value in milliseconds between start and end. Input values
@@ -885,7 +1010,7 @@
        :week week
        :day day 
        :day-in-month (inc d)
-       :first-day-in-month? (= d 1)
+       :first-day-in-month? (= (inc d) 1)
        :last-day-in-month? (= d (dec month-days))
        :weekend (boolean (*weekend-days* day))})))
 
@@ -932,6 +1057,30 @@
                   (js/Error. "time-as-value allows only Symbols in bindings"))))))
 
 (comment
+  (doseq [h (range 10)]
+    (println (hour? (date 2018 3 25 h))))
+  (minute?
+    (-
+     (date->value (date 2018 3 25 1 59 59 999))
+     (date->value (date 2018 3 25 2))))
+
+  (get-offset
+    (date->utc-value (utc-date 2018 3 25 1 59 59 999))
+    false)
+
+  (get-offset
+    (date->utc-value (utc-date 2018 3 25 2))
+    false)
+
+  (doseq [h (range 10) :let [ d (date 2018 10 28)
+                             ; d (date 2018 3 25)
+                             ; d (date 2018 3 24)
+                             dv (+ (date->value d) (hours h))]]
+    (println (value->utc-date dv))
+    (println (value->date dv))
+    ; (println (date 2018 10 28 h))
+    (println (hour? dv)))
+
   (def hr-holidays 
     #{[1 1]
       [6 1]

@@ -3,6 +3,7 @@
   (:use clojure.test
         vura.core)
   (:import
+    [java.time ZonedDateTime LocalDateTime ZoneId]
     [java.util Calendar]))
 
 (def positive-number (rand 100000))
@@ -50,11 +51,11 @@
     (is 
       (and
         (not=
-          (with-time-configuration {:timezone 0} (value->date (date->value (date 2018))))
-          (with-time-configuration {:timezone -300} (value->date (date->value (date 2018)))))
+          (with-time-configuration {:timezone "Europe/Zagreb"} (value->date (date->value (date 2018))))
+          (with-time-configuration {:timezone "America/Detroit"} (value->date (date->value (date 2018)))))
         (= 
-          (with-time-configuration {:timezone 0} (date->value (date 2018)))
-          (with-time-configuration {:timezone -300} (date->value (date 2018))))) "Offset affects value! This shouldn't happen"))
+          (with-time-configuration {:timezone "Europe/Zagreb"} (date->value (date 2018)))
+          (with-time-configuration {:timezone "America/Detroit"} (date->value (date 2018))))) "Offset affects value! This shouldn't happen"))
   (testing "Testing ? functions"
    (let [test-date (date->value (date 2018 5 30 23 59 0 0))]
     (is (= 2018 (year? test-date)) "Wrong year computed")
@@ -117,7 +118,7 @@
                   first-day-in-month?
                   last-day-in-month?]} (with-time-configuration
                                          {:weekend-days #{3}
-                                          :timezone -180
+                                          :timezone "Europe/Zagreb"
                                           :holiday? (fn [{:keys [day-in-month month]}]
                                                       (boolean 
                                                         (and
@@ -145,16 +146,8 @@
       (is (= p (period? p'))  "period and period? not bidirectional"))))
 
 
-#_(deftest DST-and-TimeZone
+(deftest DST-and-TimeZone
   (testing "Day Time Savings - Only system default timezone"
-    (is 
-      (=
-       (get-offset (date 2018 3 24))
-       (get-offset (date 2018 3 25 1))))
-    (is
-      (=
-       (get-offset (date 2018 3 26))
-       (get-offset (date 2018 3 25 3))))
     (is (= 7 (day? (time->value (date 2018 3 25)))))
     (is (= 7 (day? (time->value (date 2018 3 25 3)))))
     (is (= 25 (day-in-month? (time->value (date 2018 3 25 23 59 59 999)))))
@@ -165,30 +158,70 @@
     (is (= 83 (day-in-year? (time->value (date 2018 3 25 0 0 1))))))
   
   (testing "Timezones"
-    (let [value (with-time-configuration {:timezone 0} 
+    (let [value (with-time-configuration {:timezone "Europe/Zagreb"} 
                   (->
                     (date 2018 3 24 23 59 59 999)
                     time->value))
           minus-wtc-value (with-time-configuration 
-                            {:timezone (hours -1)}
+                            {:timezone "Asia/Tokyo"}
                             (->
                               (date 2018 3 24 23 59 59 999)
                               time->value))
           plus-wtc-value (with-time-configuration 
-                           {:timezone (hours 1)}
+                           {:timezone "America/Detroit"}
                            (->
                              (date 2018 3 24 23 59 59 999)
                              time->value))
           value' (time->value
-                   (with-time-configuration {:timezone 0} 
+                   (with-time-configuration {:offset 0} 
                      (date 2018 3 24 23 59 59 999)))
           minus-value (time->value
                         (with-time-configuration 
-                          {:timezone (hours -1)}
+                          {:timezone "Asia/Tokyo"}
                           (date 2018 3 24 23 59 59 999)))
           plus-value (time->value 
                        (with-time-configuration 
-                         {:timezone (hours 1)}
+                         {:timezone "America/Detroit"}
                          (date 2018 3 24 23 59 59 999)))]
       (is (= minus-wtc-value value plus-wtc-value) "Midnight value should be same for all offsets inside with-time-configuration scope")
       (is (< minus-value value' plus-value) "When time->value is used out of wtc scope *offset* fallbacks to system offset if not nested no other *offset* is bound."))))
+
+
+(deftest LeapTests
+  (testing  "Leap times in Northern hemisphere")
+  (let [[summer-before summer-at summer-after] (with-time-configuration
+                                                 {:timezone "Europe/Zagreb"}
+                                                 [(date 2018 3 25 1 59 59 999)
+                                                  (date 2018 3 25 2)
+                                                  (date 2018 3 25 3)])
+        [winter-before winter-at] (with-time-configuration
+                                    {:timezone "Europe/Zagreb"}
+                                    [(date 2018 10 28 2 59 59 999)
+                                     (date 2018 10 28 3)])]
+    
+    (map
+      ; value->date
+      (comp hour? date->value)
+      [(date 2018 3 25 1)
+       (date 2018 3 25 2)
+       (date 2018 3 25 3)
+       (date 2018 3 25 4)])
+    (map 
+      value->date
+      [(utc-date-value 2018 10 28 1)
+       (utc-date-value 2018 10 28 2)
+       (utc-date-value 2018 10 28 3)
+       (utc-date-value 2018 10 28 4)])
+    (is (= summer-before (-> summer-before date->value value->date)) "date->value->date")
+    (is (= summer-at (-> summer-at date->value value->date)) "date->value->date")
+    (is (= winter-before (-> winter-before date->value value->date)) "date->value->date")
+    (is (= winter-at (-> winter-at date->value value->date)) "date->value->date")
+    (id (= ))
+    (is (= 
+          (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 3 25 2 1 0 0 (ZoneId/of "Europe/Zagreb"))))
+          (date 2018 3 25 3 1 0 0)))
+    ; (is (= (get-offset summer-before false) -3600000) "Spring leap wrong before value")
+    ; (is (= (get-offset summer-at false) -7200000) "Spring leap wrong at value")
+    ; (is (= (get-offset winter-at false) -3600000) "Spring leap wrong before value")
+    ; (is (= (get-offset winter-before false) -7200000) "Spring leap wrong at value")
+    ))

@@ -26,16 +26,6 @@
    "Nov" 11
    "Dec" 12})
 
-(def days-mapping
-  {"Mon" 1
-   "Tue" 2
-   "Wed" 3
-   "Thu" 4
-   "Fri" 5
-   "Sat" 6
-   "Sun" 7})
-
-
 (def zone-grammar
   "number = #'[0-9]+'
    <comment> = #'#.*'
@@ -156,39 +146,7 @@
   {:zones (extract-zones parsed-data)
    :rules (extract-rules parsed-data)})
 
-(defn- until-date [{:keys [year month day floating-day] :as until
-                     :or {day 1
-                          month 1}}]
-  ;; Find calendar frame for this month
-  (when until
-    (let [{:keys [hour minute]
-           :or {hour 0 minute 0}} (:time until)
-          frame (->
-                  (date year month)
-                  time->value
-                  (calendar-frame :month))] 
-      (if floating-day 
-        (if (clojure.string/starts-with? floating-day "last")
-          ;; Floating day is last something
-          (let [day' (days-mapping (subs floating-day 4))]
-            (value->date
-             (:value 
-              (last
-                (filter
-                  #(= day' (:day %))
-                  frame)))))
-          ;; Floating day is higher than
-          (let [day' (days-mapping (subs floating-day 0 3))
-                operator (case (subs floating-day 3 5)
-                           ">=" >=)
-                day-in-month' (Integer/parseInt (subs floating-day 5))]
-            (value->date
-              (:value 
-                (first
-                  (filter
-                    #(operator (:day-in-month %) day-in-month')
-                    frame))))))
-        (date year month day hour minute)))))
+
 
 (defn process-zone [rules]
   (loop [rules rules 
@@ -228,11 +186,11 @@
                   ;; If it is standard clock time than use previous offset to
                   ;; calculate exact UTC time.... TODO - maybe include rules if not to complicated for now
                   "s" (binding [*offset* previous-offset]
-                        (update current :until until-date))
+                        (update current :until until-value))
                   ;; Otherwise use 0 offset for UTC
                   ("u" "g" "z") (binding [*offset* 0]
-                                  (update current :until until-date))
-                  (update current :until until-date))
+                                  (update current :until until-value))
+                  (update current :until until-value))
                 :until date->value))))))))
 
 (defn savings-rule? [{:keys [rule-save]}] 
@@ -274,7 +232,7 @@
                     conj
                     {}
                     [rule-from rule-on rule-at rule-in])]
-    [((comp date->value until-date) timestamp) 
+    [((comp date->value until-value) timestamp) 
      (case (:time-suffix (:time timestamp))
        "s" :standard
        :utc)
@@ -329,39 +287,42 @@
             active)
           (recur rest-rules history active)))))))
 
-(def timezone-data 
-  (reduce
-    (fn [r zone]
-      (let [{:keys [zones rules]} (extract-data (read-zone zone))]
-        (let [zones' (reduce
-                       (fn [result [zone rules]]
-                         (assoc result 
-                           zone 
-                           (if (string? rules) rules (process-zone rules))))
-                       {}
-                       zones)
-              rules' (reduce
-                       (fn [result [rule-name rules]]
-                         (assoc result 
-                           rule-name
-                           (process-rules rules)))
-                       {}
-                       rules)]
-          (->
-            r
-            (update :zones merge zones')
-            (update :rules merge rules')))))
-    {}
-    [:europe
-     #_:africa
-     #_:northamerica
-     #_:southamerica
-     #_:asia
-     #_:australasia]))
 
-(clojure.pprint/pprint
-  timezone-data
-  (clojure.java.io/writer zone-target))
+(defn create-timezone-data []
+    (reduce
+      (fn [r zone]
+        (let [{:keys [zones rules]} (extract-data (read-zone zone))]
+          (let [zones' (reduce
+                         (fn [result [zone rules]]
+                           (assoc result 
+                             zone 
+                             (if (string? rules) rules (process-zone rules))))
+                         {}
+                         zones)
+                rules' (reduce
+                         (fn [result [rule-name rules]]
+                           (assoc result 
+                             rule-name
+                             (process-rules rules)))
+                         {}
+                         rules)]
+            (->
+              r
+              (update :zones merge zones')
+              (update :rules merge rules')))))
+      {}
+      [:europe
+       :africa
+       :northamerica
+       :southamerica
+       :asia
+       :australasia]))
+
+(comment 
+  (clojure.pprint/pprint
+    (create-timezone-data)
+    (clojure.java.io/writer zone-target))
+  )
 
 (comment
   (def test-zone 
