@@ -174,7 +174,7 @@
                               :or {day 1 month 1}
                               :as until}]
                           (when until 
-                            (date->value (date year month day)))))]
+                            (date->utc-value (utc-date year month day)))))]
           ;; Recur on rest of rules with new history
           (recur rules (conj history current)))
         ;; There is history so we can compare previous offset
@@ -185,8 +185,7 @@
             rules
             (conj
               history
-              (update 
-                (case (-> current :until :time :time-suffix)
+              (case (-> current :until :time :time-suffix)
                   ;; If it is standard clock time than use previous offset to
                   ;; calculate exact UTC time.... TODO - maybe include rules if not to complicated for now
                   "s" (binding [*offset* previous-offset]
@@ -194,8 +193,7 @@
                   ;; Otherwise use 0 offset for UTC
                   ("u" "g" "z") (binding [*offset* 0]
                                   (update current :until until-value))
-                  (update current :until until-value))
-                :until date->value))))))))
+                  (update current :until until-value)))))))))
 
 (defn savings-rule? [{:keys [rule-save]}] 
   (when (and rule-save (number? rule-save)) 
@@ -214,11 +212,11 @@
 (defn rule-interval [{[_ from] :rule-from
                       [_ to :as rule-to] :rule-to}]
   (case rule-to
-    "only" [(-> (date from) time->value)
-            (-> from inc date time->value)]
-    "max" [(-> from date time->value)
+    "only" [(-> (utc-date from) date->utc-value)
+            (-> from inc utc-date date->utc-value)]
+    "max" [(-> from utc-date date->utc-value)
            MAX_YEAR_VALUE]
-    [(-> from date time->value) (-> to inc date time->value)]))
+    [(-> from utc-date date->utc-value) (-> to inc utc-date date->utc-value)]))
 
 
 (defn rule-interval [{[_ from] :rule-from
@@ -236,7 +234,7 @@
                     conj
                     {}
                     [rule-from rule-on rule-at rule-in])]
-    [((comp date->value until-value) timestamp) 
+    [((comp until-value) timestamp) 
      (case (:time-suffix (:time timestamp))
        "s" :standard
        :utc)
@@ -299,15 +297,15 @@
           (let [zones' (reduce
                          (fn [result [zone rules]]
                            (assoc result 
-                             zone 
-                             (if (string? rules) rules (process-zone rules))))
+                             zone
+                             (if (string? rules) rules (:current (process-zone rules)))))
                          {}
                          zones)
                 rules' (reduce
                          (fn [result [rule-name rules]]
                            (assoc result 
                              rule-name
-                             (process-rules rules)))
+                             (:current (process-rules rules))))
                          {}
                          rules)]
             (->
@@ -333,6 +331,11 @@
           (assoc result locale {:coordinates coordinates :zone zone})))
       nil
       definition-lines)))
+
+(defn compile-tz-db []
+  (clojure.pprint/pprint
+    (create-timezone-data)
+    (clojure.java.io/writer zone-target)))
 
 (comment 
   (clojure.pprint/pprint

@@ -107,16 +107,7 @@
 ;; TODO - enable this for conform with history rules not just current one
 ;; SUPPORT ONLY LATEST TZ DB
 (defn- get-timezone-attribute [timezone attribute]
-  (let [{:keys [current history]} (get-zone timezone)]
-    (get current attribute)
-    #_(if (>= value (:from current))
-        (get current attribute)
-        (get
-          (last
-            (filter
-              #(> (:until %) value)
-              (reverse history)))
-          attribute))))
+  (get (get-zone timezone) attribute))
 
 (defn- get-timezone-offset [timezone]
   (get-timezone-attribute timezone :offset))
@@ -126,7 +117,7 @@
     (when-let [rule-name (case rule
                            "-" nil
                            rule)]
-      (:current (get-rule rule-name)))))
+      (get-rule rule-name))))
 
 
 (defn system-timezone [] nil)
@@ -179,7 +170,7 @@
                             #(operator (:day-in-month %) day-in-month')
                             frame)))]
             (+ value (hours hour) (minutes minute))))
-        (date->utc-value (date year month day hour minute))))))
+        (date->utc-value (utc-date year month day hour minute))))))
 
 (defn get-dst-offset 
   "Returns DST offset for UTC input value"
@@ -188,9 +179,10 @@
     (if (nil? *offset*) 
       (if (nil? *timezone*)
         (throw (ex-info "No timezone defined" {:value value}))
-        (let [{dst-rule :daylight-savings 
-               s-rule :standard} (get-timezone-rule *timezone*)
-              month (binding [*offset* 0] (month? value))]
+        (if-let [{dst-rule :daylight-savings 
+                  s-rule :standard
+                  :as rule} (get-timezone-rule *timezone*)]
+         (let [month (binding [*offset* 0] (month? value))]
           (if-not dst-rule 0 
             (if (< (:month dst-rule) (:month s-rule))
               ;; Northen hemisphere
@@ -240,7 +232,8 @@
                                    :year (:year (first month-frame))))))]
                   (if ((if save-light? >= <) value limit)
                     0
-                    (:save dst-rule))))))))
+                    (:save dst-rule)))))))
+         0))
       *offset*)))
 
 

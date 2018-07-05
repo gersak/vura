@@ -9,11 +9,6 @@
 (def positive-number (rand 100000))
 (def negative-number (rand -10000))
 
-(defn java-day [timestamp]
-  (let [c (Calendar/getInstance)
-        _ (.setTime c timestamp)]
-    (.get c Calendar/DAY_OF_WEEK)))
-
 
 (deftest test-round-zero
   (is (every? zero? (map #(round-number positive-number 0 %) [:up :down :ceil :floor])) "Failed rounding to zero value")
@@ -221,5 +216,5 @@
 
       (is 
         (= 
-          (time (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 10 28 3 0 0 0 (ZoneId/of "Europe/Zagreb")))))
-          (time (date 2018 10 28 3 0 0 0)))))))
+          (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 10 28 3 0 0 0 (ZoneId/of "Europe/Zagreb"))))
+          (date 2018 10 28 3 0 0 0))))))

@@ -51,7 +51,7 @@
   (set-env! :source-paths #{"src" "test"})
   (comp 
     (watch)
-    (repl :server true)))
+    (repl :server true :port 54321)))
 
 (deftask deploy-core []
   (set-env! 
