@@ -151,9 +151,9 @@
     (is (= 7 (day? (time->value (date 2018 3 25)))))
     (is (= 7 (day? (time->value (date 2018 3 25 3)))))
     (is (= 25 (day-in-month? (time->value (date 2018 3 25 23 59 59 999)))))
-    (is (= 23 (hour? (time->value (date 2018 3 24 23 59 59 999)))))
-    (is (= 59 (minute? (time->value (date 2018 3 24 23 59 59 999)))))
-    (is (= 59 (second? (time->value (date 2018 3 24 23 59 59 999)))))
+    (is (= 23 (hour? (time->value (date 2018 3 25 23 59 59 999)))))
+    (is (= 59 (minute? (time->value (date 2018 3 25 23 59 59 999)))))
+    (is (= 59 (second? (time->value (date 2018 3 25 23 59 59 999)))))
     (is (= 999 (millisecond? (time->value (date 2018 3 24 23 59 59 999)))))
     (is (= 6 (day? (time->value (date 2018 3 24 23 59 59 999)))))
     (is (= 24 (day-in-month? (time->value (date 2018 3 24 23 59 59 999)))))
@@ -213,8 +213,13 @@
       (is (= 
             (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 3 25 1 59 0 0 (ZoneId/of "Europe/Zagreb"))))
             (date 2018 3 25 1 59 0 0)))
-      ; (is (= (get-offset summer-before false) -3600000) "Spring leap wrong before value")
-      ; (is (= (get-offset summer-at false) -7200000) "Spring leap wrong at value")
-      ; (is (= (get-offset winter-at false) -3600000) "Spring leap wrong before value")
-      ; (is (= (get-offset winter-before false) -7200000) "Spring leap wrong at value")
-      )))
+
+      (is 
+        (= 
+          (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 10 28 2 59 0 0 (ZoneId/of "Europe/Zagreb"))))
+          (date 2018 10 28 2 59 0 0)))
+
+      (is 
+        (= 
+          (time (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 10 28 3 0 0 0 (ZoneId/of "Europe/Zagreb")))))
+          (time (date 2018 10 28 3 0 0 0)))))))

@@ -1,63 +1,13 @@
 (ns vura.core
-  (:require
-    [vura.timezones.wiki :as zones]
-    [vura.timezones.db :refer [get-zone get-rule]])
+  (:require 
+    [vura.timezones.db 
+     :refer [get-zone get-rule]])
   (:refer-clojure :exclude [second]))
 
+(def get-locale-timezone vura.timezones.db/get-locale-timezone )
+(def get-timezone-locale vura.timezones.db/get-timezone-locale )
 
-; (defn round-number
-;   "Function returns round number that is devidable by target-number.
-;   Rounding strategy can be specified in round-how? options:
-
-;    :floor
-;    :ceil
-;    :up
-;    :down
-  
-;   Rounding number strategy is symetric to 0. This means that :ceil will round
-;   negative numbers to lower target-number. I.E (round-number -9.5 1 :ceil) would return -10.
-;   Rounding happens in absolute domain and sign is inserted afterwards.
-   
-;   Negative target-numbers are not supported. Can't reason about that yet."
-;   ([number] (round-number number 1))
-;   ([number target-number] (round-number number target-number :down))
-;   ([number target-number round-how?]
-;    {:pre [(or 
-;             (zero? target-number)
-;             (pos? target-number))]}
-;    (letfn [(normalize-number [x]
-;              #?(:clj (if (some #(% target-number) [float? double?])
-;                        (bigdec x)
-;                        x)
-;                 ;; TODO - implement normalization for Clojurescript?
-;                 :cljs x))]
-;      (case target-number
-;        0 0
-;        ;; Try (* 101 0.1) that should be equal to 10.1 bot instead
-;        ;; java rounds doubles to 10.100000000000001 
-;        ;; TO overcome this normalize floats and doubles to bigdec
-;        ;; and return double as result
-;        (let [number (normalize-number number)
-;              target-number (normalize-number target-number) 
-;              round-how? (keyword round-how?)
-;              diff (rem number target-number)
-;              base (if (>= target-number 1)
-;                     (* target-number (quot number target-number))
-;                     (- number diff))
-;              limit (* 0.25 target-number target-number)
-;              compare-fn (case round-how?
-;                           :floor (constantly false)
-;                           :ceil (constantly (not (zero? diff)))
-;                           :up <=
-;                           <)
-;              result ((if (pos? number) + -)
-;                      base
-;                      (if (compare-fn limit (* diff diff)) target-number 0))]
-;          #?(:clj 
-;             (if (some decimal? [target-number number])
-;               (double result)
-;               result)
-;             :cljs result))))))
+(declare date utc-date hours minutes calendar-frame date->value value->date hour? day-in-month? month? minute?)
 
 (defn round-number
   "Function returns round number that is devidable by target-number.
@@ -139,7 +89,7 @@
 
 (def 
  ^{:dynamic true
-   :doc "Variable that is used in function get-offset. ->local, <-local and day? funcitons are affected
+   :doc "Variable that is used in function get-dst-offset. ->local, <-local and day? funcitons are affected
    when changing value of this variable. I.E. (binding [*timezone* :hr] ...) would make all computations
    in that time zone (offset)."} 
   *timezone* 
@@ -148,7 +98,7 @@
 
 (def 
  ^{:dynamic true
-   :doc "Variable that is used in function get-offset. ->local, <-local and day? funcitons are affected
+   :doc "Variable that is used in function get-dst-offset. ->local, <-local and day? funcitons are affected
    when changing value of this variable. I.E. (binding [*offset* (hours -2)] ...) would make all computations
    in that offset from UTC."} 
   *offset* nil)
@@ -178,7 +128,6 @@
                            rule)]
       (:current (get-rule rule-name)))))
 
-(declare date hours minutes calendar-frame date->value value->date hour? day-in-month? month? minute?)
 
 (defn system-timezone [] nil)
 
@@ -205,8 +154,8 @@
           {:keys [hour minute]
            :or {hour 0 minute 0}} (:time until)
           frame (->
-                  (date year month)
-                  date->value
+                  (utc-date year month)
+                  date->utc-value
                   (calendar-frame :month))] 
       (if floating-day 
         (if (clojure.string/starts-with? floating-day "last")
@@ -232,63 +181,66 @@
             (+ value (hours hour) (minutes minute))))
         (date->utc-value (date year month day hour minute))))))
 
-(defn get-offset 
-  [utc-value utc?]
+(defn get-dst-offset 
+  "Returns DST offset for UTC input value"
+  [value]
   (letfn [(utc-rule? [rule] (if-not (= "s" (-> rule :time :time-suffix)) true false))] 
     (if (nil? *offset*) 
       (if (nil? *timezone*)
-        (throw (ex-info "No timezone defined" {:value utc-value}))
-        (- 
-          (let [timezone-offset (get-timezone-offset *timezone*)
-                {dst-rule :daylight-savings 
-                 s-rule :standard} (get-timezone-rule *timezone*)
-                standard-time (- utc-value timezone-offset)
-                month (binding [*offset* 0] (month? standard-time))
-                value (if utc? utc-value standard-time)]
-            (if-not dst-rule timezone-offset
-              (if (< (:month dst-rule) (:month s-rule))
-                ;; Northen hemisphere
-                (cond 
-                  ;; Standard time use timezone offset
-                  (and
-                    (< month (:month s-rule))
-                    (> month (:month dst-rule))) (+ timezone-offset (:save dst-rule))
-                  (or
-                    (< month (:month dst-rule))
-                    (> month (:month s-rule))) timezone-offset
-                  :else
-                  (let [month-frame (calendar-frame value "month")
-                        save-light? (= month (:month dst-rule))
-                        limit (+
-                               (if-not save-light? (hours 1) 0)
-                               (binding [*offset* 0]
-                                  (until-value 
-                                    (assoc 
-                                      (if save-light? 
-                                        dst-rule
-                                        s-rule) 
-                                      :year (:year (first month-frame))))))]
-                    (if ((if save-light? < >=) value limit)
-                      timezone-offset
-                      (+ timezone-offset (:save dst-rule)))))
-                ;; Southern hemisphere
-                (cond 
-                  ;; Standard time use timezone offset
-                  (and
-                    (> month (:month s-rule))
-                    (< month (:month dst-rule))) (+ timezone-offset (:save dst-rule))
-                  (or
-                    (> month (:month dst-rule))
-                    (< month (:month s-rule))) timezone-offset
-                  :else
-                  (let [month-frame (calendar-frame value "month")
-                        limit (+ 
-                                (binding [*offset* 0] 
-                                  (until-value (assoc dst-rule :year (:year (first month-frame)))))
-                                (if (utc-rule? dst-rule) timezone-offset 0))]
-                    (if ((if (= month (:month dst-rule)) < >) value limit)
-                      timezone-offset
-                      (+ timezone-offset (:save dst-rule))))))))))
+        (throw (ex-info "No timezone defined" {:value value}))
+        (let [{dst-rule :daylight-savings 
+               s-rule :standard} (get-timezone-rule *timezone*)
+              month (binding [*offset* 0] (month? value))]
+          (if-not dst-rule 0 
+            (if (< (:month dst-rule) (:month s-rule))
+              ;; Northen hemisphere
+              (cond 
+                ;; Standard time use timezone offset
+                (and
+                  (< month (:month s-rule))
+                  (> month (:month dst-rule))) (:save dst-rule)
+                (or
+                  (< month (:month dst-rule))
+                  (> month (:month s-rule))) 0
+                :else
+                (let [month-frame (calendar-frame value "month")
+                      save-light? (= month (:month dst-rule))
+                      limit (+
+                             (if-not save-light? (hours 1) 0)
+                             (binding [*offset* 0]
+                               (until-value 
+                                 (assoc 
+                                   (if save-light? 
+                                     dst-rule
+                                     s-rule) 
+                                   :year (:year (first month-frame))))))]
+                  (if ((if save-light? < >=) value limit)
+                    0
+                    (:save dst-rule))))
+              ;; Southern hemisphere
+              (cond 
+                ;; Standard time use timezone offset
+                (and
+                  (> month (:month s-rule))
+                  (< month (:month dst-rule))) (:save dst-rule)
+                (or
+                  (> month (:month dst-rule))
+                  (< month (:month s-rule))) 0
+                :else
+                (let [month-frame (calendar-frame value "month")
+                      save-light? (= month (:month dst-rule))
+                      limit (+
+                             (if-not save-light? (hours 1) 0)
+                             (binding [*offset* 0]
+                               (until-value 
+                                 (assoc 
+                                   (if save-light? 
+                                     dst-rule
+                                     s-rule) 
+                                   :year (:year (first month-frame))))))]
+                  (if ((if save-light? >= <) value limit)
+                    0
+                    (:save dst-rule))))))))
       *offset*)))
 
 
@@ -299,24 +251,6 @@
   
   (with-time-configuration
     {:timezone  "Europe/Zagreb"}))
-
-(defn get-locale-timezone [locale]
-  (if-let [l (get
-               zones/locales
-               (clojure.string/upper-case (name locale)))]
-    l
-    (throw
-      (ex-info "There is no offset definied for input locale."
-               {:locale locale
-                :locales (keys zones/locales)}))))
-
-(defn get-timezone [zone] 
-  (if-let [z (get zones/timezones zone)]
-    z
-    (throw
-      (ex-info "There is no offset defined for input zone."
-               {:zone zone
-                :zones (keys zones/timezones)}))))
 
 (def ^:no-doc month-values
   {:january 1
@@ -345,15 +279,27 @@
 
 (defn- ^:no-doc <-local
   "Given a local timestamp value function normalizes datetime to Greenwich timezone value"
-  ([value] (<-local value  (get-offset value true)))
-  ([value offset] (- value offset)))
+  ([value] (<-local 
+             value  
+             (let [tz-offset (get-timezone-offset *timezone*)] 
+               (+ 
+                 ;; move to standard time
+                 (get-dst-offset value)
+                 tz-offset))))
+  ([value offset] (+ value offset)))
 
 
 (defn- ^:no-doc ->local
   "Given a Greenwich timestamp value function normalizes datetime to local timezone value"
-  ([value] (->local value (get-offset value false)))
+  ([value] (->local 
+             value
+             (let [tz-offset (get-timezone-offset *timezone*)] 
+               (+ 
+                 ;; remove timzone offset to move to standard time 
+                 (get-dst-offset (- value tz-offset))
+                 tz-offset))))
   ([value offset] 
-   (+ value offset)))
+   (- value offset)))
 
 (defn milliseconds 
   "Function returns value of n seconds as number."
@@ -742,14 +688,7 @@
   ([year month day hour minute] (date year month day hour minute 0))
   ([year month day hour minute second] (date year month day hour minute second 0))
   ([year month day' hour' minute' second' millisecond']
-   (let [value (utc-date-value year month day' hour' minute' second' millisecond')
-         ; offset (get-offset value false)
-         ; offset' (get-offset (midnight value) false)
-         ; offset' (get-offset (- value hour) false)
-         ; value (if-not (= offset offset')
-         ;         (- value (- offset offset'))
-         ;         value)
-         ]
+   (let [value (utc-date-value year month day' hour' minute' second' millisecond')]
      (value->utc-date (->local value)))))
 
 
@@ -1067,17 +1006,9 @@
      (date->value (date 2018 3 25 1 59 59 999))
      (date->value (date 2018 3 25 2))))
 
-  (get-offset
-    (date->utc-value (utc-date 2018 3 25 1 59 59 999))
-    false)
-
-  (get-offset
-    (date->utc-value (utc-date 2018 3 25 2))
-    false)
-
   (doseq [h (range 10) :let [; d (date 2018 10 28)
-                             d (date 2018 10 27 22)
-                             ; d (date 2018 3 24)
+                             ; d (date 2018 10 27 22)
+                             d (date 2018 3 25)
                              dv (+ (date->value d) (hours h))]]
     ; (println (value->utc-date dv))
     ; (println (value->date dv))
@@ -1147,13 +1078,6 @@
 
   (with-time-configuration {:offset 0}  
     (-> other-day-value (round-number (hours 6) :ceil) value->date)) ;; #inst "2030-12-24T06:00:00.000-00:00"
-
-  (with-time-configuration {:offset -240}  
-    (-> 
-      other-day-value                 ;; 3848643839/2
-      (round-number (hours 2) :floor) ;; 1924315200N
-      value->date                     ;; #inst "2030-12-24T03:00:00.000-00:00"
-      get-offset))                    ;; -240
 
   (time->value (java.time.Instant/now))
   (value->time (time->value (java.sql.Timestamp. (.getTime (date 2018)))))

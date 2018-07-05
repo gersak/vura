@@ -10,7 +10,11 @@
 (defn zone-definition [zone]
   (slurp (clojure.java.io/resource (str "tzdb-2018e/" (name zone)))))
 
+(defn locale-definition []
+  (slurp (clojure.java.io/resource "tzdb-2018e/zone.tab")))
+
 (def zone-target "resources/timezones/tzdb-2018e/tz.edn")
+(def locale-target "resources/timezones/tzdb-2018e/locale.edn")
 
 (def months-mapping
   {"Jan" 1
@@ -318,10 +322,25 @@
        :asia
        :australasia]))
 
+
+(defn create-locale-date []
+  (let [definition-lines (remove
+                           #(clojure.string/starts-with? % "#")
+                           (clojure.string/split-lines (locale-definition)))]
+    (reduce
+      (fn [result line]
+        (let [[locale coordinates zone] (clojure.string/split line #"\s+")]
+          (assoc result locale {:coordinates coordinates :zone zone})))
+      nil
+      definition-lines)))
+
 (comment 
   (clojure.pprint/pprint
     (create-timezone-data)
     (clojure.java.io/writer zone-target))
+  (clojure.pprint/pprint
+    (create-locale-date)
+    (clojure.java.io/writer locale-target))
   )
 
 (comment
