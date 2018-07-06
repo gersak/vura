@@ -7,7 +7,9 @@
 (def get-locale-timezone vura.timezones.db/get-locale-timezone )
 (def get-timezone-locale vura.timezones.db/get-timezone-locale )
 
-(declare date utc-date hours minutes calendar-frame date->value value->date hour? day-in-month? month? minute?)
+(declare date utc-date hours minutes calendar-frame 
+         date->value value->date hour? 
+         day-in-month? month? minute?)
 
 (defn round-number
   "Function returns round number that is devidable by target-number.
@@ -86,6 +88,12 @@
 (def day "86400" (* 24 hour))
 (def week "604800" (* 7 day))
 
+(defn ^:no-doc
+  system-timezone []
+  #?(:clj (.(java.util.TimeZone/getDefault) (getID))
+     :cljs (Intl.DateTimeFormat().resolvedOptions().timeZone )))
+
+
 
 (def 
  ^{:dynamic true
@@ -93,8 +101,7 @@
    when changing value of this variable. I.E. (binding [*timezone* :hr] ...) would make all computations
    in that time zone (offset)."} 
   *timezone* 
-  #?(:clj (.(java.util.TimeZone/getDefault) (getID))
-     :cljs (Intl.DateTimeFormat().resolvedOptions().timeZone )))
+  (system-timezone))
 
 (def 
  ^{:dynamic true
@@ -105,7 +112,9 @@
 
 
 ;; TODO - enable this for conform with history rules not just current one
-;; SUPPORT ONLY LATEST TZ DB
+;; This is + on lib size and speed. I've compiled TZ with history and it
+;; is about 0.5 Mb in size. That is alot for CLJS not that much for CLJ
+;; For now SUPPORT ONLY LATEST(CURRENT) TZ DB
 (defn- get-timezone-attribute [timezone attribute]
   (get (get-zone timezone) attribute))
 
@@ -120,15 +129,18 @@
       (get-rule rule-name))))
 
 
-(defn system-timezone [] nil)
 
-(defn value->utc-date [value]
+(defn value->utc-date 
+  "Casts value to UTC value of Date object"
+  [value]
   #?(:cljs (js/Date. value)
      :clj (java.util.Date. (long value))))
 
-(defn date->utc-value [date] (.getTime date))
+(defn date->utc-value [date] 
+  "Returns number of milliseconds from UNIX epoch"
+  (.getTime date))
 
-(defn until-value 
+(defn ^:no-doc until-value 
   [{:keys [year month day floating-day] :as until
     :or {day 1
          month 1}}]
@@ -167,7 +179,9 @@
                 value (:value 
                         (first
                           (filter
-                            #(operator (:day-in-month %) day-in-month')
+                            #(and
+                               (= day' (:day %))
+                               (operator (:day-in-month %) day-in-month'))
                             frame)))]
             (+ value (hours hour) (minutes minute))))
         (date->utc-value (utc-date year month day hour minute))))))
@@ -181,6 +195,10 @@
         (throw (ex-info "No timezone defined" {:value value}))
         (if-let [{dst-rule :daylight-savings 
                   s-rule :standard
+                  ;; TODO - if this is going to expand to other rules in history
+                  ;;  than get-timezone-rule should be function of two arguments
+                  ;; *timezone* and value
+                  ;; THIS IS ONLY PLACE REQUIRED FOR EXPANDING TO FULL TZ SUPPORT
                   :as rule} (get-timezone-rule *timezone*)]
          (let [month (binding [*offset* 0] (month? value))]
           (if-not dst-rule 0 
@@ -198,7 +216,9 @@
                 (let [month-frame (calendar-frame value "month")
                       save-light? (= month (:month dst-rule))
                       limit (+
-                             (if-not save-light? (hours 1) 0)
+                             (if-not save-light? 
+                               (:save dst-rule) 
+                               0)
                              (binding [*offset* 0]
                                (until-value 
                                  (assoc 
@@ -214,15 +234,17 @@
                 ;; Standard time use timezone offset
                 (and
                   (> month (:month s-rule))
-                  (< month (:month dst-rule))) (:save dst-rule)
+                  (< month (:month dst-rule))) 0 
                 (or
                   (> month (:month dst-rule))
-                  (< month (:month s-rule))) 0
+                  (< month (:month s-rule))) (:save dst-rule)
                 :else
                 (let [month-frame (calendar-frame value "month")
                       save-light? (= month (:month dst-rule))
                       limit (+
-                             (if-not save-light? (hours 1) 0)
+                             (if-not save-light? 
+                               (:save dst-rule) 
+                               0)
                              (binding [*offset* 0]
                                (until-value 
                                  (assoc 
@@ -230,20 +252,12 @@
                                      dst-rule
                                      s-rule) 
                                    :year (:year (first month-frame))))))]
-                  (if ((if save-light? >= <) value limit)
+                  (if ((if save-light? < >=) value limit)
                     0
                     (:save dst-rule)))))))
          0))
       *offset*)))
 
-
-(comment 
-  (def value (with-time-configuration 
-               {:offset 0}
-               (time->value (date 2018 3 25 1))))
-  
-  (with-time-configuration
-    {:timezone  "Europe/Zagreb"}))
 
 (def ^:no-doc month-values
   {:january 1
@@ -619,8 +633,9 @@
   "Constructs new Date object.
   Months: 1-12
   Days: 1-7 (1 is Monday)"
-  ([] #?(:cljs (js/Date.)
-         :clj (java.util.Date.)))
+  ([] (date->utc-value
+        #?(:cljs (js/Date.)
+           :clj (java.util.Date.))))
   ([year] (utc-date-value year 1 ))
   ([year month] (utc-date-value year month 1))
   ([year month day] (utc-date-value year month day 0))
@@ -670,10 +685,14 @@
 
 (defn date
   "Constructs new Date object.
-  Months: 1-12
-  Days: 1-7 (1 is Monday)"
-  ([] #?(:cljs (js/Date.)
-         :clj (java.util.Date.)))
+  Month:       1-12
+  Day:         Depends on month
+  Hour:        0-24
+  Minute:      0-59
+  Second:      0-59
+  Milliseconds: 0-999"
+  ([] 
+   (utc-date))
   ([year] (date year 1 ))
   ([year month] (date year month 1))
   ([year month day] (date year month day 0))
@@ -744,9 +763,15 @@
 (defprotocol TimeValueProtocol
   (time->value [this] "Return numeric value for given object.")
   (value->time [this] "Returns Date for given value.")
-  (teleport [this timezone] "Teleports value to different timezone.")
   (time-travel [this destination] "Travels in time in current zone to given date. Remaining in that zone(place)."))
 
+(defn teleport 
+  "Teleports value to different timezone."
+  [value timezone]
+  (let [d (value->time value)]
+    (with-time-configuration 
+      {:timezone timezone}
+      (time->value d))))
 
 #?(:clj
    (extend-protocol TimeValueProtocol
@@ -839,7 +864,6 @@
                 vura.core/*weekend-days* ~weekend-days
                 vura.core/*holiday?* ~holiday?]
         ~@body)))
-
 
 ;; TIME FRAMES
 (defmulti calendar-frame 

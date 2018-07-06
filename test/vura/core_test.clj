@@ -202,19 +202,74 @@
       (is (= summer-at (-> summer-at date->value value->date)) "date->value->date")
       (is (= winter-before (-> winter-before date->value value->date)) "date->value->date")
       (is (= winter-at (-> winter-at date->value value->date)) "date->value->date")
-      (is (= 
-            (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 3 25 3 0 0 0 (ZoneId/of "Europe/Zagreb"))))
-            (date 2018 3 25 3 0 0 0)))
-      (is (= 
-            (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 3 25 1 59 0 0 (ZoneId/of "Europe/Zagreb"))))
-            (date 2018 3 25 1 59 0 0)))
+      (with-time-configuration
+        {:timezone "Europe/Zagreb"} 
+        (is (= 
+              (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 3 25 3 0 0 0 (ZoneId/of "Europe/Zagreb"))))
+              (date 2018 3 25 3 0 0 0)))
+        (is (= 
+              (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 3 25 1 59 0 0 (ZoneId/of "Europe/Zagreb"))))
+              (date 2018 3 25 1 59 0 0)))
 
-      (is 
-        (= 
-          (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 10 28 2 59 0 0 (ZoneId/of "Europe/Zagreb"))))
-          (date 2018 10 28 2 59 0 0)))
+        (is 
+          (= 
+            (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 10 28 2 59 0 0 (ZoneId/of "Europe/Zagreb"))))
+            (date 2018 10 28 2 59 0 0)))
 
-      (is 
-        (= 
-          (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 10 28 3 0 0 0 (ZoneId/of "Europe/Zagreb"))))
-          (date 2018 10 28 3 0 0 0))))))
+        (is 
+          (= 
+            (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 10 28 3 0 0 0 (ZoneId/of "Europe/Zagreb"))))
+            (date 2018 10 28 3 0 0 0))))
+      (with-time-configuration
+        {:timezone "America/Sao_Paulo"}
+        (is
+          (= 
+            (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 11 4 0 0 0 0 (ZoneId/of "America/Sao_Paulo"))))
+            (date 2018 11 4 0 0 0)))
+        (println (get-dst-offset (date->value (date 2018 10 31 23 59 0 0))))
+        (println (get-dst-offset (date->value (date 2018 11 4 0 0 0))))
+        (println (get-dst-offset (date->value (date 2018 11 3 23 59 0 0))))
+        #_(is
+            (=
+             ;; TODO - Invesitigate this... Looks like Java is returning wrong
+             ;; offset for this situation. Should be -3 but it is -2
+             (java.util.Date/from 
+               (.toInstant 
+                 (ZonedDateTime/of 
+                   2018 10 31 23 59 0 0
+                   (ZoneId/of "America/Sao_Paulo"))))
+             (date 2018 10 31 23 59 0 0)))))))
+
+
+(deftest Teleportation
+  (let [target (date 2018 7 6 12)
+        t1 (with-time-configuration
+             {:timezone "Europe/Zagreb"}
+             target)
+        t2 (with-time-configuration
+             {:timezone "Asia/Tokyo"}
+             target)
+        t3 (with-time-configuration
+             {:timezone "America/New_York"}
+             target)]
+    (is (= t1 t2 t3) "Every time is same time")
+    (is
+      (= 
+        {:value 1530903600000, :hour 19, :minute 0, :second 0, :millisecond 0}
+        (with-time-configuration 
+          {:timezone "Asia/Tokyo"}
+          (time-context (date->value target)))
+        (time-context
+          (teleport
+            (date->value target)
+            "Asia/Tokyo"))))
+    (is
+      (=
+       {:value 1530856800000, :hour 6, :minute 0, :second 0, :millisecond 0}
+       (with-time-configuration
+         {:timezone "America/New_York"}
+         (time-context (date->value target)))
+       (time-context
+         (teleport 
+           (date->value target)
+           "America/New_York"))))))
