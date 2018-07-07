@@ -36,6 +36,9 @@
 (deftask build
   "Build vura and install localy"
   []
+  (set-env! 
+    :dependencies '[[org.clojure/clojure "1.8.0" :scope "provided"]]
+    :resource-paths #{"src"})
   (comp (pom) (jar) (install)))
 
 (deftask deploy []
@@ -55,7 +58,7 @@
 
 (deftask deploy-core []
   (set-env! 
-    :dependencies '[[org.clojure/clojure "1.8.0" :scope "provided"]]
+    :dependencies '[]
     :resource-paths #{"src"})
   (comp
     (sift 

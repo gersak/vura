@@ -1,4 +1,7 @@
 (ns vura.core
+  #?(:cljs
+     (:require-macros 
+       [vura.core :refer [with-time-configuration]]))
   (:require 
     [vura.timezones.db 
      :refer [get-zone get-rule]])
@@ -95,7 +98,7 @@
 (defn ^:no-doc
   system-timezone []
   #?(:clj (.(java.util.TimeZone/getDefault) (getID))
-     :cljs (Intl.DateTimeFormat().resolvedOptions().timeZone )))
+     :cljs (.-timeZone (.resolvedOptions (js/Intl.DateTimeFormat )))))
 
 
 
@@ -180,7 +183,8 @@
           (let [day' (days-mapping (subs floating-day 0 3))
                 operator (case (subs floating-day 3 5)
                            ">=" >=)
-                day-in-month' (Integer/parseInt (subs floating-day 5))
+                day-in-month' #?(:clj (Integer/parseInt (subs floating-day 5))
+                                 :cljs (js/parseInt (subs floating-day 5)))
                 value (:value 
                         (first
                           (filter
@@ -771,13 +775,7 @@
   (value->time [this] "Returns Date for given value.")
   (time-travel [this destination] "Travels in time in current zone to given date. Remaining in that zone(place)."))
 
-(defn teleport 
-  "Teleports value to different timezone."
-  [value timezone]
-  (let [d (value->time value)]
-    (with-time-configuration 
-      {:timezone timezone}
-      (time->value d))))
+
 
 #?(:clj
    (extend-protocol TimeValueProtocol
@@ -849,8 +847,7 @@
   (first (intervals start end)))
 
 
-#?(:clj
-   (defmacro with-time-configuration 
+(defmacro with-time-configuration 
      "Utility macro to put context frame on computation scope. Specify:
 
      :holiday?     - (fn [day-context] true | false)
@@ -869,7 +866,13 @@
                 vura.core/*offset* ~offset
                 vura.core/*weekend-days* ~weekend-days
                 vura.core/*holiday?* ~holiday?]
-        ~@body)))
+        ~@body))(defn teleport 
+  "Teleports value to different timezone."
+  [value timezone]
+  (let [d (value->time value)]
+    (with-time-configuration 
+      {:timezone timezone}
+      (time->value d))))
 
 ;; TIME FRAMES
 (defmulti calendar-frame 
