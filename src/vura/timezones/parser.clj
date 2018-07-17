@@ -209,14 +209,14 @@
     "max" MAX_YEAR
     to))
 
-(defn rule-interval [{[_ from] :rule-from
-                      [_ to :as rule-to] :rule-to}]
-  (case rule-to
-    "only" [(-> (utc-date from) date->utc-value)
-            (-> from inc utc-date date->utc-value)]
-    "max" [(-> from utc-date date->utc-value)
-           MAX_YEAR_VALUE]
-    [(-> from utc-date date->utc-value) (-> to inc utc-date date->utc-value)]))
+; (defn rule-interval [{[_ from] :rule-from
+;                       [_ to :as rule-to] :rule-to}]
+;   (case rule-to
+;     "only" [(-> (utc-date from) date->utc-value)
+;             (-> from inc utc-date date->utc-value)]
+;     "max" [(-> from utc-date date->utc-value)
+;            MAX_YEAR_VALUE]
+;     [(-> from utc-date date->utc-value) (-> to inc utc-date date->utc-value)]))
 
 
 (defn rule-interval [{[_ from] :rule-from

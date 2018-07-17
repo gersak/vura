@@ -1,7 +1,7 @@
 (ns vura.async.jobs
   #?(:cljs
      (:require-macros 
-       [clojure.core.async.macros 
+       [cljs.core.async.macros 
         :refer [go go-loop]]))
   (:require
     [vura.core :as core]

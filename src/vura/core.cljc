@@ -1,10 +1,8 @@
 (ns vura.core
-  #?(:cljs
-     (:require-macros 
-       [vura.core :refer [with-time-configuration]]))
   (:require 
     [vura.timezones.db 
-     :refer [get-zone get-rule]])
+     :refer [get-zone get-rule]]
+    #?(:cljs [goog.object]))
   (:refer-clojure :exclude [second]))
 
 
@@ -97,8 +95,8 @@
 
 (defn ^:no-doc
   system-timezone []
-  #?(:clj (.(java.util.TimeZone/getDefault) (getID))
-     :cljs (.-timeZone (.resolvedOptions (js/Intl.DateTimeFormat )))))
+  #?(:clj (.. (java.util.TimeZone/getDefault) (getID))
+     :cljs (goog.object/get (.resolvedOptions (js/Intl.DateTimeFormat)) "timeZone")))
 
 
 
@@ -114,7 +112,7 @@
  ^{:dynamic true
    :doc "Variable that is used in function get-dst-offset. ->local, <-local and day? funcitons are affected
    when changing value of this variable. I.E. (binding [*offset* (hours -2)] ...) would make all computations
-   in that offset from UTC."} 
+   in that offset from UTC."}
   *offset* nil)
 
 
@@ -200,17 +198,16 @@
   "Returns DST offset for UTC input value"
   [value]
   (letfn [(utc-rule? [rule] (if-not (= "s" (-> rule :time :time-suffix)) true false))] 
-    (if (nil? *offset*) 
-      (if (nil? *timezone*)
-        (throw (ex-info "No timezone defined" {:value value}))
-        (if-let [{dst-rule :daylight-savings 
-                  s-rule :standard
-                  ;; TODO - if this is going to expand to other rules in history
-                  ;;  than get-timezone-rule should be function of two arguments
-                  ;; *timezone* and value
-                  ;; THIS IS ONLY PLACE REQUIRED FOR EXPANDING TO FULL TZ SUPPORT
-                  :as rule} (get-timezone-rule *timezone*)]
-         (let [month (binding [*offset* 0] (month? value))]
+    (if (nil? *timezone*)
+      (throw (ex-info "No timezone defined" {:value value}))
+      (if-let [{dst-rule :daylight-savings 
+                s-rule :standard
+                ;; TODO - if this is going to expand to other rules in history
+                ;;  than get-timezone-rule should be function of two arguments
+                ;; *timezone* and value
+                ;; THIS IS ONLY PLACE REQUIRED FOR EXPANDING TO FULL TZ SUPPORT
+                :as rule} (get-timezone-rule *timezone*)]
+        (let [month (binding [*offset* 0] (month? value))]
           (if-not dst-rule 0 
             (if (< (:month dst-rule) (:month s-rule))
               ;; Northen hemisphere
@@ -265,8 +262,7 @@
                   (if ((if save-light? < >=) value limit)
                     0
                     (:save dst-rule)))))))
-         0))
-      *offset*)))
+    0))))
 
 
 (def ^:no-doc month-values
@@ -298,11 +294,15 @@
   "Given a local timestamp value function normalizes datetime to Greenwich timezone value"
   ([value] (<-local 
              value  
-             (let [tz-offset (get-timezone-offset *timezone*)] 
-               (+ 
-                 ;; move to standard time
-                 (get-dst-offset value)
-                 tz-offset))))
+             (if (number? *offset*) *offset*
+               (if (string? *timezone*)
+                 (let [tz-offset (get-timezone-offset *timezone*)] 
+                   (+ 
+                     ;; move to standard time
+                     (get-dst-offset value)
+                     tz-offset))
+                 ;; Fallback to deprecated getTimeZoneOffset
+                 (* -1 (minutes (.getTimezoneOffset (value->utc-date value))))))))
   ([value offset] (+ value offset)))
 
 
@@ -310,11 +310,15 @@
   "Given a Greenwich timestamp value function normalizes datetime to local timezone value"
   ([value] (->local 
              value
-             (let [tz-offset (get-timezone-offset *timezone*)] 
-               (+ 
-                 ;; remove timzone offset to move to standard time 
-                 (get-dst-offset (- value tz-offset))
-                 tz-offset))))
+             (if (number? *offset*) *offset*
+               (if (string? *timezone*)
+                 (let [tz-offset (get-timezone-offset *timezone*)] 
+                   (+ 
+                     ;; remove timzone offset to move to standard time 
+                     (get-dst-offset (- value tz-offset))
+                     tz-offset))
+                 ;; Fallback to deprecated getTimeZoneOffset
+                 (* -1 (minutes (.getTimezoneOffset (value->utc-date value))))))))
   ([value offset] 
    (- value offset)))
 
@@ -390,8 +394,8 @@
     12 31))
 
 
-(def ^:no-doc normal-year-seconds (* 365 day))
-(def ^:no-doc leap-year-seconds (* 366 day))
+(def ^:no-doc normal-year-value (* 365 day))
+(def ^:no-doc leap-year-value (* 366 day))
 
 
 (defn- gregorian-year-period 
@@ -399,8 +403,8 @@
   (reduce
     (fn [r year]
       (+ r (if (leap-year? year)
-             leap-year-seconds
-             normal-year-seconds)))
+             leap-year-value
+             normal-year-value)))
     0
     (range start-year end-year)))
 
@@ -415,13 +419,13 @@
   unix-epoch-year according to Gregorian calendar"}
   future-years 
   (iterate
-    (fn [{:keys [year seconds]}]
+    (fn [{:keys [year value]}]
       {:year (inc year)
-       :seconds (if (leap-year? year)
-                  (+ seconds leap-year-seconds)
-                  (+ seconds normal-year-seconds))})
+       :value (if (leap-year? year)
+                  (+ value leap-year-value)
+                  (+ value normal-year-value))})
     {:year 1970
-     :seconds 0}))
+     :value 0}))
 
 
 (def 
@@ -429,13 +433,13 @@
   according to Gregorian calendar from unix-epoch-year"} 
   past-years 
   (iterate
-    (fn [{:keys [year seconds]}]
+    (fn [{:keys [year value]}]
       {:year (dec year)
-       :seconds (if (leap-year? (dec year))
-                  (- seconds leap-year-seconds)
-                  (- seconds normal-year-seconds))})
+       :value (if (leap-year? (dec year))
+                (- value leap-year-value)
+                (- value normal-year-value))})
     {:year 1970
-     :seconds 0}))
+     :value 0}))
 
 
 (defn year-day-mapping
@@ -470,26 +474,27 @@
 (defn ^:dynamic *find-year*
   "Finds a year for given value. Returns
   {:year x
-   :seconds x}
+   :milliseconds x}
   for given value where seconds is number of seconds of start of the year
   relative to unix-epoch-year"
   [value]
   (loop [position 0]
-    (let [{:keys [year seconds]
+    (let [{:keys [year]
+           value' :value
            :as target} (if (pos? value) 
                          (nth future-years position)
                          (nth past-years position))
           diff (if (pos? value)
-                 (- value seconds)
-                 (- seconds value))
-          step (/ diff normal-year-seconds)]
+                 (- value value')
+                 (- value' value))
+          step (/ diff normal-year-value)]
       (if (zero? diff) target
         (if (pos? diff)
           (if (< 
                 diff 
                 (if (leap-year? year) 
-                  leap-year-seconds
-                  normal-year-seconds))
+                  leap-year-value
+                  normal-year-value))
             (if (pos? value) 
               target 
               (nth (if (pos? value) future-years past-years) (inc position)))
@@ -508,7 +513,7 @@
   "Returns which second in day does input value belongs to. For example
   for date 15.02.2015 it will return number 0"
   [value]
-  (int 
+  (long
     (mod
       (/ (round-number value second :floor) second)
       60)))
@@ -518,7 +523,7 @@
   "Returns which hour in day does input value belongs to. For example
   for date 15.02.2015 it will return number 0"
   [value]
-  (int
+  (long
     (mod
       (/ (round-number value minute :floor) minute)
       60)))
@@ -528,7 +533,7 @@
   "Returns which hour in day does input value belongs to. For example
   for date 15.02.2015 it will return number 0"
   [value]
-  (int
+  (long
     (mod
       (/ (round-number value hour :floor) hour)
       24)))
@@ -557,8 +562,8 @@
 (defn day-in-year?
   "Returns day in year period (1 - 366)"
   [value]
-  (let [{year :year year-start :seconds} (*find-year* value)
-        relative-day (int (quot (- value year-start) day))]
+  (let [{year :year year-start :value} (*find-year* value)
+        relative-day (long (quot (- value year-start) day))]
     relative-day))
 
 
@@ -566,7 +571,7 @@
   "Returns which week in year does input value belongs to. For example
   for date 15.02.2015 it will return number 6"
   [value]
-  (let [{year :year year-start :seconds} (*find-year* value)
+  (let [{year :year year-start :value} (*find-year* value)
         value (midnight value)
         first-monday (first
                        (filter
@@ -577,15 +582,15 @@
     ;; If year startsh with Thursday, Friday, or any above
     (if (neg? time-difference)
       0
-      (int (+ (/ week-in-year week) 1)))))
+      (long (+ (/ week-in-year week) 1)))))
 
 
 (defn month? 
   "Returns which month (Gregorian) does input value belongs to. For example
   for date 15.02.2015 it will return number 2"
   [value]
-  (let [{year :year year-start :seconds} (*find-year* value)
-        relative-day (int (inc (quot (- value year-start) day)))]
+  (let [{year :year year-start :value} (*find-year* value)
+        relative-day (long (inc (quot (- value year-start) day)))]
     (get
       (if (leap-year? year)
         leap-year-day-mapping
@@ -609,8 +614,8 @@
   "Returns which day (Gregorian) in month input value belongs to. For example
   for date 15.02.2015 it will return number 15"
   [value]
-  (let [{year :year year-start :seconds} (*find-year* value)
-        relative-day (int (inc (quot (- value year-start) day)))
+  (let [{year :year year-start :value} (*find-year* value)
+        relative-day (long (inc (quot (- value year-start) day)))
         leap-year? (leap-year? year)
         month (get
                 (if leap-year?
@@ -727,7 +732,7 @@
            [(* 7 day weeks)
             (* day days)
             (* hour hours)
-            (* seconds second)
+            (* second seconds)
             (* minutes minute)
             (* milliseconds millisecond)])))
 
@@ -848,25 +853,27 @@
 
 
 (defmacro with-time-configuration 
-     "Utility macro to put context frame on computation scope. Specify:
+  "Utility macro to put context frame on computation scope. Specify:
 
-     :holiday?     - (fn [day-context] true | false)
-     :timezone     - timezone-name or +/- number
-     :weekend-days - (fn [number] true | false)"
-     [{:keys [timezone
-              holiday?
-              offset
-              weekend-days]
-       :or {weekend-days *weekend-days*
-            holiday? (fn [_] false)
-            timezone nil
-            offset nil}}
-      & body]
-     `(binding [vura.core/*timezone* ~timezone
-                vura.core/*offset* ~offset
-                vura.core/*weekend-days* ~weekend-days
-                vura.core/*holiday?* ~holiday?]
-        ~@body))(defn teleport 
+  :holiday?     - (fn [day-context] true | false)
+  :timezone     - timezone-name
+  :weekend-days - (fn [number] true | false)"
+  [{:keys [timezone
+           holiday?
+           offset
+           weekend-days]
+    :or {weekend-days *weekend-days*
+         holiday? (fn [_] false)
+         timezone (system-timezone)
+         offset nil}}
+   & body]
+  `(binding [vura.core/*timezone* ~timezone
+             vura.core/*offset* ~offset
+             vura.core/*weekend-days* ~weekend-days
+             vura.core/*holiday?* ~holiday?]
+     ~@body))
+
+(defn teleport 
   "Teleports value to different timezone."
   [value timezone]
   (let [d (value->time value)]
@@ -961,21 +968,25 @@
         month-days (days-in-month month leap-year)
         current-day-in-month (day-in-month? value)
         current-day (midnight value)
-        week (week-in-year? value)
+        first-week (week-in-year? value)
         first-day (- 
                     current-day 
                     (days (dec current-day-in-month)))
-        first-day-in-week (day? value)]
+        first-day-in-week (day? first-day)]
     (for [d (range month-days)
           :let [v (+ first-day (days d))
                 day (mod (+ first-day-in-week d) 7)
                 day (if (zero? day) 7 day)
-                week (+ week (quot (+ d (- 7 first-day-in-week)) 7))]]
+                week' (+ 
+                        first-week 
+                        (quot 
+                          (dec (+ d first-day-in-week)) 
+                          7))]]
 
       {:value v
        :month month
        :year year
-       :week week
+       :week week'
        :day day 
        :day-in-month (inc d)
        :first-day-in-month? (= (inc d) 1)
@@ -1023,3 +1034,27 @@
                     "time-as-value only allows Symbols in bindings")
                   :cljs
                   (js/Error. "time-as-value allows only Symbols in bindings"))))))
+
+
+(def synodic-month-value
+  (period 
+    {:days 29
+     :hours 12
+     :minutes 44
+     :seconds 2.8016}))
+
+(def ^:private new-moon-reference
+  (date->utc-value (utc-date 1999 8 11 13 8)))
+
+
+(defn moon-phase? [value]
+  (let [distance (- value new-moon-reference)
+        new-moon-value (round-number 
+                         distance
+                         synodic-month-value
+                         (if (pos? distance) :floor :ceil))
+        phase-value (/ synodic-month-value 4)
+        phase-start (+ new-moon-reference new-moon-value)]
+    [new-moon-reference new-moon-value]
+    (value->date (long (+ new-moon-reference new-moon-value)))
+    #_(mod (int (round-number (/ phase-start phase-value) 1)) 4)))

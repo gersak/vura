@@ -2,9 +2,10 @@
   (:refer-clojure :exclude [second])
   (:use clojure.test
         vura.core)
+  (:require [vura.timezones.db :as db])
   (:import
     [java.time ZonedDateTime LocalDateTime ZoneId]
-    [java.util Calendar]))
+    [java.util TimeZone Calendar]))
 
 (def positive-number (rand 100000))
 (def negative-number (rand -10000))
@@ -274,3 +275,11 @@
          (teleport 
            (date->value target)
            "America/New_York"))))))
+
+
+
+(deftest TimezoneCoverage
+  (let [java-zones (set (TimeZone/getAvailableIDs))
+        vura-zones (set (keys (:zones db/db)))
+        [java vura _] (clojure.data/diff java-zones vura-zones)]
+    (sort java)))

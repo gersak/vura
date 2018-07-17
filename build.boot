@@ -8,11 +8,17 @@
                   [org.clojure/tools.logging "0.5.0-alpha" :scope "test"]
                   [kovacnica/dreamcatcher "1.0.7-SNAPSHOT"]
                   [org.clojure/core.async "0.4.474"]
-                  [org.clojure/clojurescript "1.10.238"]
                   [instaparse "1.4.9" :scope "test"]
-                  [boot-codox "0.10.3" :scope "test"]])
+                  [boot-codox "0.10.3" :scope "test"]
+                  ;; Clojurescript
+                  [org.clojure/clojurescript "1.10.339" :scope "test"]
+                  [adzerk/boot-cljs-repl     "0.3.3" :scope "test"]
+                  [com.cemerick/piggieback   "0.2.2" :scope "test"]
+                  [weasel                    "0.7.0" :scope "test"]
+                  [org.clojure/tools.nrepl   "0.2.13"]])
 
 (require '[adzerk.boot-cljs :refer [cljs]])
+(require '[adzerk.boot-cljs-repl :refer [cljs-repl start-repl]])
 (require '[pandeiro.boot-http :refer [serve]])
 (require '[codox.boot :refer [codox]])
 (require '[adzerk.boot-test :refer :all])
@@ -28,10 +34,7 @@
          :version +version+
          :filter-namespaces #{'vura.core}})
 
-(deftask dev []
-  (comp
-    (wait)
-    (repl :server true :port 54321)))
+
 
 (deftask build
   "Build vura and install localy"
@@ -49,13 +52,6 @@
     (push :repo "clojars"
           :gpg-sign (not (.endsWith +version+ "-SNAPSHOT")))))
 
-
-(deftask dev-test []
-  (set-env! :source-paths #{"src" "test"})
-  (comp 
-    (watch)
-    (repl :server true :port 54321)))
-
 (deftask deploy-core []
   (set-env! 
     :dependencies '[]
@@ -71,3 +67,22 @@
                  "version" +version+})
     (push :repo "clojars"
           :gpg-sign (not (.endsWith +version+ "-SNAPSHOT")))))
+
+(deftask dev []
+  (comp
+    (wait)
+    (repl :server true :port 54321)))
+
+(deftask dev-cljs []
+  (comp
+    (watch)
+    (cljs-repl 
+      :nrepl-opts {:port 54321})
+    (cljs)
+    (target :dir #{"target"})))
+
+(deftask dev-test []
+  (set-env! :source-paths #{"src" "test"})
+  (comp 
+    (watch)
+    (repl :server true :port 54321)))
