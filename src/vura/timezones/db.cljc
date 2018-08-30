@@ -294,13 +294,14 @@
 
 
 (def db-extensions
-  {"GMT"
-   {:offset 0, :rule "-" , :format "GMT", :from 0}
-   "GMT-0" "GMT"
-   "GMT+0" "GMT"})
+  {:zones 
+   {"GMT"
+    {:offset 0, :rule "-" , :format "GMT", :from 0}
+    "GMT-0" "GMT"
+    "GMT+0" "GMT"}})
 
 (def db
-  (merge
+  (merge-with merge
     db-extensions
     {:zones
      {"Europe/Amsterdam"

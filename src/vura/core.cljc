@@ -644,6 +644,7 @@
         days-in-month' (days-in-month (month? value) (leap-year? (year? value)))]
     (= days-in-month' day-in-month)))
 
+
 (defn utc-date-value
   "Constructs new Date object.
   Months: 1-12
@@ -697,6 +698,7 @@
 
 
 (def utc-date (comp value->utc-date utc-date-value))
+
 
 (defn date
   "Constructs new Date object.
@@ -873,6 +875,7 @@
              vura.core/*holiday?* ~holiday?]
      ~@body))
 
+
 (defn teleport 
   "Teleports value to different timezone."
   [value timezone]
@@ -880,6 +883,7 @@
     (with-time-configuration 
       {:timezone timezone}
       (time->value d))))
+
 
 ;; TIME FRAMES
 (defmulti calendar-frame 
@@ -902,6 +906,7 @@
     * month
     * week"
   (fn [value frame-type & options] frame-type))
+
 
 (defn day-context 
   "Returns day context for given value in Gregorian calendar. 
@@ -927,6 +932,24 @@
       (if (fn? *holiday?*) 
         (assoc context :holiday? (*holiday?* context))
         context))))
+
+
+(defn context->value [{:keys [year
+                              month
+                              day-in-month
+                              hour
+                              minute
+                              second
+                              millisecond]
+                       :or {year 0
+                            month 1
+                            day-in-month 1
+                            hour 0
+                            minute 0
+                            second 0
+                            millisecond 0}}]
+  (date->value 
+    (date year month day-in-month hour minute second millisecond)))
 
 
 (defn time-context 
@@ -956,6 +979,7 @@
           (+ cd (days (days-in-month m leap?)))
           (inc m)
           (concat r (calendar-frame cd :month)))))))
+
 
 (defmethod calendar-frame "year" [value _]
   (calendar-frame value :year))
@@ -1009,7 +1033,6 @@
   (calendar-frame value :week))
 
 
-
 #?(:clj
    (defmacro time-as-value 
      "bindings => [name (time->value x) ...]
@@ -1042,6 +1065,7 @@
      :hours 12
      :minutes 44
      :seconds 2.8016}))
+
 
 (def ^:private new-moon-reference
   (date->utc-value (utc-date 1999 8 11 13 8)))
