@@ -56,7 +56,6 @@
      (holiday? [this dispatch] (set (map (partial is-holiday? dispatch) this)))
      java.util.Date
      (holiday? [this dispatch]
-       (println "DISPAtCH: " dispatch)
        ((comp (partial is-holiday? dispatch) day-context date->value) this))
      java.time.Instant
      (holiday? [this dispatch]
