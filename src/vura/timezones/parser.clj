@@ -1,11 +1,10 @@
 (ns vura.timezones.parser
   (:refer-clojure :exclude [second])
   (:require 
-    [dreamcatcher.core :as dreamcatcher]
     [vura.core :refer :all]
     [instaparse.core :as insta]))
 
-(def zones ["europe" "africa" "northamerica" "pacificnew" "southamerica" "asia" "australasia"])
+(def zones ["europe" "africa" "northamerica" "pacificnew" "southamerica" "asia" "australasia" "etcetera" "backward"])
 
 (defn zone-definition [zone]
   (slurp (clojure.java.io/resource (str "tzdb-2018e/" (name zone)))))
@@ -49,8 +48,8 @@
 
    <zone-start> =  'Zone'
    sign = '+' | '-'
-   gmtoff = sign? hour <':'> minute (<':'> second)? | hour 
-   <zone-name> = #'[a-zA-Z/_\\-0-9]+'
+   gmtoff = sign? hour <':'> minute (<':'> second)? | sign? hour 
+   <zone-name> = #'[a-zA-Z/_\\-0-9+-]+'
    zone-rule = #'[a-zA-Z\\-_]+'  | gmtoff
    zone-format = #'[A-Z\\-/%s\\+0-9a-z]+'
    zone-until = <space> year (<space> month)? (<space> day | <space> floating-day)? (<space> time)?
@@ -318,7 +317,9 @@
        :northamerica
        :southamerica
        :asia
-       :australasia]))
+       :australasia
+       :backward
+       :etcetera]))
 
 
 (defn create-locale-date []

@@ -5,6 +5,7 @@
                   [adzerk/boot-reload "0.5.2" :scope "test"]
                   [adzerk/boot-test "1.2.0" :scope "test"]
                   [pandeiro/boot-http "0.8.3" :scope "test"]
+                  [cljfmt/cljfmt "0.6.0" :scope "test"]
                   [org.clojure/tools.logging "0.5.0-alpha" :scope "test"]
                   [kovacnica/dreamcatcher "1.0.7-SNAPSHOT"]
                   [org.clojure/core.async "0.4.474"]
@@ -17,11 +18,12 @@
                   [weasel                    "0.7.0" :scope "test"]
                   [org.clojure/tools.nrepl   "0.2.13"]])
 
-(require '[adzerk.boot-cljs :refer [cljs]])
-(require '[adzerk.boot-cljs-repl :refer [cljs-repl start-repl]])
-(require '[pandeiro.boot-http :refer [serve]])
-(require '[codox.boot :refer [codox]])
-(require '[adzerk.boot-test :refer :all])
+(require '[adzerk.boot-cljs :refer [cljs]]
+         '[adzerk.boot-cljs-repl :refer [cljs-repl start-repl]]
+         '[pandeiro.boot-http :refer [serve]]
+         '[codox.boot :refer [codox]]
+         '[adzerk.boot-test :refer :all]
+         '[cljfmt.core])
 
 (def +version+ "0.5.3-SNAPSHOT")
 
