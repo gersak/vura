@@ -110,32 +110,32 @@
 (static-holiday all-saints? 11 1)
 (static-holiday christmas? 12 25)
 
-(def holiday->name
-  {easter? "Easter"
-   epiphany? "Epiphany"
-   mardi-gras? "Mardi Gras"
-   ash-wednesday? "Ash Wednesday"
-   palm-sunday? "Palm Sunday"
-   moundy-thursday? "Moundy Thursday"
-   good-friday? "Good Friday"
-   easter-monday? "Easter Monday"
-   corpus-christi? "Corpus Christi"
-   assumption-of-the-blessed-virgin-mary? "Assumption of the Blessed Virgin Mary"
-   ascension-of-jesus? "Ascension of Jesus"
-   pentecost? "Pentecost"
-   all-saints? "All Saint's Day"
-   christmas? "Christmas"})
+(def holiday->context
+  {easter? {:name "Easter"}
+   epiphany? {:name "Epiphany"}
+   mardi-gras? {:name "Mardi Gras"}
+   ash-wednesday? {:name "Ash Wednesday"}
+   palm-sunday? {:name "Palm Sunday"}
+   moundy-thursday? {:name "Moundy Thursday"}
+   good-friday? {:name "Good Friday"}
+   easter-monday? {:name "Easter Monday"}
+   corpus-christi? {:name "Corpus Christi"}
+   assumption-of-the-blessed-virgin-mary? {:name "Assumption of the Blessed Virgin Mary"}
+   ascension-of-jesus? {:name "Ascension of Jesus"}
+   pentecost? {:name "Pentecost"}
+   all-saints? {:name "All Saint's Day"}
+   christmas? {:name "Christmas"}})
 
 (defmethod c/is-holiday? :religion/christian [_ day-context]
   (let [d (select-keys day-context [:day-in-month :month :year])]
     (boolean
      (some
       #(% day-context)
-      (keys holiday->name)))))
+      (keys holiday->context)))))
 
-(defmethod c/holiday-name :religion/christian [_ data]
+(defmethod c/holiday-context-impelemntation :religion/christian [_ data]
   (let [d (-> data vura/time->value vura/day-context)]
     (some
      (fn [[f n]]
        (when (f d) n))
-     holiday->name)))
+     holiday->context)))

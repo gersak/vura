@@ -14,36 +14,53 @@
 (static-holiday dan-neovisnosti? 10 8)
 (static-holiday sveti-stjepan? 12 26)
 
-(def holiday->name
-  {nova-godina? "Nova Godina"
-   catholic/epiphany? "Sveta tri kralja"
-   catholic/easter? "Uskrs"
-   catholic/easter-monday? "Uskršnji ponedjeljak"
-   praznik-rada? "Praznik rada"
-   catholic/corpus-christi? "Tijelovo"
-   dan-antifasiticke-borbe? "Dan antifašističke borbe"
-   dan-drzavnosti? "Dan državnosti"
-   dan-pobjede-i-domovinske-zahvalnosti? "Dan pobjede i domovinske zahvalnosti"
-   catholic/assumption-of-the-blessed-virgin-mary? "Velika Gospa"
-   dan-neovisnosti? "Dan neovisnosti"
-   catholic/all-saints? "Dan svih svetih"
-   catholic/christmas? "Božić"
-   sveti-stjepan? "Sveti Stjepan"})
+(def holiday->context
+  {nova-godina? {:name "Nova Godina"
+                 :working-day? false}
+   catholic/epiphany? {:name "Sveta tri kralja"
+                       :working-day? false}
+   catholic/easter? {:name "Uskrs"
+                     :working-day? false}
+   catholic/easter-monday? {:name "Uskršnji ponedjeljak"
+                            :working-day? false}
+   praznik-rada? {:name "Praznik rada"
+                  :working-day? false}
+   catholic/corpus-christi? {:name "Tijelovo"
+                             :working-day? false}
+   dan-antifasiticke-borbe? {:name "Dan antifašističke borbe"
+                             :working-day? false}
+   dan-drzavnosti? {:name "Dan državnosti"
+                    :working-day? false}
+   dan-pobjede-i-domovinske-zahvalnosti? {:name "Dan pobjede i domovinske zahvalnosti"
+                                          :working-day? false}
+   catholic/assumption-of-the-blessed-virgin-mary? {:name "Velika Gospa"
+                                                    :working-day? false}
+   dan-neovisnosti? {:name "Dan neovisnosti"
+                     :working-day? false}
+   catholic/all-saints? {:name "Dan svih svetih"
+                         :working-day? false}
+   catholic/christmas? {:name "Božić"
+                        :working-day? false}
+   sveti-stjepan? {:name "Sveti Stjepan"
+                   :working-day? false}})
 
 (defn holiday? [{:keys [day-in-month month year] :as day-context}]
   (let [d (select-keys day-context [:day-in-month :month :year])]
     (boolean
      (some
       #(% day-context)
-      (keys holiday->name)))))
+      (keys holiday->context)))))
 
 (defmethod c/is-holiday? :country/croatia [_ day-context] (holiday? day-context))
 
-(defmethod c/holiday-name :country/croatia [_ data]
+(defmethod c/holiday-context-impelemntation :country/croatia [_ data]
   (let [d (-> data v/time->value v/day-context)]
     (some
      (fn [[f n]]
        (when (f d) n))
-     holiday->name)))
+     holiday->context)))
 
 (derive :locale/hr :country/croatia)
+(derive :locale/hr c/locale)
+(derive :country/croatia c/country)
+(derive :vura.core.holiday/locale :vura.core/holiday)
