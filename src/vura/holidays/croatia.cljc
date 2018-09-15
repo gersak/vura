@@ -53,12 +53,12 @@
 
 (defmethod c/is-holiday? :country/croatia [_ day-context] (holiday? day-context))
 
-(defmethod c/holiday-context-impelemntation :country/croatia [_ data]
-  (let [d (-> data v/time->value v/day-context)]
-    (some
-     (fn [[f n]]
-       (when (f d) n))
-     holiday->context)))
+; (defmethod c/holiday-context-impelemntation :country/croatia [_ data]
+;   (let [d (-> data v/time->value v/day-context)]
+;     (some
+;      (fn [[f n]]
+;        (when (f d) n))
+;      holiday->context)))
 
 (derive :locale/hr :country/croatia)
 (derive :locale/hr c/locale)
