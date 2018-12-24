@@ -1,4 +1,6 @@
 (ns vura.core
+  #?(:cljs 
+     (:require-macros [vura.core :refer [with-time-configuration]]))
   (:require
    [vura.timezones.db
     :refer [get-timezone get-rule]]
@@ -89,7 +91,7 @@
   macro. Specify function that calculates if given day-context is
   holiday or not. Look @ \"day-context\" Returns boolean"}
   *holiday?*
-  (constantly false))
+  nil)
 
 (def millisecond "1" 1)
 (def microsecond  "1.0E-3" (/ millisecond 1000))
@@ -120,6 +122,33 @@
    in that offset from UTC."}
   *offset* nil)
 
+(defn unknown-holiday [_] false)
+
+(defmacro with-time-configuration
+  "Utility macro to put context frame on computation scope. Specify:
+
+  :holiday?     - (fn [day-context] true | false)
+  :timezone     - timezone-name
+  :weekend-days - (fn [number] true | false)
+  :calendar     - :vura.core/gregorian :vura.core/julian"
+  [{:keys [timezone
+           holiday?
+           offset
+           calendar
+           weekend-days]
+    :or {weekend-days vura.core/*weekend-days*
+         timezone (vura.core/system-timezone)
+         holiday? *holiday?*
+         calendar :vura.core/gregorian
+         offset nil}}
+   & body]
+  ;;`(let [] ~@body)
+  `(binding [vura.core/*timezone* ~timezone
+             vura.core/*offset* ~offset
+             vura.core/*weekend-days* ~weekend-days
+             vura.core/*holiday?* ~holiday?
+             vura.core/*calendar* ~calendar]
+     ~@body))
 
 ;; TODO - enable this to conform with history rules not just current one
 ;; This is + on lib size and speed. I've compiled TZ with history and it
@@ -407,6 +436,8 @@
    0
    (range start-year end-year)))
 
+
+
 (def ^:no-doc unix-epoch-year 1970)
 (def ^:no-doc unix-epoch-day 4)
 (def ^:no-doc julian-day-epoch
@@ -418,7 +449,9 @@
 
 
 
-;; Lazy sequence of all future years to come according to Gregorian calendar
+;; Credits 
+;; Algorithms taken from awesome Astronomy Answers page
+;; https://www.aa.quae.nl/en/reken/juliaansedag.html
 
 
 (defn value->jcdn
@@ -427,7 +460,11 @@
   (/ (- (round-number value day :floor) julian-day-epoch) day))
 
 (defn jcdn->value [jcdn]
-  (+ (* jcdn day) julian-day-epoch))
+  (+ (days jcdn) julian-day-epoch))
+
+
+(defn jcdn->calendar [jcdn]
+  )
 
 (defn- value->gregorian-calendar [value]
   (letfn [(div [x y]
@@ -472,6 +509,10 @@
         d (inc (round-number (/ (mod k1 325) 11) 1 :floor))]
     {:day-in-month (long d) :month (long m) :year (long j)}))
 
+
+(defn- islamic-calendar->value [{:keys [day-in-month month year]}]
+  )
+
 (letfn [(c1 [x]
           (round-number
            (/ (inc (* 235 x)) 19)
@@ -481,12 +522,6 @@
             (/ (c1 x) 1095)
             1 :floor))
         (r [x] (mod (c1 x) 1095))
-        ; (v1 [x]
-        ;     (+
-        ;      (* 32336 (q x))
-        ;      (round-number
-        ;       (/ (+ (* 15 (q x)) (* 765433 (r x)) 12084)
-        ;          25920))))
         (v1 [x]
             (+
              (* 29 (c1 x))
@@ -565,10 +600,31 @@
           u3 (- gama3 (round-number (/ (inc (* 235 epsilon3)) 19) 1 :floor))
           z4 (- y4 (c4 epsilon3 u3))
           c (round-number (/ (- 12 u3) 7) 1 :floor)
-          j (+ epsilon3 1 (* -1 c))
-          m (inc u3)
-          d (inc z4)]
-      {:year (long j) :month (long m) :day-in-month (long d)})))
+          j (long (- (inc epsilon3) c))
+          m (long (inc u3))
+          d (long (inc z4))
+          year-length (long (L epsilon3))
+          month-mapping (case year-length
+                          353 (zipmap (range 1 13)
+                                      [30 29 30 29 30 29 30 29 29 29 30 29])
+                          354 (zipmap (range 1 13)
+                                      [30 29 30 29 30 29 30 29 30 29 30 29])
+                          355 (zipmap (range 1 13)
+                                      [30 29 30 29 30 29 30 30 30 29 30 29])
+                          383 (zipmap (range 1 14)
+                                      [30 29 30 29 30 29 30 30 30 29 30 30 29])
+                          384 (zipmap (range 1 13)
+                                      [30 29 30 29 30 29 30 29 30 29 30 30 29])
+                          386 (zipmap (range 1 13)
+                                      [30 29 30 29 30 29 30 30 30 29 30 30 29]))
+          last-day (get month-mapping m)]
+      {:year j
+       :month m
+       :day-in-month d
+       :year-lenght year-length
+       :month-length last-day
+       :first-day-in-month? (= 1 d)
+       :last-day-in-month? (= last-day d)})))
 
 (def
   ^{:doc "Definition of future years. Lazy sequence of all future years from
@@ -1037,7 +1093,10 @@
      js/Date
      (time->value [this] (date->value this))
      (value->time [this] this)
-     cljs.core/PersistentMap
+     cljs.core/PersistentArrayMap
+     (value->time [this] this)
+     (time->value [this] (context->value this))
+     cljs.core/PersistentHashMap
      (value->time [this] this)
      (time->value [this] (context->value this))
      cljs.core/PersistentVector
@@ -1065,30 +1124,7 @@
   [start end]
   (first (intervals start end)))
 
-(defmacro with-time-configuration
-  "Utility macro to put context frame on computation scope. Specify:
 
-  :holiday?     - (fn [day-context] true | false)
-  :timezone     - timezone-name
-  :weekend-days - (fn [number] true | false)
-  :calendar     - :vura.core/gregorian :vura.core/julian"
-  [{:keys [timezone
-           holiday?
-           offset
-           calendar
-           weekend-days]
-    :or {weekend-days *weekend-days*
-         holiday? (fn [_] false)
-         timezone (system-timezone)
-         calendar ::gregorian
-         offset nil}}
-   & body]
-  `(binding [vura.core/*timezone* ~timezone
-             vura.core/*offset* ~offset
-             vura.core/*weekend-days* ~weekend-days
-             vura.core/*holiday?* ~holiday?
-             vura.core/*calendar* ~calendar]
-     ~@body))
 
 (defn teleport
   "Teleports value to different timezone."

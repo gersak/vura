@@ -1,0 +1,7 @@
+{:deps true
+ :builds 
+ {:vura {:target :browser
+         :modules {:vura {:entries [vura.core]}}
+         :output-to "target/vura.js"
+         :devtools {:http-root "target"
+                    :http-port 3450}}}}

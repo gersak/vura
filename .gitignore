@@ -1,4 +1,5 @@
 /target
+.shadow-cljs/
 gpg.edn
 repl.clj
 .nrepl-port

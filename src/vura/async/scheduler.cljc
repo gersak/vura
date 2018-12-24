@@ -1,8 +1,6 @@
 (ns vura.async.scheduler
-  #?(:cljs (:require-macros [dreamcatcher.core :refer [safe]]
-                            [cljs.core.async.macros :refer [go go-loop]]))
+  #?(:cljs (:require-macros [cljs.core.async.macros :refer [go go-loop]]))
   (:require
-    #?(:clj [dreamcatcher.core :refer [safe]])
     [vura.core :as core]
     [vura.cron 
      :refer [next-timestamp valid-timestamp?]]
@@ -158,48 +156,3 @@
      (doseq [[_ job :as x] args]
        (apply add-job schedule x))
      schedule)))
-
-
-
-
-(comment
-  (def test-job (make-job
-                  [:telling (safe
-                              (println "Telling!!! " (core/date)))
-                   :throwning (safe (println "Throwing..."))]))
-
-  (def another-job1 (make-job
-                      [:drinking (safe
-                                   (println (core/date))
-                                   (println  "job1 drinking"))
-                       :going-home (safe (println "job1 going home"))]))
-
-  (def long-job (make-job
-                  [:phuba (safe
-                            (println (core/date))
-                            (println "Going from phuba!")
-                            (async/<!! (timeout 2000)))
-                   :letovanic (safe
-                                (println "paryting in Letovanic")
-                                (async/<!! (timeout 5000)))]))
-
-
-  (def test-schedule (make-schedule
-                       :test-job test-job "4/10 * * * * * *"
-                       :long-job long-job "*/2 * * * * * *"
-                       :another another-job1 "*/15 * * * * * *"))
-
-  (def new-job (make-job [:execute-task (safe (println "Executing new job"))]))
-
-  (add-job test-schedule [:id 10] new-job "0 0 0 1 1 * 2018")
-  (job-candidates? test-schedule)
-  (get-schedules test-schedule)
-  (start-dispatching! test-schedule)
-  (stop-dispatching! test-schedule)
-  (stale-jobs? test-schedule)
-
-  (def t (make-schedule :t test-job "*/10"))
-
-  (def suicide-job (make-job
-                     [:buying-rope (safe (println "@" (local-now)) (println "Suicide is buying a rope! Watch out!"))
-                      :suicide (safe (println "Last goodbay!"))])))

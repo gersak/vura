@@ -12,12 +12,12 @@
 
 (def ^:private blank-job-machine
   (make-state-machine
-    [:initialize :start (fn [x] (update-data! x assoc "*started-at*" (core/date)))
-     :start :end identity
-     :end :finished (fn [x] 
-                      (-> x
-                        (update-data! assoc "*ended-at*" (core/date))
-                        (update-data! assoc "*running*" false)))]))
+    {:transitions [:initialize :start (fn [x] (update-data! x assoc "*started-at*" (core/date)))
+                   :start :end identity
+                   :end :finished (fn [x] 
+                                    (-> x
+                                      (update-data! assoc "*ended-at*" (core/date))
+                                      (update-data! assoc "*running*" false)))]}))
 
 
 (defn job-life [x]
@@ -105,8 +105,8 @@
   (before-phase? [this phase] "Returns boolean true if current phase that job-agent is working on is before input phase")
   (after-phase? [this phase] "Returns boolean true if current phase that job-agent is working on is before input phase")
   (get-phases [this] "Lists all Job phases")
-  (started-at? [this] "Returns org.joda.time.DateTime timestamp")
-  (ended-at? [this] "Returns org.joda.time.DateTime timestamp")
+  (started-at? [this] "Returns timestamp")
+  (ended-at? [this] "Returns timestamp")
   (started? [thsi] "Returns true if job is not in phase start")
   (finished? [this] "Returns true is job is in :finished state")
   (active? [this] "Returns true if job is running")
