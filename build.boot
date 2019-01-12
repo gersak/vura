@@ -61,7 +61,8 @@
     :resource-paths #{"src"})
   (comp
     (sift 
-      :include #{#"vura/core.cljc"})
+      :include #{#"vura/core.cljc"
+                 #"vura/timezones/db.cljc"})
     (pom 
       :project 'kovacnica/vura.core
       :version +version+)

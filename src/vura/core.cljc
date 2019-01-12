@@ -76,7 +76,7 @@
 
          :vura.core/gregorian
          :vura.core/julian"}
-  *calendar* ::gregorian)
+  *calendar* :gregorian)
 
 (def
   ^{:dynamic true
@@ -302,28 +302,6 @@
                           (:save dst-rule)))))))
         0))))
 
-(def ^:no-doc month-values
-  {:january 1
-   :february 2
-   :march 3
-   :april 4
-   :may 5
-   :june 6
-   :july 7
-   :august 8
-   :september 9
-   :october 10
-   :november 11
-   :december 12})
-
-(def ^:no-doc day-values
-  {:monday 1
-   :tuesday 2
-   :wednesday 3
-   :thursday 4
-   :friday 5
-   :saturday 6
-   :sunday 7})
 
 (defn- ^:no-doc <-local
   "Given a local timestamp value function normalizes datetime to Greenwich timezone value"
@@ -393,66 +371,17 @@
   [value]
   (round-number value day :floor))
 
-(defn leap-year?
-  "Calculates if date value belongs to year that is defined as leap year."
-  [year]
-  (if ((comp not zero?) (mod year 4)) false
-      (if ((comp not zero?) (mod year 100)) true
-          (if (and
-               (case *calendar*
-                 ::gregorian true
-                 ::julian false)
-               ((comp not zero?) (mod year 400))) false
-              true))))
-
-(defn days-in-month
-  "Mapping for months. Returns how much are there for input month according
-  to Gregorian calendar."
-  [month leap-year?]
-  (case month
-    1 31
-    2 (if leap-year? 29 28)
-    3 31
-    4 30
-    5 31
-    6 30
-    7 31
-    8 31
-    9 30
-    10 31
-    11 30
-    12 31))
-
-(def ^:no-doc normal-year-value (* 365 day))
-(def ^:no-doc leap-year-value (* 366 day))
-
-(defn- year-period
-  [start-year end-year]
-  (reduce
-   (fn [r year]
-     (+ r (if (leap-year? year)
-            leap-year-value
-            normal-year-value)))
-   0
-   (range start-year end-year)))
 
 
-
-(def ^:no-doc unix-epoch-year 1970)
-(def ^:no-doc unix-epoch-day 4)
 (def ^:no-doc julian-day-epoch
   (with-time-configuration
     {:offset 0}
     (- (days 2440588))))
 
 
-
-
-
 ;; Credits 
 ;; Algorithms taken from awesome Astronomy Answers page
 ;; https://www.aa.quae.nl/en/reken/juliaansedag.html
-
 
 (defn value->jcdn
   "For given value returns which Julian Day value belongs to"
@@ -463,10 +392,7 @@
   (+ (days jcdn) julian-day-epoch))
 
 
-(defn jcdn->calendar [jcdn]
-  )
-
-(defn- value->gregorian-calendar [value]
+(defn- value->gregorian-date [value]
   (letfn [(div [x y]
             [(quot x y)
              (mod x y)])]
@@ -481,12 +407,51 @@
                    (+ (* 5 (round-number (/ r2 100) 1 :floor)) 2)
                    153)
           d (inc (round-number (/ r1 5) 1 :floor))
-          c0 (round-number (/ (+ x1 2) 12) 1 :floor)]
+          c0 (round-number (/ (+ x1 2) 12) 1 :floor)
+          j (long (+ (* 100 x3) x2 c0))
+          m (long (+ x1 (* -12 c0) 3))
+          leap-year? (if ((comp not zero?) (mod j 4)) false
+                       (if ((comp not zero?) (mod j 100)) true
+                         (if ((comp not zero?) (mod j 400)) false
+                           true)))
+          days-in-month (case m
+                          1 31
+                          2 (if leap-year? 29 28)
+                          3 31
+                          4 30
+                          5 31
+                          6 30
+                          7 31
+                          8 31
+                          9 30
+                          10 31
+                          11 30
+                          12 31)]
       {:day-in-month (long d)
-       :month (long (+ x1 (* -12 c0) 3))
-       :year (long (+ (* 100 x3) x2 c0))})))
+       :month m
+       :year j
+       :leap-year? leap-year?
+       :days-in-month days-in-month
+       :first-day-in-month? (== 1 d)
+       :last-day-in-month? (== days-in-month d)})))
 
-(defn- value->julian-calendar [value]
+
+(defn- gregorian-date->value [{:keys [day-in-month month year]
+                               :or {month 1 day-in-month 1}}]
+  (let [c0 (round-number (/ (- month 3) 12) 1 :floor)
+        x4 (+ year c0)
+        x3 (quot x4 100)
+        x2 (rem x4 100)
+        x1 (- month (* 12 c0) 3)
+        J (+ 
+            (round-number (/ (* 146097 x3) 4) 1 :floor)
+            (round-number (/ (* 36525 x2) 100) 1 :floor)
+            (round-number (/ (+ 2 (* 153 x1)) 5) 1 :floor)
+            day-in-month
+            1721119)]
+    (jcdn->value J)))
+
+(defn- value->julian-date [value]
   (let [J (value->jcdn value)
         y2 (- J 1721118)
         k2 (+ (* 4 y2) 3)
@@ -495,23 +460,82 @@
         c0 (round-number (/ (+ x1 2) 12) 1 :floor)
         j (+ (round-number (/ k2 1461) 1 :floor) c0)
         m (+ x1 (* c0 -12) 3)
-        d (inc (round-number (/ (mod k1 153) 5) 1 :floor))]
+        d (inc (round-number (/ (mod k1 153) 5) 1 :floor))
+        leap-year? (if ((comp not zero?) (mod j 4)) false true)
+        days-in-month (case m
+                        1 31
+                        2 (if leap-year? 29 28)
+                        3 31
+                        4 30
+                        5 31
+                        6 30
+                        7 31
+                        8 31
+                        9 30
+                        10 31
+                        11 30
+                        12 31)]
     {:day-in-month (long d)
      :month (long m)
-     :year (long j)}))
+     :year (long j)
+     :leap-year? leap-year?
+     :first-day-in-month? (== 1 d)
+     :days-in-month days-in-month
+     :last-day-in-month? (== d days-in-month)}))
 
-(defn- value->islamic-calendar [value]
+
+(defn- julian-date->value [{:keys [day-in-month month year]
+                            :or {month 1 day-in-month 1}}]
+  (let [J0 1721117
+        c0 (round-number (/ (- month 3) 12) 1 :floor)
+        J1 (round-number
+             (/ (* 1461 (+ year c0)) 4)
+             1
+             :floor)
+        J2 (round-number
+             (/ (- (* 153 month) (* 1836 c0) 457) 5)
+             1
+             :floor)]
+    (jcdn->value (+ J1 J2 day-in-month J0))))
+
+
+(defn- value->islamic-date [value]
   (let [J (value->jcdn value)
         k2 (+ 15 (* 30 (- J 1948440)))
         k1 (+ 5 (* 11 (round-number (/ (mod k2 10631) 30) 1 :floor)))
         j (inc (round-number (/ k2 10631) 1 :floor))
         m (inc (round-number (/ k1 325) 1 :floor))
-        d (inc (round-number (/ (mod k1 325) 11) 1 :floor))]
-    {:day-in-month (long d) :month (long m) :year (long j)}))
+        d (inc (round-number (/ (mod k1 325) 11) 1 :floor))
+        ;; TODO - smarter days-in-month computation
+        value' (days (- 30 d))
+        J' (value->jcdn value')
+        k2' (+ 15 (* 30 (- J' 1948440)))
+        k1' (+ 5 (* 11 (round-number (/ (mod k2' 10631) 30) 1 :floor)))
+        m' (inc (round-number (/ k1' 325) 1 :floor))
+        days-in-month (if (= m m') 30 29)]
+    {:day-in-month (long d) 
+     :month (long m) 
+     :year (long j)
+     :days-in-month days-in-month
+     :first-day-in-month? (== 1 d)
+     :last-day-in-month? (== days-in-month d)}))
 
 
-(defn- islamic-calendar->value [{:keys [day-in-month month year]}]
-  )
+(defn- islamic-date->value [{:keys [day-in-month month year]
+                             :or {month 1 day-in-month 1}}]
+  (jcdn->value
+    (+
+     (round-number
+       (/ (- (* 10631 year) 10617) 30)
+       1
+       :floor)
+     (round-number
+       (/ (- (* 325 month) 320) 11)
+       1
+       :floor)
+     day-in-month
+     1948439)))
+
 
 (letfn [(c1 [x]
           (round-number
@@ -560,7 +584,8 @@
               (c9 x)
               (round-number (/ (+ m 3) 12) 1 :floor))))
         (c4 [x m] (+ (c2 x) (c3 x m)))]
-  (defn- hebrew-date->value [{:keys [year month day-in-month]}]
+  (defn- hebrew-date->value [{:keys [day-in-month month year]
+                              :or {month 1 day-in-month 1}}]
     (let [c0 (round-number
               (/ (- 13 month) 7)
               1 :floor)
@@ -571,7 +596,7 @@
              (c4 x1 (dec month))
              z4)]
       (jcdn->value J)))
-  (defn- value->hebrew-calendar [value]
+  (defn- value->hebrew-date [value]
     (let [J (value->jcdn value)
           y4 (- J 347821)
           q (round-number (/ y4 1447) 1 :floor)
@@ -626,120 +651,9 @@
        :first-day-in-month? (= 1 d)
        :last-day-in-month? (= last-day d)})))
 
-(def
-  ^{:doc "Definition of future years. Lazy sequence of all future years from
-  unix-epoch-year according to Gregorian calendar"}
-  gregorian-future-years
-  (iterate
-   (fn [{:keys [year value]}]
-     {:year (inc year)
-      :value (binding [*calendar* ::gregorian]
-               (if (leap-year? year)
-                 (+ value leap-year-value)
-                 (+ value normal-year-value)))})
-   {:year 1970
-    :value 0}))
 
-(def
-  ^{:doc "Definition of past years. Lazy sequence of all past years
-  according to Gregorian calendar from unix-epoch-year"}
-  gregorian-past-years
-  (iterate
-   (fn [{:keys [year value]}]
-     {:year (dec year)
-      :value (binding [*calendar* ::gregorian]
-               (if (leap-year? (dec year))
-                 (- value leap-year-value)
-                 (- value normal-year-value)))})
-   {:year 1970
-    :value 0}))
 
-(def
-  ^{:doc "Definition of future years. Lazy sequence of all future years from
-  unix-epoch-year according to Gregorian calendar"}
-  julian-future-years
-  (iterate
-   (fn [{:keys [year value]}]
-     {:year (inc year)
-      :value (binding  [*calendar* ::julian]
-               (if (leap-year? year)
-                 (+ value leap-year-value)
-                 (+ value normal-year-value)))})
-   {:year 1970
-    :value 0}))
 
-(def
-  ^{:doc "Definition of past years. Lazy sequence of all past years
-  according to Gregorian calendar from unix-epoch-year"}
-  julian-past-years
-  (iterate
-   (fn [{:keys [year value]}]
-     {:year (dec year)
-      :value (binding [*calendar* ::julian]
-               (if (leap-year? (dec year))
-                 (- value leap-year-value)
-                 (- value normal-year-value)))})
-   {:year 1970
-    :value 0}))
-
-(defn year-day-mapping
-  "Calculates day mapping. Keys are days values are months. Function will return map
-  where keys are days in year from 1-36[56] and month as value for that day."
-  [leap-year?]
-  (let [days (range 1 (if leap-year? 367 366))]
-    (loop [d days
-           m 1
-           r {}]
-      (if (empty? d) r
-          (let [days-count (days-in-month m leap-year?)
-                month-days (take days-count d)]
-            (recur
-             (drop days-count d)
-             (inc m)
-             (merge
-              r
-              (zipmap month-days (repeat m)))))))))
-
-(def ^{:doc "Year day to month mapping calculated during compilation with year-day-mapping function."}
-  normal-year-day-mapping
-  (year-day-mapping false))
-
-(def ^{:doc "Year day to month mapping calculated during compilation with year-day-mapping function for leap year."}
-  leap-year-day-mapping
-  (year-day-mapping true))
-
-(defn ^:dynamic *find-year*
-  "Finds a year for given value. Returns
-  {:year x
-   :milliseconds x}
-  for given value where seconds is number of seconds of start of the year
-  relative to unix-epoch-year"
-  [value]
-  (loop [position 0]
-    (let [[future-years past-years] (case *calendar*
-                                      ::gregorian [gregorian-future-years gregorian-past-years]
-                                      ::julian [julian-future-years julian-past-years])
-          {:keys [year]
-           value' :value
-           :as target} (if (pos? value)
-                         (nth future-years position)
-                         (nth past-years position))
-          diff (if (pos? value)
-                 (- value value')
-                 (- value' value))
-          step (/ diff normal-year-value 2)]
-      (if (zero? diff) target
-          (if (pos? diff)
-            (if (<
-                 diff
-                 (if (leap-year? year)
-                   leap-year-value
-                   normal-year-value))
-              (if (pos? value)
-                target
-                (nth (if (pos? value) future-years past-years) (inc position)))
-              (recur (round-number (+ position step) 1 (if (pos? diff) :ceil :floor))))
-            (recur (round-number (+ position step) 1 (if (pos? diff) :ceil :floor))))))))
 
 (defn millisecond?
   "Returns which millisecond in day does input value belongs to. For example
@@ -774,6 +688,36 @@
     (/ (round-number value hour :floor) hour)
     24)))
 
+
+(defn- date-map->value 
+  [{:keys [hour minute second millisecond] 
+    :or {hour 0 minute 0 second 0 millisecond 0}
+    :as date}]
+  (let [_time (reduce + [(hours hour) (minutes minute) (seconds second) (milliseconds millisecond)])
+        date-value ((case *calendar*
+                      :gregorian gregorian-date->value
+                      :julian julian-date->value
+                      :islamic islamic-date->value
+                      :hebrew hebrew-date->value)
+                    date)]
+    (long (+ date-value _time))))
+
+
+(defn- value->date-map 
+  [value]
+  (assoc 
+    ((case *calendar*
+       :gregorian value->gregorian-date
+       :julian value->julian-date
+       :islamic value->islamic-date 
+       :hebrew value->hebrew-date)
+     value)
+    :hour (hour? value)
+    :minute (minute? value)
+    :second (second? value)
+    :millisecond (millisecond? value)))
+
+
 (defn day?
   "Returns which day in week does input value belongs to. For example
    for date 15.02.2015 it will return number 7"
@@ -789,25 +733,27 @@
 (defn year?
   "For given value year? returns year that value belogs to."
   [value]
-  ((comp :year) (*find-year* value)))
+  (:year (value->date-map value)))
 
 (defn day-in-year?
   "Returns day in year period (1 - 366)"
   [value]
-  (let [{year :year year-start :value} (*find-year* value)
-        relative-day (long (quot (- value year-start) day))]
-    relative-day))
+  (let [start-year-value (date-map->value {:year (year? value)})]
+    (long 
+      (quot
+        (- value start-year-value)
+        day))))
 
 (defn week-in-year?
   "Returns which week in year does input value belongs to. For example
   for date 15.02.2015 it will return number 6"
   [value]
-  (let [{year :year year-start :value} (*find-year* value)
+  (let [year-start (date-map->value {:year (year? value)})
         value (midnight value)
         first-monday (first
-                      (filter
-                       #(#{1} (day? %))
-                       (iterate (partial + day) year-start)))
+                       (filter
+                         #(#{1} (day? %))
+                         (iterate (partial + day) year-start)))
         time-difference (- value first-monday)
         week-in-year (round-number time-difference week :floor)]
     ;; If year startsh with Thursday, Friday, or any above
@@ -815,74 +761,47 @@
       0
       (long (+ (/ week-in-year week) 1)))))
 
-(defn- normalize-calendar-value [value]
-  (+ value
-     (case *calendar*
-       ::gregorian 0
-       ::julian (days -13))))
+
+
 
 (defn month?
   "Returns which month does input value belongs to. For example
   for date 15.02.2015 it will return number 2"
   [value]
-  (let [value (normalize-calendar-value value)
-        {year :year year-start :value} (*find-year* value)
-        relative-day (long (inc (quot (- value year-start) day)))]
-    (get
-     (if (leap-year? year)
-       leap-year-day-mapping
-       normal-year-day-mapping)
-     relative-day)))
+  (:month (value->date-map value)))
 
-(defn first-day-in-month
-  "Returns first day for given month in range of days 1-366 for leap-year?"
-  ([month] (first-day-in-month month false))
-  ([month leap-year?]
-   (apply
-    min
-    (keep
-     (fn [[d m]] (when (= m month) d))
-     (if leap-year?
-       leap-year-day-mapping
-       normal-year-day-mapping)))))
+
+(defn first-day-in-month 
+  "Returns value of first day in current month"
+  [value])
+
+
+(defn last-day-in-month
+  "Returns value of last day in current month"
+  [value])
+
 
 (defn day-in-month?
   "Returns which day (Gregorian) in month input value belongs to. For example
   for date 15.02.2015 it will return number 15"
   [value]
-  (let [value (normalize-calendar-value value)
-        {year :year year-start :value} (*find-year* value)
-        relative-day (long (inc (quot (- value year-start) day)))
-        leap-year? (leap-year? year)
-        month (get
-               (if leap-year?
-                 leap-year-day-mapping
-                 normal-year-day-mapping)
-               relative-day)]
-    (when (nil? month)
-      (throw
-       (ex-info "Month can't be nil"
-                {:value value
-                 :leap-year leap-year?
-                 :relative-day relative-day})))
-    (+ 1 (- relative-day (first-day-in-month month leap-year?)))))
+  (:day-in-month (value->date-map value)))
+
 
 (defn first-day-in-month?
   "Returns true if value in seconds belongs to first day in month."
   [value]
   (= 1 (day-in-month? value)))
 
+
 (defn last-day-in-month?
   "Returns true if value in seconds belongs to last day in month."
   [value]
-  (let [day-in-month (day-in-month? value)
-        days-in-month' (days-in-month (month? value) (leap-year? (year? value)))]
-    (= days-in-month' day-in-month)))
+  (:last-day-in-month? (value->date-map value)))
+
 
 (defn utc-date-value
-  "Constructs new Date object.
-  Months: 1-12
-  Days: 1-7 (1 is Monday)"
+  "Computes value for given arguments depending with respect to *calendar* binding"
   ([] (date->utc-value
        #?(:cljs (js/Date.)
           :clj (java.util.Date.))))
@@ -893,56 +812,15 @@
   ([year month day hour minute] (utc-date-value year month day hour minute 0))
   ([year month day hour minute second] (utc-date-value year month day hour minute second 0))
   ([year month day' hour' minute' second' millisecond']
-   (let [leap-year? (leap-year? year)]
-     (assert (and
-              (< 0 month)
-              (> 13 month)) "Month should be in range 1-12")
-     (assert (not (or (neg? day') (zero? day'))) "There is no 0 or negative day in month.")
-     (assert (and
-              (<= 0 hour')
-              (> 25 hour')) "Hour should be in range 0-24")
-     (assert (and
-              (<= 0 minute')
-              (> 60 minute')) "Minute should be in range 0-59")
-     (assert (and
-              (<= 0 second')
-              (> 60 second')) "Second should be in range 0-59")
-     (assert (and
-              (< 0 day')
-              (<= day' (days-in-month month leap-year?)))
-             (str  "Day " day' " is out of range: 1-" (days-in-month month leap-year?) " for year " year))
-     (let [years-period (if (>= year unix-epoch-year)
-                          (year-period unix-epoch-year year)
-                          (* -1 (year-period year unix-epoch-year)))
-           months-period (reduce + 0
-                                 (map
-                                  #(* day (days-in-month % leap-year?))
-                                  (range 1 month)))
-           date-value (reduce
-                       +
-                       0
-                       ; (case *calendar*
-                       ;   ::gregorian 0
-                       ;   ::julian (days -13))
-                       [years-period
-                        months-period
-                        (days (dec day'))
-                        (hours hour')
-                        (minutes minute')
-                        (seconds second')
-                        (milliseconds millisecond')])]
-       date-value))))
+   (date-map->value 
+     {:year year :month month :day-in-month day' :hour hour' 
+      :minute minute' :second second' :millisecond millisecond'})))
+
 
 (def utc-date (comp value->utc-date utc-date-value))
 
 (defn date
-  "Constructs new Date object.
-  Month:       1-12
-  Day:         Depends on month
-  Hour:        0-24
-  Minute:      0-59
-  Second:      0-59
-  Milliseconds: 0-999"
+  "Constructs new Date object"
   ([]
    (utc-date))
   ([year] (date year 1))
@@ -954,6 +832,7 @@
   ([year month day' hour' minute' second' millisecond']
    (let [value (utc-date-value year month day' hour' minute' second' millisecond')]
      (value->utc-date (->local value)))))
+
 
 (defn period
   "Returns number of seconds of all input arguments added together"
@@ -971,6 +850,7 @@
             (* second seconds)
             (* minutes minute)
             (* milliseconds millisecond)])))
+
 
 (defn period?
   "Returns duration of for input value in form of map with keys:
@@ -993,28 +873,23 @@
           [r ms] (round-period r millisecond)]
       {:weeks w :hours h :days d :minutes m :seconds s :milliseconds ms})))
 
+
 (defn value->date
   "Returns Date instance for value in seconds for current. Function first
   transforms value to local *timezone* value."
   ([value]
-   (let [value (case *calendar*
-                 ::gregorian (->local value)
-                 ;; While *calendar* is bound to ::julian
-                 ;; keep values Dates in Julian domain
-                 ::julian (->local (- value (days 13))))]
+   (let [value (->local value)]
      (new
-      #?(:clj java.util.Date
-         :cljs js/Date)
-      (long value)))))
+       #?(:clj java.util.Date
+          :cljs js/Date)
+       (long value)))))
+
 
 (defn date->value
   "Returns value of Date instance in seconds. Value is localized to offset"
   ([t]
-   (when t
-     (let [v (<-local (date->utc-value t))]
-       (case *calendar*
-         ::gregorian v
-         ::julian (+ v (days 13)))))))
+   (when t (<-local (date->utc-value t)))))
+
 
 (defn context->value [{:keys [year
                               month
@@ -1031,6 +906,7 @@
                             second 0
                             millisecond 0}}]
   (date->value (date year month day-in-month hour minute second millisecond)))
+
 
 (defprotocol TimeValueProtocol
   (time->value [this] "Return numeric value for given object.")
@@ -1159,11 +1035,14 @@
     * week"
   (fn [value frame-type & options] frame-type))
 
-(defn day-context
+(defn day-time-context
   "Returns day context for given value in Gregorian calendar. 
 
   Returnes hash-map with keys: 
     :value
+    :millisecond
+    :second
+    :hour
     :day
     :week
     :month
@@ -1174,39 +1053,24 @@
     :first-day-in-month?
     :last-day-in-month?"
   [value]
-  (binding [*find-year* (memoize *find-year*)]
-    (let [context (zipmap
-                   [:value :day :week :month :year :day-in-month :weekend?
-                    :last-day-in-month? :first-day-in-month?]
-                   ((juxt identity day? week-in-year? month? year? day-in-month?
-                          weekend? last-day-in-month? first-day-in-month?) value))]
-      (if (fn? *holiday?*)
-        (assoc context :holiday? (*holiday?* context))
-        context))))
+  (let [day (day? value)
+        context (value->date-map value)]
+    (assoc context
+      :day day
+      :weekend? (boolean (*weekend-days* day))
+      :week (week-in-year? value)
+      :holiday? (when (fn? *holiday?*) (*holiday?* context)))))
 
-(defn time-context
-  "Similar to day-context only for time values [millisecond, second, minute, hour]"
-  [value]
-  (binding [*find-year* (memoize *find-year*)]
-    (zipmap
-     [:value :hour :minute :second :millisecond]
-     ((juxt identity hour? minute? second? millisecond?) value))))
-
-(defn day-time-context
-  "Composition of time-context and day-context"
-  [value]
-  (merge (day-context value) (time-context value)))
 
 (defmethod calendar-frame :year [value _]
-  (let [year (year? value)
-        leap? (leap-year? year)
+  (let [{:keys [days-in-month year]} (day-time-context value)
         first-day (time->value (date year 1 1))]
     (loop [cd first-day
            m 1
            r []]
       (if (> m 12) r
           (recur
-           (+ cd (days (days-in-month m leap?)))
+           (+ cd (days days-in-month))
            (inc m)
            (concat r (calendar-frame cd :month)))))))
 
@@ -1214,18 +1078,15 @@
   (calendar-frame value :year))
 
 (defmethod calendar-frame :month [value _]
-  (let [year (year? value)
-        leap-year (leap-year? year)
-        month (month? value)
-        month-days (days-in-month month leap-year)
-        current-day-in-month (day-in-month? value)
+  (let [{:keys [year month days-in-month
+                day-in-month]} (day-time-context value)
         current-day (midnight value)
         first-week (week-in-year? value)
         first-day (-
                    current-day
-                   (days (dec current-day-in-month)))
+                   (days (dec day-in-month)))
         first-day-in-week (day? first-day)]
-    (for [d (range month-days)
+    (for [d (range days-in-month)
           :let [v (+ first-day (days d))
                 day (mod (+ first-day-in-week d) 7)
                 day (if (zero? day) 7 day)
@@ -1242,7 +1103,7 @@
        :day day
        :day-in-month (inc d)
        :first-day-in-month? (= (inc d) 1)
-       :last-day-in-month? (= d (dec month-days))
+       :last-day-in-month? (= d (dec days-in-month))
        :weekend (boolean (*weekend-days* day))})))
 
 (defmethod calendar-frame "month" [value _]
@@ -1285,28 +1146,15 @@
                   "time-as-value allows only Symbols in bindings"))))))
 
 (comment
-  (def date1 (with-time-configuration {:calendar ::julian} (time->value (date 1582 10 5))))
+  (time (time->value (date 2019 1 7)))
+  (time 
+    (clojure.pprint/pprint
+      (let [value (time->value (date 2019 1 7))] 
+        (with-time-configuration {:calendar :julian} 
+          (calendar-frame value :month)))))
+  (time 
+    (let [value (time->value (date 2019 1 7))] 
+      (with-time-configuration {:calendar :julian} 
+        (day-time-context value))))
   (def date2 (time->value (date 1582 10 15)))
   (= date1 date2))
-
-; (def synodic-month-value
-;   (period
-;    {:days 29
-;     :hours 12
-;     :minutes 44
-;     :seconds 2.8016}))
-
-; (def ^:private new-moon-reference
-;   (date->utc-value (utc-date 1999 8 11 13 8)))
-
-; (defn moon-phase? [value]
-;   (let [distance (- value new-moon-reference)
-;         new-moon-value (round-number
-;                         distance
-;                         synodic-month-value
-;                         (if (pos? distance) :floor :ceil))
-;         phase-value (/ synodic-month-value 4)
-;         phase-start (+ new-moon-reference new-moon-value)]
-;     [new-moon-reference new-moon-value]
-;     (value->date (long (+ new-moon-reference new-moon-value)))
-;     #_(mod (int (round-number (/ phase-start phase-value) 1)) 4)))
