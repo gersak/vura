@@ -61,9 +61,10 @@
   ^{:dynamic true
     :doc "Influences time->value and value->time functions as well as all '?' functions.
          Valid values: 
-
-         :vura.core/gregorian
-         :vura.core/julian"}
+         :gregorian (default)
+         :julian
+         :islamic
+         :hebrew"}
   *calendar* :gregorian)
 
 (def
@@ -380,20 +381,20 @@
   (+ (days jcdn) julian-day-epoch))
 
 
-(defn- value->gregorian-date [value]
+(defn ^:no-doc value->gregorian-date [value]
   (letfn [(div [x y]
             [(quot x y)
              (mod x y)])]
     (let [J (value->jcdn value)
           [x3 r3] (div (- (* 4 J) 6884477) 146097)
           [x2 r2] (div
-                   (+
-                    (* 100 (round-number (/ r3 4) 1 :floor))
-                    99)
-                   36525)
+                    (+
+                     (* 100 (round-number (/ r3 4) 1 :floor))
+                     99)
+                    36525)
           [x1 r1] (div
-                   (+ (* 5 (round-number (/ r2 100) 1 :floor)) 2)
-                   153)
+                    (+ (* 5 (round-number (/ r2 100) 1 :floor)) 2)
+                    153)
           d (inc (round-number (/ r1 5) 1 :floor))
           c0 (round-number (/ (+ x1 2) 12) 1 :floor)
           j (long (+ (* 100 x3) x2 c0))
@@ -424,8 +425,8 @@
        :last-day-in-month? (== days-in-month d)})))
 
 
-(defn- gregorian-date->value [{:keys [day-in-month month year]
-                               :or {month 1 day-in-month 1}}]
+(defn ^:no-doc gregorian-date->value [{:keys [day-in-month month year]
+                                       :or {month 1 day-in-month 1}}]
   (let [c0 (round-number (/ (- month 3) 12) 1 :floor)
         x4 (+ year c0)
         x3 (quot x4 100)
@@ -439,7 +440,7 @@
             1721119)]
     (jcdn->value J)))
 
-(defn- value->julian-date [value]
+(defn ^:no-doc value->julian-date [value]
   (let [J (value->jcdn value)
         y2 (- J 1721118)
         k2 (+ (* 4 y2) 3)
@@ -472,8 +473,8 @@
      :last-day-in-month? (== d days-in-month)}))
 
 
-(defn- julian-date->value [{:keys [day-in-month month year]
-                            :or {month 1 day-in-month 1}}]
+(defn ^:no-doc julian-date->value [{:keys [day-in-month month year]
+                                    :or {month 1 day-in-month 1}}]
   (let [J0 1721117
         c0 (round-number (/ (- month 3) 12) 1 :floor)
         J1 (round-number
@@ -486,97 +487,128 @@
              :floor)]
     (jcdn->value (+ J1 J2 day-in-month J0))))
 
-
-(defn- value->islamic-date [value]
-  (let [J (value->jcdn value)
-        k2 (+ 15 (* 30 (- J 1948440)))
-        k1 (+ 5 (* 11 (round-number (/ (mod k2 10631) 30) 1 :floor)))
-        j (inc (round-number (/ k2 10631) 1 :floor))
-        m (inc (round-number (/ k1 325) 1 :floor))
-        d (inc (round-number (/ (mod k1 325) 11) 1 :floor))
-        ;; TODO - smarter days-in-month computation
-        value' (days (- 30 d))
-        J' (value->jcdn value')
-        k2' (+ 15 (* 30 (- J' 1948440)))
-        k1' (+ 5 (* 11 (round-number (/ (mod k2' 10631) 30) 1 :floor)))
-        m' (inc (round-number (/ k1' 325) 1 :floor))
-        days-in-month (if (= m m') 30 29)]
-    {:day-in-month (long d) 
-     :month (long m) 
-     :year (long j)
-     :days-in-month days-in-month
-     :first-day-in-month? (== 1 d)
-     :last-day-in-month? (== days-in-month d)}))
+;;  Type   r   J0
+;;  Ia     15  1948439
+;;  Ic     15  1948440
+;;  IIa    14  1948439
+;;  IIc    14  1948440
+;;  IIIa   11  1948439
+;;  IIIc   11  1948440
+;;  IVa    9   1948439
+;;  IVc    9   1948440
 
 
-(defn- islamic-date->value [{:keys [day-in-month month year]
-                             :or {month 1 day-in-month 1}}]
-  (jcdn->value
-    (+
-     (round-number
-       (/ (- (* 10631 year) 10617) 30)
-       1
-       :floor)
-     (round-number
-       (/ (- (* 325 month) 320) 11)
-       1
-       :floor)
-     day-in-month
-     1948439)))
+(defn ^:no-doc value->islamic-date [value]
+  (letfn [(div [x y]
+            [(quot x y)
+             (mod x y)])] 
+    (let [J0 1948440
+          r 14
+          J (value->jcdn value)
+          y2 (- J J0)
+          [x2 r2] (div 
+                    (- 
+                      (+ (* 30 y2) 29)
+                      r)
+                    10631)
+          z2 (round-number (/ r2 30) 1 :floor)
+          [x1 r1] (div (+ (* 11 z2) 5) 325)
+          z1 (round-number (/ r1 11) 1 :floor)
+          j (inc x2)
+          m (inc x1)
+          d (inc z1)
+          value' (+ value (days (- 30 d)))
+          J' (value->jcdn value')
+          y2' (- J' J0)
+          [x2' r2'] (div 
+                      (- 
+                        (+ (* 30 y2') 29)
+                        r)
+                      10631)
+          z2' (round-number (/ r2' 30) 1 :floor)
+          [x1' r1'] (div (+ (* 11 z2') 5) 325)
+          m' (inc x1')
+          days-in-month (if (== m m') 30 29)
+          z1' (round-number (/ r1' 11) 1 :floor)
+          d' (inc z1')]
+      {:day-in-month (long d)
+       :month (long m)
+       :year (long j)
+       :days-in-month days-in-month
+       :first-day-in-month? (== 1 d)
+       :last-day-in-month? (== days-in-month d)})))
+
+
+(defn ^:no-doc islamic-date->value [{:keys [day-in-month month year]
+                                     :or {month 1 day-in-month 1}}]
+  (let [J0 1948440
+        r 14] 
+    (jcdn->value
+      (+
+       (round-number
+         (/ (+ (- (* 10631 year) 10631) r) 30)
+         1
+         :floor)
+       (round-number
+         (/ (- (* 325 month) 320) 11)
+         1
+         :floor)
+       day-in-month
+       (dec J0)))))
 
 
 (letfn [(c1 [x]
           (round-number
-           (/ (inc (* 235 x)) 19)
-           1 :floor))
+            (/ (inc (* 235 x)) 19)
+            1 :floor))
         (q [x]
-           (round-number
+          (round-number
             (/ (c1 x) 1095)
             1 :floor))
         (r [x] (mod (c1 x) 1095))
         (v1 [x]
-            (+
-             (* 29 (c1 x))
-             (round-number (/ (+ 12084 (* 13753 (c1 x))) 25920) 1 :floor)))
+          (+
+           (* 29 (c1 x))
+           (round-number (/ (+ 12084 (* 13753 (c1 x))) 25920) 1 :floor)))
         (v2 [x]
-            (+
-             (v1 x)
-             (mod
-              (round-number
+          (+
+           (v1 x)
+           (mod
+             (round-number
                (/ (* 6 (mod (v1 x) 7)) 7)
                1 :floor)
-              2)))
+             2)))
         (L2 [x] (- (v2 (inc x)) (v2 x)))
         (v3 [x]
-            (* 2
-               (mod
-                (round-number (/ (+ (L2 x) 19) 15) 1 :floor)
-                2)))
+          (* 2
+             (mod
+               (round-number (/ (+ (L2 x) 19) 15) 1 :floor)
+               2)))
         (v4 [x]
-            (mod
-             (round-number (/ (+ 7 (L2 (dec x))) 15) 1 :floor)
-             2))
+          (mod
+            (round-number (/ (+ 7 (L2 (dec x))) 15) 1 :floor)
+            2))
         (c2 [x] (+ (v2 x) (v3 x) (v4 x)))
         (L [x] (- (c2 (inc x)) (c2 x)))
         (c8 [x] (mod (round-number (/ (+ 7 (L x)) 2) 1 :floor) 15))
         (c9 [x] (* -1 (mod (round-number (/ (- 385 (L x)) 2)  1 :floor) 15)))
         (c3 [x m]
-            (+
-             (round-number
-              (/ (+ 7 (* 384 m)) 13)
-              1 :floor)
-             (*
-              (c8 x)
-              (round-number (/ (+ m 4) 12) 1 :floor))
-             (*
-              (c9 x)
-              (round-number (/ (+ m 3) 12) 1 :floor))))
+          (+
+           (round-number
+             (/ (+ 7 (* 384 m)) 13)
+             1 :floor)
+           (*
+            (c8 x)
+            (round-number (/ (+ m 4) 12) 1 :floor))
+           (*
+            (c9 x)
+            (round-number (/ (+ m 3) 12) 1 :floor))))
         (c4 [x m] (+ (c2 x) (c3 x m)))]
-  (defn- hebrew-date->value [{:keys [day-in-month month year]
-                              :or {month 1 day-in-month 1}}]
+  (defn ^:no-doc hebrew-date->value [{:keys [day-in-month month year]
+                                      :or {month 1 day-in-month 1}}]
     (let [c0 (round-number
-              (/ (- 13 month) 7)
-              1 :floor)
+               (/ (- 13 month) 7)
+               1 :floor)
           x1 (+ c0 (dec year))
           z4 (dec day-in-month)
           J (+
@@ -584,7 +616,7 @@
              (c4 x1 (dec month))
              z4)]
       (jcdn->value J)))
-  (defn- value->hebrew-date [value]
+  (defn ^:no-doc value->hebrew-date [value]
     (let [J (value->jcdn value)
           y4 (- J 347821)
           q (round-number (/ y4 1447) 1 :floor)
@@ -628,7 +660,7 @@
                                       [30 29 30 29 30 29 30 30 30 29 30 30 29])
                           384 (zipmap (range 1 13)
                                       [30 29 30 29 30 29 30 29 30 29 30 30 29])
-                          386 (zipmap (range 1 13)
+                          385 (zipmap (range 1 13)
                                       [30 29 30 29 30 29 30 30 30 29 30 30 29]))
           last-day (get month-mapping m)]
       {:year j
@@ -677,7 +709,7 @@
     24)))
 
 
-(defn- date-map->value 
+(defn- ^:no-doc date-map->value 
   [{:keys [hour minute second millisecond] 
     :or {hour 0 minute 0 second 0 millisecond 0}
     :as date}]
@@ -691,7 +723,7 @@
     (long (+ date-value _time))))
 
 
-(defn- value->date-map 
+(defn- ^:no-doc value->date-map 
   [value]
   (assoc 
     ((case *calendar*
@@ -879,20 +911,22 @@
    (when t (<-local (date->utc-value t)))))
 
 
-(defn context->value [{:keys [year
-                              month
-                              day-in-month
-                              hour
-                              minute
-                              second
-                              millisecond]
-                       :or {year 0
-                            month 1
-                            day-in-month 1
-                            hour 0
-                            minute 0
-                            second 0
-                            millisecond 0}}]
+(defn context->value 
+  "Function turns map of time units to value"
+  [{:keys [year
+           month
+           day-in-month
+           hour
+           minute
+           second
+           millisecond]
+    :or {year 0
+         month 1
+         day-in-month 1
+         hour 0
+         minute 0
+         second 0
+         millisecond 0}}]
   (date->value (date year month day-in-month hour minute second millisecond)))
 
 
@@ -970,6 +1004,7 @@
      (value->time [this] (set (map value->time this)))
      (time->value [this] (set (map time->value this)))))
 
+
 (defn intervals
   "Given sequence of timestamps (Date) values returns period values between each timestamp
   value in milliseconds"
@@ -982,12 +1017,12 @@
         t2 (butlast timestamps')]
     (map - t1 t2)))
 
+
 (defn interval
   "Returns period of time value in milliseconds between start and end. Input values
   are supposed to be Date."
   [start end]
   (first (intervals start end)))
-
 
 
 (defn teleport
