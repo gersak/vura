@@ -33,41 +33,29 @@
    {:pre [(or
            (zero? target-number)
            (pos? target-number))]}
-   (letfn [(normalize-number [x]
-             #?(:clj (if (some #(% target-number) [float? double?])
-                       (bigdec x)
-                       x)
-                :cljs x))]
-     (case target-number
-       0 0
-       ;; First normalize numbers to floating point or integer
-       (let [number (normalize-number number)
-             target-number (normalize-number target-number)
-             round-how? (keyword round-how?)
-             diff (rem number target-number)
-             base (if (>= target-number 1)
-                    (* target-number (quot number target-number))
-                    (- number diff))
-             limit (* 0.25 target-number target-number)
-             compare-fn (if (and (not symetric?) (neg? number))
-                          (case round-how?
-                            :floor (constantly (not (zero? diff)))
-                            :ceil (constantly false)
-                            :up <
-                            <=)
-                          (case round-how?
-                            :floor (constantly false)
-                            :ceil (constantly (not (zero? diff)))
-                            :up <=
-                            <))
-             result ((if (pos? number) + -)
-                     base
-                     (if (compare-fn limit (* diff diff)) target-number 0))]
-         #?(:clj
-            (if (some decimal? [target-number number])
-              (double result)
-              result)
-            :cljs result))))))
+   (case target-number
+     0 0
+     ;; First normalize numbers to floating point or integer
+     (let [round-how? (keyword round-how?)
+           diff (rem number target-number)
+           base (if (>= target-number 1)
+                  (* target-number (quot number target-number))
+                  (- number diff))
+           limit (* 0.25 target-number target-number)
+           compare-fn (if (and (not symetric?) (neg? number))
+                        (case round-how?
+                          :floor (constantly (not (zero? diff)))
+                          :ceil (constantly false)
+                          :up <
+                          <=)
+                        (case round-how?
+                          :floor (constantly false)
+                          :ceil (constantly (not (zero? diff)))
+                          :up <=
+                          <))]
+       ((if (pos? number) + -)
+        base
+        (if (compare-fn limit (* diff diff)) target-number 0))))))
 
 (def
   ^{:dynamic true
@@ -139,7 +127,7 @@
     :or {weekend-days vura.core/*weekend-days*
          timezone (vura.core/system-timezone)
          holiday? *holiday?*
-         calendar :vura.core/gregorian
+         calendar :gregorian
          offset nil}}
    & body]
   ;;`(let [] ~@body)
@@ -1055,11 +1043,15 @@
   [value]
   (let [day (day? value)
         context (value->date-map value)]
-    (assoc context
+    (assoc 
+      context
+      :value value
       :day day
       :weekend? (boolean (*weekend-days* day))
       :week (week-in-year? value)
-      :holiday? (when (fn? *holiday?*) (*holiday?* context)))))
+      :holiday? (if (fn? *holiday?*) 
+                  (*holiday?* context)
+                  false))))
 
 
 (defmethod calendar-frame :year [value _]

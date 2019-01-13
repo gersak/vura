@@ -107,6 +107,27 @@
      (fn [[validator value]] (validator value))
      (partition 2 (interleave constraints elements)))))
 
+
+(defn days-in-month [year month]
+  (let [leap-year?  (if ((comp not zero?) (mod year 4)) false
+                      (if ((comp not zero?) (mod year 100)) true
+                        (if ((comp not zero?) (mod year 400)) false
+                          true)))]
+    (case month
+      1 31
+      2 (if leap-year? 29 28)
+      3 31
+      4 30
+      5 31
+      6 30
+      7 31
+      8 31
+      9 30
+      10 31
+      11 30
+      12 31)))
+
+
 (defn next-timestamp
   "Return next valid timestamp after input timestamp. If there is no such timestamp,
    than nil is returned."
@@ -139,7 +160,7 @@
                           :when (and
                                  (after-timestamp? y m)
                                  ((get mapping 4 (constantly true)) m))
-                          d (range 1 (inc (core/days-in-month m (core/leap-year? y))))
+                          d (range 1 (inc (days-in-month y m)))
                           :when (and
                                  (after-timestamp? y m d)
                                  ((get mapping 5 (constantly true))
