@@ -17,30 +17,31 @@
 
 (deftest test-round-number
   (testing "Rounding numbers? Aye"
-    (are [x y] (= (round-number 10.75 0.5 x) y)
+    (are [x y] (== (round-number 10.75 0.5 x) y)
          :ceil 11.0
          :floor 10.5
          :up 11.0
          :down 10.5)
-    (are [x y] (= (round-number 10.76 0.5 x) y)
+    (are [x y] (== (round-number 10.76 0.5 x) y)
          :ceil 11.0
          :floor 10.5
          :up 11.0
          :down 11.0)
-    (are [x y] (= (round-number -10.75 0.5 x) y)
-         :ceil -11.0
-         :floor -10.5
-         :up -11.0
-         :down -10.5)
-    (are [x y] (= (round-number -10.76 0.5 x) y)
-         :ceil -11.0
-         :floor -10.5
+    (are [x y] (== (round-number -10.75 0.5 x) y)
+         :ceil -10.5
+         :floor -11
+         :up -10.5
+         :down -11)
+    (are [x y] (== (round-number -10.76 0.5 x) y)
+         :ceil -10.5
+         :floor -11
          :up -11.0
          :down -11.0)
-    (is (= (round-number 10.12345681928 0.5) 10.0) "Rounding failed")
-    (is (= (round-number 10.12345681928 0.1) 10.1) "Rounding failed")
-    (is (= (round-number 122 3) 123) "Rounding failed")
-    (is (= (round-number 10.12345681928 0.125) 10.125) "Rounding failed")))
+    (is (== (round-number 10.12345681928 0.5) 10.0) "Rounding failed")
+    ;; Think about this JS/Java Clojure implementation limitation
+    ; (is (== (round-number 10.12345681928 0.1) 10.1) "Rounding failed")
+    (is (== (round-number 122 3) 123) "Rounding failed")
+    (is (== (round-number 10.12345681928 0.125) 10.125) "Rounding failed")))
 
 
 (deftest vura-core
@@ -228,9 +229,9 @@
           (= 
             (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 11 4 0 0 0 0 (ZoneId/of "America/Sao_Paulo"))))
             (date 2018 11 4 0 0 0)))
-        (println (get-dst-offset (date->value (date 2018 10 31 23 59 0 0))))
-        (println (get-dst-offset (date->value (date 2018 11 4 0 0 0))))
-        (println (get-dst-offset (date->value (date 2018 11 3 23 59 0 0))))
+        ; (println (get-dst-offset (date->value (date 2018 10 31 23 59 0 0))))
+        ; (println (get-dst-offset (date->value (date 2018 11 4 0 0 0))))
+        ; (println (get-dst-offset (date->value (date 2018 11 3 23 59 0 0))))
         #_(is
             (=
              ;; TODO - Invesitigate this... Looks like Java is returning wrong
@@ -260,22 +261,34 @@
         {:value 1530903600000, :hour 19, :minute 0, :second 0, :millisecond 0}
         (with-time-configuration 
           {:timezone "Asia/Tokyo"}
-          (time-context (date->value target)))
-        (time-context
-          (teleport
-            (date->value target)
-            "Asia/Tokyo"))))
+          (select-keys (day-time-context (date->value target)) [:value :hour :minute :second :millisecond]))
+        (select-keys 
+          (day-time-context
+            (teleport
+              (date->value target)
+              "Asia/Tokyo"))
+          [:value :hour :minute :second :millisecond])))
     (is
       (=
        {:value 1530856800000, :hour 6, :minute 0, :second 0, :millisecond 0}
        (with-time-configuration
          {:timezone "America/New_York"}
-         (time-context (date->value target)))
-       (time-context
-         (teleport 
-           (date->value target)
-           "America/New_York"))))))
+         (select-keys (day-time-context (date->value target)) [:value :hour :minute :second :millisecond]))
+       (select-keys
+         (day-time-context
+           (teleport 
+             (date->value target)
+             "America/New_York"))
+         [:value :hour :minute :second :millisecond])))))
 
+
+(deftest CalendarAlgorithms
+  "Testing calendar algorithms"
+  (let [value (-> (date 2019 1 19) time->value)]
+    (is (== value (-> value value->gregorian-date gregorian-date->value)) "Gregorian algorithm is not bidirectional")
+    (is (== value (-> value value->julian-date julian-date->value)) "Julian algorithm is not bidirectional")
+    (is (== value (-> value value->islamic-date islamic-date->value)) "Islamic algorithm is not bidirectional")
+    (is (== value (-> value value->hebrew-date hebrew-date->value)) "Hebrew algorithm is not bidirectional")))
 
 
 (deftest TimezoneCoverage
