@@ -1,10 +1,7 @@
 (ns vura.core
-  #?(:cljs 
-     (:require-macros [vura.core :refer [with-time-configuration]]))
-  (:require
-   [vura.timezones.db
-    :refer [get-timezone get-rule]]
-   #?(:cljs [goog.object]))
+  #?(:cljs (:require-macros [vura.core :refer [with-time-configuration]]))
+  (:require [vura.timezones.db :refer [get-timezone get-rule]]
+            #?(:cljs [goog.object]))
   (:refer-clojure :exclude [second]))
 
 (def get-locale-timezone vura.timezones.db/get-locale-timezone)
@@ -86,10 +83,10 @@
 (def microsecond  "1.0E-3" (/ millisecond 1000))
 (def nanosecond  "1.0E-6" (/ microsecond 1000))
 (def second "1000" (* 1000 millisecond))
-(def minute  "60" (* 60 second))
-(def hour  "3600" (* 60 minute))
-(def day "86400" (* 24 hour))
-(def week "604800" (* 7 day))
+(def minute  "60000" (* 60 second))
+(def hour  "3600000" (* 60 minute))
+(def day "86400000" (* 24 hour))
+(def week "604800000" (* 7 day))
 
 (defn ^:no-doc
   system-timezone []
@@ -119,7 +116,7 @@
   :holiday?     - (fn [day-context] true | false)
   :timezone     - timezone-name
   :weekend-days - (fn [number] true | false)
-  :calendar     - :vura.core/gregorian :vura.core/julian"
+  :calendar     - :gregorian, :julian, :islamic, :hebrew"
   [{:keys [timezone
            holiday?
            offset
@@ -166,13 +163,7 @@
 
 (defn date->utc-value [date]
   "Returns number of milliseconds from UNIX epoch"
-  (when-let [t (.getTime date)]
-    t
-    #_(case *calendar*
-        ::gregorian t
-      ;; Add 13 days becaouse gregorian is refrence calendar
-      ;; So if *calendar* = ::julian, add 13 days to get real value
-        ::julian (+ t (days 13)))))
+  (.getTime date))
 
 (defn ^:no-doc until-value
   [{:keys [year month day floating-day] :as until
@@ -236,59 +227,59 @@
                 :as rule} (get-timezone-rule *timezone*)]
         (let [month (binding [*offset* 0] (month? value))]
           (if-not dst-rule 0
-                  (if (< (:month dst-rule) (:month s-rule))
+            (if (< (:month dst-rule) (:month s-rule))
               ;; Northen hemisphere
-                    (cond
+              (cond
                 ;; Standard time use timezone offset
-                      (and
-                       (< month (:month s-rule))
-                       (> month (:month dst-rule))) (:save dst-rule)
-                      (or
-                       (< month (:month dst-rule))
-                       (> month (:month s-rule))) 0
-                      :else
-                      (let [month-frame (calendar-frame value "month")
-                            save-light? (= month (:month dst-rule))
-                            limit (+
-                                   (if-not save-light?
-                                     (:save dst-rule)
-                                     0)
-                                   (binding [*offset* 0]
-                                     (until-value
-                                      (assoc
-                                       (if save-light?
-                                         dst-rule
-                                         s-rule)
-                                       :year (:year (first month-frame))))))]
-                        (if ((if save-light? < >=) value limit)
-                          0
-                          (:save dst-rule))))
+                (and
+                  (< month (:month s-rule))
+                  (> month (:month dst-rule))) (:save dst-rule)
+                (or
+                  (< month (:month dst-rule))
+                  (> month (:month s-rule))) 0
+                :else
+                (let [month-frame (calendar-frame value "month")
+                      save-light? (= month (:month dst-rule))
+                      limit (+
+                             (if-not save-light?
+                               (:save dst-rule)
+                               0)
+                             (binding [*offset* 0]
+                               (until-value
+                                 (assoc
+                                   (if save-light?
+                                     dst-rule
+                                     s-rule)
+                                   :year (:year (first month-frame))))))]
+                  (if ((if save-light? < >=) value limit)
+                    0
+                    (:save dst-rule))))
               ;; Southern hemisphere
-                    (cond
+              (cond
                 ;; Standard time use timezone offset
-                      (and
-                       (> month (:month s-rule))
-                       (< month (:month dst-rule))) 0
-                      (or
-                       (> month (:month dst-rule))
-                       (< month (:month s-rule))) (:save dst-rule)
-                      :else
-                      (let [month-frame (calendar-frame value "month")
-                            save-light? (= month (:month dst-rule))
-                            limit (+
-                                   (if-not save-light?
-                                     (:save dst-rule)
-                                     0)
-                                   (binding [*offset* 0]
-                                     (until-value
-                                      (assoc
-                                       (if save-light?
-                                         dst-rule
-                                         s-rule)
-                                       :year (:year (first month-frame))))))]
-                        (if ((if save-light? < >=) value limit)
-                          0
-                          (:save dst-rule)))))))
+                (and
+                  (> month (:month s-rule))
+                  (< month (:month dst-rule))) 0
+                (or
+                  (> month (:month dst-rule))
+                  (< month (:month s-rule))) (:save dst-rule)
+                :else
+                (let [month-frame (calendar-frame value "month")
+                      save-light? (= month (:month dst-rule))
+                      limit (+
+                             (if-not save-light?
+                               (:save dst-rule)
+                               0)
+                             (binding [*offset* 0]
+                               (until-value
+                                 (assoc
+                                   (if save-light?
+                                     dst-rule
+                                     s-rule)
+                                   :year (:year (first month-frame))))))]
+                  (if ((if save-light? < >=) value limit)
+                    0
+                    (:save dst-rule)))))))
         0))))
 
 
@@ -297,14 +288,14 @@
   ([value] (<-local
             value
             (if (number? *offset*) *offset*
-                (if (string? *timezone*)
-                  (let [tz-offset (get-timezone-offset *timezone*)]
-                    (+
-                     ;; move to standard time
-                     (get-dst-offset value)
-                     tz-offset))
-                 ;; Fallback to deprecated getTimeZoneOffset
-                  (* -1 (minutes (.getTimezoneOffset (value->utc-date value))))))))
+              (if (string? *timezone*)
+                (let [tz-offset (get-timezone-offset *timezone*)]
+                  (+
+                   ;; move to standard time
+                   (get-dst-offset value)
+                   tz-offset))
+                ;; Fallback to deprecated getTimeZoneOffset
+                (* -1 (minutes (.getTimezoneOffset (value->utc-date value))))))))
   ([value offset] (+ value offset)))
 
 (defn- ^:no-doc ->local
@@ -312,16 +303,15 @@
   ([value] (->local
             value
             (if (number? *offset*) *offset*
-                (if (string? *timezone*)
-                  (let [tz-offset (get-timezone-offset *timezone*)]
-                    (+
+              (if (string? *timezone*)
+                (let [tz-offset (get-timezone-offset *timezone*)]
+                  (+
                    ;; remove timzone offset to move to standard time 
-                     (get-dst-offset (- value tz-offset))
-                     tz-offset))
+                   (get-dst-offset (- value tz-offset))
+                   tz-offset))
                 ;; Fallback to deprecated getTimeZoneOffset
-                  (* -1 (minutes (.getTimezoneOffset (value->utc-date value))))))))
-  ([value offset]
-   (- value offset)))
+                (* -1 (minutes (.getTimezoneOffset (value->utc-date value))))))))
+  ([value offset] (- value offset)))
 
 (defn milliseconds
   "Function returns value of n seconds as number."
@@ -372,12 +362,12 @@
 ;; Algorithms taken from awesome Astronomy Answers page
 ;; https://www.aa.quae.nl/en/reken/juliaansedag.html
 
-(defn value->jcdn
+(defn ^:no-doc value->jcdn
   "For given value returns which Julian Day value belongs to"
   [value]
   (/ (- (round-number value day :floor) julian-day-epoch) day))
 
-(defn jcdn->value [jcdn]
+(defn ^:no-doc jcdn->value [jcdn]
   (+ (days jcdn) julian-day-epoch))
 
 
@@ -670,9 +660,6 @@
        :month-length last-day
        :first-day-in-month? (= 1 d)
        :last-day-in-month? (= last-day d)})))
-
-
-
 
 
 (defn millisecond?
