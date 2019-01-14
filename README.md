@@ -102,7 +102,17 @@ vura.core=> (time (round-number 182.625 0.25 :up))
 182.75
 
 
+
 ```
+
+## Calendars and timezones (Credits)
+**vura.core** internals are based on algorithms provided by 
+awesome [Astronomy answers](https://www.aa.quae.nl/en/reken/juliaansedag.html)
+
+Timezones are contained in **vura.timezones.db** namespace and are parsed from files
+downloaded from [IANA - Time Zone Database](https://www.iana.org/time-zones)
+
+
 ## Intro
 
 Values of timestamps are normalized to Greenwich Mean Time.
@@ -140,12 +150,7 @@ Time constructs defined this way can be easly added, subtracted, multiplied, dev
 ```
 Yout get the idea...
 
-## Calendars and timezones
-**vura.core** internals are based on algorithms provided by 
-awesome [Astronomy answers](https://www.aa.quae.nl/en/reken/juliaansedag.html)
 
-Timezones are contained in **vura.timezones.db** namespace and are parsed from files
-downloaded from [IANA - Time Zone Database](https://www.iana.org/time-zones)
 
 ## Time configuration
 Usually when working with time context/location is very important. Following dynamic
