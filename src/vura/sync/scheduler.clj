@@ -1,6 +1,5 @@
 (ns vura.sync.scheduler
   (:require
-    [dreamcatcher.core :refer [safe]]
     [clojure.tools.logging :refer [error info warn]]
     [vura.core :as core]
     [vura.cron :refer [next-timestamp valid-timestamp?]]
@@ -142,37 +141,3 @@
 
 (defn make-dispatcher [schedule]
   (Dispatcher. (agent {:schedule schedule :running true})))
-
-
-(comment
-
-  (def test-dispatcher (make-dispatcher test-schedule))
-  (start-dispatching! test-dispatcher)
-  (stop-dispatching! test-dispatcher)
-
-  (defjob another-job1 [:drinking (safe (println "job1 drinking"))
-                        :going-home (safe (println "job1 going home")) (wait-for 1000)])
-
-  (defjob suicide-job [:buying-rope (safe (println "Suicide is buying a rope! Watch out!"))
-                       :suicide (safe (println "Last goodbay!"))])
-
-  (defjob test-job [:test1 (safe (println "Testis 1"))
-                    :test2 (safe (println "Testis 2")) (wait-for 3000)
-                    :test3 (safe (println "Testis 3"))])
-
-
-
-  (defschedule s [:t test-job "5"
-                  :a another-job1 "*/10"
-                  ; :s suicide-job "*/4 * * * * * *"
-                  ])
-  (def x (make-dispatcher s))
-  (stop-dispatching! x)
-
-  (wake-up-at? s)
-  (job-candidates? s)
-
-
-  (def test-schedule (-> (Schedule. (atom nil))
-                         (add-job :test-job test-job "* * * * * * *")
-                         (add-job :another another-job1 "* 1 * * * * *"))))

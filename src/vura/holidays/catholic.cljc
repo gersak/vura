@@ -133,7 +133,7 @@
       #(% day-context)
       (keys holiday->context)))))
 
-(defmethod c/holiday-name-impl [:country/croatia :country/croatia])
+; (defmethod c/holiday-name-impl [:country/croatia :country/croatia])
 
 ; (defmethod c/holiday-context-impelemntation :religion/christian [_ data]
 ;   (let [d (-> data vura/time->value vura/day-context)]

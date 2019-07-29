@@ -2,8 +2,7 @@
   (:require
    [clojure.data.json :as json]
    [vura.core
-    :refer [day-context
-            date->value
+    :refer [day-time-context
             time->value]]))
 
 (defn dispatch [dispatch _] dispatch)
@@ -36,7 +35,7 @@
   (throw (Exception. (str "Unkonwn dispatch " (pr-str dispatch) ". Are you sure that target multimethod implementation is loaded(required)?"))))
 
 (defn holiday? [data dispatch]
-  (is-holiday? dispatch (-> data time->value day-context)))
+  (is-holiday? dispatch (-> data time->value day-time-context)))
 
 (defmulti holiday-name-impl
   (fn

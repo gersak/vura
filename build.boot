@@ -11,7 +11,7 @@
                   [kovacnica/dreamcatcher "1.0.7"]
                   [org.clojure/core.async "0.4.474"]
                   [instaparse "1.4.9" :scope "test"]
-                  [boot-codox "0.10.3" :scope "test"]
+                  [boot-codox "0.10.5" :scope "test"]
                   ;; Clojurescript
                   [org.clojure/clojurescript "1.10.339" :scope "test"]
                   [adzerk/boot-cljs-repl     "0.3.3" :scope "test"]
@@ -35,7 +35,8 @@
   codox {:name "vura"
          :description "Zero dependency micro library to compute and manipulate time"
          :version +version+
-         :filter-namespaces #{'vura.core}})
+         :filter-namespaces #{'vura.core
+                              'vura.timezones.db}})
 
 
 
@@ -49,7 +50,7 @@
 
 (deftask deploy []
   (set-env! :resource-paths #{"src"})
-  (comp 
+  (comp
     (pom)
     (jar)
     (push :repo "clojars"
@@ -89,4 +90,5 @@
   (set-env! :source-paths #{"src" "test"})
   (comp 
     (watch)
+    ; (test)
     (repl :server true :port 54321)))

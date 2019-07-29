@@ -218,69 +218,70 @@
   (letfn [(utc-rule? [rule] (if-not (= "s" (-> rule :time :time-suffix)) true false))]
     (if (nil? *timezone*)
       (throw (ex-info "No timezone defined" {:value value}))
-      (if-let [{dst-rule :daylight-savings
-                s-rule :standard
-                ;; TODO - if this is going to expand to other rules in history
-                ;;  than get-timezone-rule should be function of two arguments
-                ;; *timezone* and value
-                ;; THIS IS ONLY PLACE REQUIRED FOR EXPANDING TO FULL TZ SUPPORT
-                :as rule} (get-timezone-rule *timezone*)]
-        (let [month (binding [*offset* 0] (month? value))]
-          (if-not dst-rule 0
-            (if (< (:month dst-rule) (:month s-rule))
-              ;; Northen hemisphere
-              (cond
-                ;; Standard time use timezone offset
-                (and
-                  (< month (:month s-rule))
-                  (> month (:month dst-rule))) (:save dst-rule)
-                (or
-                  (< month (:month dst-rule))
-                  (> month (:month s-rule))) 0
-                :else
-                (let [month-frame (calendar-frame value "month")
-                      save-light? (= month (:month dst-rule))
-                      limit (+
-                             (if-not save-light?
-                               (:save dst-rule)
-                               0)
-                             (binding [*offset* 0]
-                               (until-value
-                                 (assoc
-                                   (if save-light?
-                                     dst-rule
-                                     s-rule)
-                                   :year (:year (first month-frame))))))]
-                  (if ((if save-light? < >=) value limit)
-                    0
-                    (:save dst-rule))))
-              ;; Southern hemisphere
-              (cond
-                ;; Standard time use timezone offset
-                (and
-                  (> month (:month s-rule))
-                  (< month (:month dst-rule))) 0
-                (or
-                  (> month (:month dst-rule))
-                  (< month (:month s-rule))) (:save dst-rule)
-                :else
-                (let [month-frame (calendar-frame value "month")
-                      save-light? (= month (:month dst-rule))
-                      limit (+
-                             (if-not save-light?
-                               (:save dst-rule)
-                               0)
-                             (binding [*offset* 0]
-                               (until-value
-                                 (assoc
-                                   (if save-light?
-                                     dst-rule
-                                     s-rule)
-                                   :year (:year (first month-frame))))))]
-                  (if ((if save-light? < >=) value limit)
-                    0
-                    (:save dst-rule)))))))
-        0))))
+      (binding [*holiday?* nil] 
+        (if-let [{dst-rule :daylight-savings
+                  s-rule :standard
+                  ;; TODO - if this is going to expand to other rules in history
+                  ;;  than get-timezone-rule should be function of two arguments
+                  ;; *timezone* and value
+                  ;; THIS IS ONLY PLACE REQUIRED FOR EXPANDING TO FULL TZ SUPPORT
+                  :as rule} (get-timezone-rule *timezone*)]
+          (let [month (binding [*offset* 0] (month? value))]
+            (if-not dst-rule 0
+              (if (< (:month dst-rule) (:month s-rule))
+                ;; Northen hemisphere
+                (cond
+                  ;; Standard time use timezone offset
+                  (and
+                    (< month (:month s-rule))
+                    (> month (:month dst-rule))) (:save dst-rule)
+                  (or
+                    (< month (:month dst-rule))
+                    (> month (:month s-rule))) 0
+                  :else
+                  (let [month-frame (calendar-frame value "month")
+                        save-light? (= month (:month dst-rule))
+                        limit (+
+                               (if-not save-light?
+                                 (:save dst-rule)
+                                 0)
+                               (binding [*offset* 0]
+                                 (until-value
+                                   (assoc
+                                     (if save-light?
+                                       dst-rule
+                                       s-rule)
+                                     :year (:year (first month-frame))))))]
+                    (if ((if save-light? < >=) value limit)
+                      0
+                      (:save dst-rule))))
+                ;; Southern hemisphere
+                (cond
+                  ;; Standard time use timezone offset
+                  (and
+                    (> month (:month s-rule))
+                    (< month (:month dst-rule))) 0
+                  (or
+                    (> month (:month dst-rule))
+                    (< month (:month s-rule))) (:save dst-rule)
+                  :else
+                  (let [month-frame (calendar-frame value "month")
+                        save-light? (= month (:month dst-rule))
+                        limit (+
+                               (if-not save-light?
+                                 (:save dst-rule)
+                                 0)
+                               (binding [*offset* 0]
+                                 (until-value
+                                   (assoc
+                                     (if save-light?
+                                       dst-rule
+                                       s-rule)
+                                     :year (:year (first month-frame))))))]
+                    (if ((if save-light? < >=) value limit)
+                      0
+                      (:save dst-rule)))))))
+          0)))))
 
 
 (defn- ^:no-doc <-local
@@ -1020,6 +1021,24 @@
       {:timezone timezone}
       (time->value d))))
 
+(defn before 
+  "Returns Date object that was before some time value"
+  [date value]
+  (->
+    date
+    time->value
+    (- value)
+    value->time))
+
+(defn after
+  "Returns Date object that was after some time value"
+  [date value]
+  (->
+    date
+    time->value
+    (+ value)
+    value->time))
+
 
 ;; TIME FRAMES
 
@@ -1075,6 +1094,7 @@
                   (*holiday?* context)
                   false))))
 
+(def day-context day-time-context)
 
 (defmethod calendar-frame :year [value _]
   (let [{:keys [days-in-month year]} (day-time-context value)

@@ -229,9 +229,6 @@
           (= 
             (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 11 4 0 0 0 0 (ZoneId/of "America/Sao_Paulo"))))
             (date 2018 11 4 0 0 0)))
-        ; (println (get-dst-offset (date->value (date 2018 10 31 23 59 0 0))))
-        ; (println (get-dst-offset (date->value (date 2018 11 4 0 0 0))))
-        ; (println (get-dst-offset (date->value (date 2018 11 3 23 59 0 0))))
         #_(is
             (=
              ;; TODO - Invesitigate this... Looks like Java is returning wrong
