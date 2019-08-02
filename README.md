@@ -102,21 +102,25 @@ vura.core=> (time (round-number 182.625 0.25 :up))
 182.75
 
 
+
 ```
 
+## Calendars and timezones (Credits)
+**vura.core** internals are based on algorithms provided by 
+awesome [Astronomy answers](https://www.aa.quae.nl/en/reken/juliaansedag.html)
 
-## Choices and assumptions
+Timezones are contained in **vura.timezones.db** namespace and are parsed from files
+downloaded from [IANA - Time Zone Database](https://www.iana.org/time-zones)
 
-Values of timestamps are normalized to Greenwich Mean Time. As base unit of time **vura** uses **second**.
-This is not usual choice from programmers perspective but not that unusual for anyone else that is using
-[SI](https://en.wikipedia.org/wiki/SI_base_unit). So bare with me it doesn't matter in the end anyway.
+
+## Intro
+
+Values of timestamps are normalized to Greenwich Mean Time.
 
 ```clojure
-(def second 1)
-(def millisecond (/ second 1000))
-(def microsecond (/ millisecond 1000))
-(def nanosecond (/ microsecond 1000))
-(def minute 60)
+(def millisecond 1)
+(def second (* 1000 millisecond)
+(def minute (* 60 second))
 (def hour (* 60 minute))
 (def day (* 24 hour))
 (def week (* 7 day))
@@ -144,20 +148,50 @@ Time constructs defined this way can be easly added, subtracted, multiplied, dev
   (round-number value day :floor))
 
 ```
-
 Yout get the idea...
 
 
-## What else?
 
-How about... I've used to have alot of problems working with calendar, calculating weekends,
+## Time configuration
+Usually when working with time context/location is very important. Following dynamic
+variables are defined in _vura.core_ that affect computation of _time->value_ and 
+_value->time_ functions as well as _date_ function.
+
+- \*timezone\* - specify what timezone will vura use to translate value from UTC to ->local timezone
+- \*calendar\* - when constructing Date object which calendar is used to calculate year/month/day value
+- \*weekend-days\* - What days are weekend-days?
+- \*holiday?\* - Convinince function to check if certain day is holiday or not
+
+Vura offers **with-time-configuration** macro that binds options map to above dynamic
+variables and afterwards evaluates body. Nice example for this macro is function _teleport_
+that transfers value from one timezone to another.
+
+``` clojure
+(defn teleport
+  "Teleports value to different timezone."
+  [value timezone]
+  (let [d (value->time value)] ;; first cast value to Date for current *timezone*
+    (with-time-configuration   ;; Then specify that following computation is in different timezone
+      {:timezone timezone}
+      (time->value d))))       ;; At last compute value for given date at that timezone
+```
+This function explains alot. Casting value to _Date_ is a way to hold current timezone value and inject
+that value to different context provided by _with-time-configuration_ macro. For more information go
+to wiki _Date is the gate_ section. If there are still some questions left try to find them in _We all live in England_.
+
+
+
+
+## Day/Time context
+
+I've used to have alot of problems working with calendar, calculating weekends,
 working days and holidays, calculating daily wage or spent/unused vacation days.
-Vura offers functions like day-(time-)context:
+Vura offers functions like _day-time-context_:
 
 ```clojure
 (->
     (date 2018 12 25 0 0 0 0)
-    date->value
+    time->value
     day-time-context)
 
 
@@ -177,78 +211,22 @@ Vura offers functions like day-(time-)context:
  :minute 0}
 ```
 
-day-(time-)context functions can be mapped to any sequence of vura time values. So it is possible
+day-time-context functions can be mapped to any sequence of vura time values. So it is possible
 to `(iterate (partial + (days 3.5)) (date->value (date 2018)))` to get all dates with interval of 3.5
-days till the end of time and afterwards apply map day-context and take 20 days for example. This is nice
-but how do holidays fit in. Checkout **with-time-configuration** macro for customizing day-context computation.
+days till the end of time and afterwards apply map day-context and take 20 days for example. 
 
+When used inside of _with-time-configuration_ macro it will return context for specified \*calendar\*/\*timezone\*.
+This results with easy switching of year/month/day/holiday for given value/values from one calendar/timezone
+to another.
 
+## Calendar Frame
 
-## with-time-configuration
-
-```clojure
-(require '[vura.core :refer [date day day-context with-time-configuration date->value]])
-
-
-(def hr-holidays
-    #{[1 1]
-      [6 1]
-      [1 5]
-      [22 6]
-      [25 6]
-      [5 8]
-      [15 8]
-      [8 10]
-      [1 11]
-      [25 12]
-      [26 12]})
-
-(def vacation-start (date 2030 6 15 8 0 0))
-
-(with-time-configuration
-    {:weekend-days #{5 6 7}
-     :holiday? (fn [{:keys [day-in-month month]}]
-                 (boolean (hr-holidays [day-in-month month])))}
-    (->>
-      (iterate (partial + day) (date->value vacation-start))
-      (take 20)
-      ;; Be carefull if this is not realized in with-time-configuration
-      ;; configuration bindings won't work. Use mapv instead map
-      (mapv day-context)
-      (remove :holiday?)
-      (remove :weekend?)
-      count
-      time))
-
-"Elapsed time: 6.397 msecs"
-11
-
-
-```
-
-What happend here? Lets say that we want to go on vacation from 15 of June for 20 days. There are some holidays in June as
-well the fact that we are living in socially advanced culture with 3 day weekend that is Friday, Saturday and Sunday.
-So how many days have we actually spent?
-
-
-**with-time-configuration** macro allows us to put time values in context. Vura has dynamic variables **\*wekend-days\*,
-\*week-days\* \*holiday?\*, \*offset\*** that can be used to put values in context. For example if we are interesed for
-sequence of values what is theirs **day-context** with configuration definition above `(mapv day-context)`
-will return vector of maps with following keys:
-
-* value
-* day
-* week
-* month
-* year
-* day-in-month
-* weekend?
-* holiday?
-* first-day-in-month?
-* last-day-in-month?
-
-
-After that everything else is simple. We just remove :holiday? and :weekend? and we are left with only spent days. That is 11 days.
+**day-time-context** function solves most of calculation challenges. Still there are some use cases where it is usefull to have
+function that can return day-context for whole month or year for given input value.
+Multimethod **calendar-frame** provides implementations for **:year, :month** and **:week**
+view for given value and can be extended to other frame types. This function might be usefull in frontend for creating different UI components
+with OM or Reagent or some other Clojure/script frontend library. Don't forget to use **with-time-configuration** macro
+to put context on calendar-frame (to flag holidays and weekend-days, as well as calendar).
 
 ### Dragons
 When using **with-time-configuration** values are calculated using defined **\*offset\***. This is computation scope and if you wan't
@@ -272,13 +250,7 @@ As mentioned Vura normalizes **time->value** to UTC, and does computations after
 variable is used to return computed value to bound offset. By default **\*offset\*** is set to OS offset.
 
 
-## Calendar Frame
-**day-context** function solves most of calculation challenges. Still there are some use cases where it is usefull to have
-function that can return day-context for whole month or year for given input value.
-Multimethod **calendar-frame** provides implementations for **:year, :month** and **:week**
-view for given value and can be extended to other frame types. This function might be usefull in frontend for creating different UI components
-with OM or Reagent or some other Clojure/script frontend library. Don't forget to use **with-time-configuration** macro
-to put context on calendar-frame (to flag holidays and weekend-days).
+
 
 
 ## Don't forget about round-number
