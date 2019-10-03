@@ -54,6 +54,11 @@
         base
         (if (compare-fn limit (* diff diff)) target-number 0))))))
 
+
+(defprotocol TimeValueProtocol
+  (time->value [this] "Return numeric value for given object.")
+  (value->time [this] "Returns Date for given value."))
+
 (def
   ^{:dynamic true
     :doc "Influences time->value and value->time functions as well as all '?' functions.
@@ -658,7 +663,7 @@
        :month m
        :day-in-month d
        :year-lenght year-length
-       :month-length last-day
+       :days-in-month last-day
        :first-day-in-month? (= 1 d)
        :last-day-in-month? (= last-day d)})))
 
@@ -752,6 +757,7 @@
         (- value start-year-value)
         day))))
 
+
 (defn week-in-year?
   "Returns which week in year does input value belongs to. For example
   for date 15.02.2015 it will return number 6"
@@ -764,12 +770,9 @@
                          (iterate (partial + day) year-start)))
         time-difference (- value first-monday)
         week-in-year (round-number time-difference week :floor)]
-    ;; If year startsh with Thursday, Friday, or any above
-    (if (neg? time-difference)
-      0
-      (long (+ (/ week-in-year week) 1)))))
-
-
+    (if (== first-monday year-start) 
+      (long (+ (/ week-in-year week) 1))
+      (inc (long (+ (/ week-in-year week) 1))))))
 
 
 (defn month?
@@ -918,11 +921,7 @@
   (date->value (date year month day-in-month hour minute second millisecond)))
 
 
-(defprotocol TimeValueProtocol
-  (time->value [this] "Return numeric value for given object.")
-  (value->time [this] "Returns Date for given value.")
-  ; (time-travel [this destination] "Travels in time in current zone to given date. Remaining in that zone(place).")
-)
+
 
 #?(:clj
    (extend-protocol TimeValueProtocol

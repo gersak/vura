@@ -2,7 +2,9 @@
   (:refer-clojure :exclude [second])
   (:use clojure.test
         vura.core)
-  (:require [vura.timezones.db :as db])
+  (:require 
+    [vura.timezones.db :as db]
+    [clojure.data :as data])
   (:import
     [java.time ZonedDateTime LocalDateTime ZoneId]
     [java.util TimeZone Calendar]))
@@ -281,15 +283,127 @@
 
 (deftest CalendarAlgorithms
   "Testing calendar algorithms"
-  (let [value (-> (date 2019 1 19) time->value)]
+  (let [value (-> (date 1900 1 1) time->value)
+        context {:year 1900
+                 :month 1
+                 :day 1}]
     (is (== value (-> value value->gregorian-date gregorian-date->value)) "Gregorian algorithm is not bidirectional")
     (is (== value (-> value value->julian-date julian-date->value)) "Julian algorithm is not bidirectional")
     (is (== value (-> value value->islamic-date islamic-date->value)) "Islamic algorithm is not bidirectional")
     (is (== value (-> value value->hebrew-date hebrew-date->value)) "Hebrew algorithm is not bidirectional")))
 
 
-(deftest TimezoneCoverage
-  (let [java-zones (set (TimeZone/getAvailableIDs))
-        vura-zones (set (keys (:zones db/db)))
-        [java vura _] (clojure.data/diff java-zones vura-zones)]
-    (sort java)))
+(deftest JulianCalendar
+  (with-time-configuration {:calendar :julian}
+    (let [value (-> (date 1900 2 1) time->value)
+          {:keys [day day-in-month week
+                  year month days-in-month]
+           :as context} (day-time-context value)]
+      (is (== year 1900) "Wrong year")
+      (is (== month 2) "Wrong month")
+      (is (== day-in-month 1) "Wrong date")
+      (is (== day 2) "Wrong day")
+      (is (== week 6) "Wrong week")
+      (is (== days-in-month 29) "Wrong leap year count"))))
+
+
+(deftest GregorianCalendar
+  (with-time-configuration {:calendar :gregorian}
+    (let [value (-> (date 1900 2 1) time->value)
+          {:keys [day day-in-month week
+                  year month days-in-month]
+           :as context} (day-time-context value)]
+      (is (== year 1900) "Wrong year")
+      (is (== month 2) "Wrong month")
+      (is (== day-in-month 1) "Wrong date")
+      (is (== day 4) "Wrong day")
+      (is (== week 5) "Wrong week")
+      (is (== days-in-month 28) "Wrong leap year count"))))
+
+
+(deftest IslamicCalendar
+  (let [value (-> (date 1900 1 1) time->value)
+        months {1 "Muharram"
+                2 "Safar"
+                3 "Rabi al-Awwal"
+                4 "Rabi al Thani"
+                5 "Jumada al-Ula"
+                6 "Jumada al-Akhirah"
+                7 "Rajab"
+                8 "Sha'ban"
+                9 "Ramadan"
+                10 "Shawwal"
+                11 "Zulqiddah"
+                12 "Zulhijjah"}]
+    (with-time-configuration {:calendar :islamic}
+      (let [{:keys [day day-in-month week
+                    year month days-in-month]
+             :as context} (day-time-context value)
+            context (assoc context :month/name (months month))]
+        (is (== year 1317) "Wrong year")
+        (is (== month 8) "Wrong month")
+        (is (== day-in-month 28) "Wrong date")
+        (is (== day 1) "Wrong day")
+        (is (== week 35) "Wrong week")
+        (is (== days-in-month 29) "Wrong number of days in month")))))
+
+
+(deftest HebrewCalendar
+  (let [value (-> (date 1948 1 1) time->value)]
+    (with-time-configuration {:calendar :hebrew}
+      (let [{:keys [day day-in-month week
+                    year month days-in-month]
+             :as context} (day-time-context value)]
+        ; (week-in-year? value)
+        (println context)
+        (is (== year 5708) "Wrong year")
+        (is (== month 10) "Wrong month")
+        (is (== day-in-month 19) "Wrong date")
+        (is (== day 4) "Wrong day")
+        ; (is (== week 35) "Wrong week")
+        (is (== days-in-month 29) "Wrong number of days in month")))))
+
+
+(deftest BidirectionalContext
+  (let [gregorian-context {:year 1900 :month 1 :day-in-month 1}
+        julian-context {:year 1900 :month 1 :day-in-month 1}
+        islamic-context {:year 1317 :month 8 :day-in-month 28}
+        hebrew-context {:year 5708 :month 10 :day-in-month 19}]
+    (with-time-configuration {:calendar :gregorian} 
+      (is (= gregorian-context 
+             (select-keys 
+               (-> 
+                 gregorian-context 
+                 context->value 
+                 day-time-context) 
+               [:year :month :day-in-month]))))
+    (with-time-configuration {:calendar :julian} 
+      (is (= julian-context 
+             (select-keys 
+               (-> 
+                 julian-context 
+                 context->value 
+                 day-time-context) 
+               [:year :month :day-in-month]))))
+    (with-time-configuration {:calendar :islamic}
+      (is (= islamic-context 
+             (select-keys 
+               (-> 
+                 islamic-context 
+                 context->value 
+                 day-time-context) 
+               [:year :month :day-in-month]))))
+    (with-time-configuration {:calendar :hebrew}
+      (is (= hebrew-context 
+             (select-keys 
+               (-> 
+                 hebrew-context 
+                 context->value 
+                 day-time-context) 
+               [:year :month :day-in-month]))))))
+
+; (deftest TimezoneCoverage
+;   (let [java-zones (set (TimeZone/getAvailableIDs))
+;         vura-zones (set (keys (:zones db/db)))
+;         [java vura _] (data/diff java-zones vura-zones)]
+;     (sort java)))
