@@ -4,5 +4,10 @@
   kovacnica/dreamcatcher {:mvn/version "1.0.9-SNAPSHOT"}
   org.clojure/clojurescript {:mvn/version "1.10.520"}
   org.clojure/core.async {:mvn/version "0.4.474"}}
-
- :paths ["src" "test"]}
+ :paths ["src/core" "test"]
+ :aliases
+ {:tz {:extra-paths ["src/tz"]
+       :extra-deps 
+       {me.raynes/fs {:mvn/version "1.4.6"}}}
+  :holidays {:extra-paths ["src/holidays"]}
+  :cron {:extra-paths ["src/cron"]}}}

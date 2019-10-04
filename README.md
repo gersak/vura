@@ -6,20 +6,25 @@
 
 [![Clojars Project](https://img.shields.io/clojars/v/kovacnica/vura.core.svg)](https://clojars.org/kovacnica/vura.core)
 
-Vura is small Clojure/script **zero dependency** time computation and manipulation library. Library uses numeric representation of
-time to compute Gregorian calendar years, months and so on. Vura calculates time with current system offset by transforming local
-timestamp value to UTC value at given time with function **time->value** that returns plain number of seconds. When computation/manipulation
-is over numeric value of time should be transformed to Date representation by caling **value->time**.
-For rest of core functions check [API docs](http://gersak.github.io/vura/api/vura.core.html).
+Vura is small Clojure/script **zero dependency** time computation and
+manipulation library. Library uses numeric representation of time to compute
+Gregorian calendar years, months and so on. Vura calculates time with current
+system offset by transforming local timestamp value to UTC value at given time
+with function **time->value** that returns plain number of milliseconds. When
+computation/manipulation is over numeric value of time should be transformed to
+Date representation by caling **value->time**. For rest of core functions check
+[API docs](http://gersak.github.io/vura/api/vura.core.html).
 
-Usual workflow would be to transform java.util.Date or some other object to numeric value with
-**time->value** protocol implementation and afterwards do the computation in numeric domain.
-vura.core offers at par functions to **clj(s)-time** only those functions work in numeric
-domain and on immutable values. This means working with numbers instead of objects to compute values. After computation
-is over if needed use **value->time** implementation of __TimeValueProtocol__ to transform numeric
-values to _java.util.Date_ | _js/Date_, or leave them in numeric form if that fits you. Vura has nice macro
-that transforms __Date__ instances to their value representations and afterwards evaluates body -> **time-as-value**. Use it
-to reduce boilerplate when possible.
+Usual workflow would be to transform java.util.Date or some other object to
+numeric value with **time->value** protocol implementation and afterwards do the
+computation in numeric domain. vura.core offers at par functions to
+**clj(s)-time** only those functions work in numeric domain and on immutable
+values. This means working with numbers instead of objects to compute values.
+After computation is over if needed use **value->time** implementation of
+__TimeValueProtocol__ to transform numeric values to _java.util.Date_
+| _js/Date_, or leave them in numeric form if that fits you. Vura has nice macro
+that transforms __Date__ instances to their value representations and afterwards
+evaluates body -> **time-as-value**. Use it to reduce boilerplate when possible.
 
 
 
@@ -27,7 +32,12 @@ to reduce boilerplate when possible.
 
 * Immutability
 * **Zero dependency**, only **clojure.core**
-* Simple and familiar algebra in number domain
+* Simple and familiar algebra in number domain (+,-,/,*,round-number,qout,mod)
+* Powerfull core clojure concepts of sequences and operation on sequences
+  (range, map, for, doseq, iterate) fit very nicely into this concept
+* Multiple calendars (julian, gregorian, hebrew, islamic)
+* Timezone handling through pure clojure data, converted directly from IANA TZ
+  database and stored in vura.timezones.db namespace
 * Both Clojure and Clojurescript library with same 99% of code
 
 
@@ -65,7 +75,8 @@ Heart of this library is round-number function.
         (if (compare-fn limit (* diff diff)) target-number 0))))))
 ```
 
-This is nice (and quick) function that doesn't just to rounding to 1 or 0 but to any target number whatsoever. I.E.
+This is nice (and quick) function that doesn't just to rounding to 1 or 0 but to
+any target number whatsoever. I.E.
 ``` clojure
 
 vura.core=> (time (round-number 182.8137172 0.25 :up))
@@ -87,9 +98,10 @@ vura.core=> (time (round-number 182.8137172 0.25 :floor))
 
 ```
 
-Rounding strategy :floor and :ceil are selfexplanatory. :up and :down are different in that :up will
-round number up if value is exactly half of target-number and :down will round number down.
-Otherwise value will be rounded to nearest value. I.E.
+Rounding strategy :floor and :ceil are selfexplanatory. :up and :down are
+different in that :up will round number up if value is exactly half of
+target-number and :down will round number down. Otherwise value will be rounded
+to nearest value. I.E.
 
 ``` clojure
 
@@ -126,7 +138,8 @@ Values of timestamps are normalized to Greenwich Mean Time.
 (def week (* 7 day))
 ```
 
-Time constructs defined this way can be easly added, subtracted, multiplied, devided, round-numbered.
+Time constructs defined this way can be easly added, subtracted, multiplied,
+devided, round-numbered.
 
 ```clojure
 (defn seconds
@@ -153,9 +166,9 @@ Yout get the idea...
 
 
 ## Time configuration
-Usually when working with time context/location is very important. Following dynamic
-variables are defined in _vura.core_ that affect computation of _time->value_ and 
-_value->time_ functions as well as _date_ function.
+Usually when working with time context/location is very important. Following
+dynamic variables are defined in _vura.core_ that affect computation of
+_time->value_ and _value->time_ functions as well as _date_ function.
 
 - \*timezone\* - specify what timezone will vura use to translate value from UTC to ->local timezone
 - \*calendar\* - when constructing Date object which calendar is used to calculate year/month/day value
@@ -175,9 +188,11 @@ that transfers value from one timezone to another.
       {:timezone timezone}
       (time->value d))))       ;; At last compute value for given date at that timezone
 ```
-This function explains alot. Casting value to _Date_ is a way to hold current timezone value and inject
-that value to different context provided by _with-time-configuration_ macro. For more information go
-to wiki _Date is the gate_ section. If there are still some questions left try to find them in _We all live in England_.
+This function explains alot. Casting value to _Date_ is a way to hold current
+timezone value and inject that value to different context provided by
+_with-time-configuration_ macro. For more information go to wiki _Date is the
+gate_ section. If there are still some questions left try to find them in _We
+all live in England_.
 
 
 
@@ -211,53 +226,33 @@ Vura offers functions like _day-time-context_:
  :minute 0}
 ```
 
-day-time-context functions can be mapped to any sequence of vura time values. So it is possible
-to `(iterate (partial + (days 3.5)) (date->value (date 2018)))` to get all dates with interval of 3.5
-days till the end of time and afterwards apply map day-context and take 20 days for example. 
+day-time-context functions can be mapped to any sequence of vura time values. So
+it is possible to `(iterate (partial + (days 3.5)) (date->value (date 2018)))`
+to get all dates with interval of 3.5 days till the end of time and afterwards
+apply map day-context and take 20 days for example. 
 
-When used inside of _with-time-configuration_ macro it will return context for specified \*calendar\*/\*timezone\*.
-This results with easy switching of year/month/day/holiday for given value/values from one calendar/timezone
-to another.
+When used inside of _with-time-configuration_ macro it will return context for
+specified \*calendar\*/\*timezone\*. This results with easy switching of
+year/month/day/holiday for given value/values from one calendar/timezone to
+another.
 
 ## Calendar Frame
 
-**day-time-context** function solves most of calculation challenges. Still there are some use cases where it is usefull to have
-function that can return day-context for whole month or year for given input value.
-Multimethod **calendar-frame** provides implementations for **:year, :month** and **:week**
-view for given value and can be extended to other frame types. This function might be usefull in frontend for creating different UI components
-with OM or Reagent or some other Clojure/script frontend library. Don't forget to use **with-time-configuration** macro
-to put context on calendar-frame (to flag holidays and weekend-days, as well as calendar).
-
-### Dragons
-When using **with-time-configuration** values are calculated using defined **\*offset\***. This is computation scope and if you wan't
-to use vura.core functions with above scope keep your computation in the scope, don't mix it with functions/values out of **with-time-configuration** scope. For example:
-
-``` Clojure
-(def formater (java.text.SimpleDateFormat. "EEE, d MMM yyyy HH:mm:ss Z"))
-
-;; GOOD
-(.format formater (with-time-configuration {:offset -60} (-> (date) date->value midnight time->value)))   ;; Tue, 5 Jun 2018 01:00:00 +0200
-;; BAD!
-(.format formater (value->time (with-time-configuration {:offset -60} (-> (date) date->value midnight)))) ;; Tue, 5 Jun 2018 00:00:00 +0200
-
-;; GOOD
-(with-time-configuration  {:offset 60} (-> (date) date->value midnight day?))   ;; 3
-;; BAD!
-(day? (with-time-configuration  {:offset 60} (-> (date) date->value midnight))) ;; 2
-
-```
-As mentioned Vura normalizes **time->value** to UTC, and does computations afterwards. When using **value->time**, **\*offset\*** dynamic
-variable is used to return computed value to bound offset. By default **\*offset\*** is set to OS offset.
-
-
-
-
+**day-time-context** function solves most of calculation challenges. Still there
+are some use cases where it is usefull to have function that can return
+day-context for whole month or year for given input value. Multimethod
+**calendar-frame** provides implementations for **:year, :month** and **:week**
+view for given value and can be extended to other frame types. This function
+might be usefull in frontend for creating different UI components with OM,
+Reagent, hx or some other Clojure/script frontend library.. Don't forget to use
+**with-time-configuration** macro to put context on calendar-frame (to flag
+holidays and weekend-days, as well as calendar).
 
 ## Don't forget about round-number
 
-Vura returns Date representations from numeric values and all values can be round-number(ed) so use that. Round
-values to `(days 3.5)` or `(hours 11)` or maybe `(period {:week 2 :days 3})`
-
+Vura returns Date representations from numeric values and all values can be
+round-number(ed) so use that. Round values to `(days 3.5)` or `(hours 11)` or
+maybe `(period {:week 2 :days 3})`
 
 ## Use clojure.core functions
 
