@@ -7,7 +7,7 @@
 (def get-locale-timezone vura.timezones.db/get-locale-timezone)
 (def get-timezone-locale vura.timezones.db/get-timezone-locale)
 
-(declare utc-date hours minutes calendar-frame month?)
+(declare utc-date hours minutes calendar-frame month? day-time-context)
 
 (defn round-number
   "Function returns round number that is devidable by target-number.
@@ -171,9 +171,11 @@
   (.getTime date))
 
 (defn ^:no-doc until-value
-  [{:keys [year month day floating-day] :as until
-    :or {day 1
-         month 1}}]
+  [{:keys [year month day-in-month floating-day] :as until
+    :or {month 1
+         day-in-month 1
+         hour 0
+         minute 0}}]
   ;; Find calendar frame for this month
   (when until
     (let [days-mapping
@@ -185,11 +187,7 @@
            "Sat" 6
            "Sun" 7}
           {:keys [hour minute]
-           :or {hour 0 minute 0}} (:time until)
-          frame (->
-                 (utc-date year month)
-                 date->utc-value
-                 (calendar-frame :month))]
+           :or {hour 0 minute 0}} (:time until)]
       (if floating-day
         (if (clojure.string/starts-with? floating-day "last")
           ;; Floating day is last something
@@ -198,24 +196,49 @@
                        (last
                         (filter
                          #(= day' (:day %))
-                         frame)))]
+                         (->
+                           (utc-date year month)
+                           date->utc-value
+                           (calendar-frame :month)))))]
             value
             (+ value (minutes minute) (hours hour)))
           ;; Floating day is higher than
           (let [day' (days-mapping (subs floating-day 0 3))
-                operator (case (subs floating-day 3 5)
-                           ">=" >=)
+                operator-def (subs floating-day 3 5)
+                operator (case operator-def 
+                           ">=" >=
+                           "<=" <=)
                 day-in-month' #?(:clj (Integer/parseInt (subs floating-day 5))
                                  :cljs (js/parseInt (subs floating-day 5)))
+                limit (date->utc-value (utc-date year month day-in-month'))
                 value (:value
-                       (first
-                        (filter
-                         #(and
-                           (= day' (:day %))
-                           (operator (:day-in-month %) day-in-month'))
-                         frame)))]
+                        (first
+                          (filter
+                            #(and
+                               (= day' (:day %))
+                               (operator (:value %) limit))
+                            (take 100
+                                  (map day-time-context 
+                                       (iterate 
+                                         (fn [v]
+                                           ((case operator-def
+                                              ">=" +
+                                              "<=" -)
+                                             v
+                                             day)) 
+                                         limit))))))]
+            ;; {:year 1973 :month 10 :day-in-monht 31}
+            ; (when (nil? value)
+            ;   (println "AKDSAL: " (pr-str until))
+            ;   (println "OPERATOR: " operator-def)
+            ;   (println "VALUE:" 
+            ;            (take 100
+            ;                    (map day-time-context 
+            ;                         (iterate 
+            ;                           (partial + day) 
+            ;                           limit)))))
             (+ value (hours hour) (minutes minute))))
-        (date->utc-value (utc-date year month day hour minute))))))
+        (date->utc-value (utc-date year month day-in-month hour minute))))))
 
 (defn get-dst-offset
   "Returns DST offset for UTC input value"

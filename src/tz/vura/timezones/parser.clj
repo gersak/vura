@@ -4,16 +4,17 @@
     [vura.core :refer :all]
     [instaparse.core :as insta]))
 
+
+(def ^:dynamic *tz-dir* nil)
+
 (def zones ["europe" "africa" "northamerica" "pacificnew" "southamerica" "asia" "australasia" "etcetera" "backward"])
 
 (defn zone-definition [zone]
-  (slurp (clojure.java.io/resource (str "tzdb-2018e/" (name zone)))))
+  (slurp (clojure.java.io/file (str *tz-dir* (name zone)))))
 
 (defn locale-definition []
-  (slurp (clojure.java.io/resource "tzdb-2018e/zone.tab")))
+  (slurp (clojure.java.io/file (str *tz-dir* "zone.tab"))))
 
-(def zone-target "resources/timezones/tzdb-2018e/tz.edn")
-(def locale-target "resources/timezones/tzdb-2018e/locale.edn")
 
 (def months-mapping
   {"Jan" 1
@@ -319,10 +320,11 @@
        :asia
        :australasia
        :backward
-       :etcetera]))
+       :etcetera
+       ]))
 
 
-(defn create-locale-date []
+(defn create-locale-data []
   (let [definition-lines (remove
                            #(clojure.string/starts-with? % "#")
                            (clojure.string/split-lines (locale-definition)))]
@@ -333,7 +335,7 @@
       nil
       definition-lines)))
 
-(defn compile-tz-db []
+(defn compile-tz-db [zone-target]
   (clojure.pprint/pprint
     (create-timezone-data)
     (clojure.java.io/writer zone-target)))
@@ -343,7 +345,7 @@
     (create-timezone-data)
     (clojure.java.io/writer zone-target))
   (clojure.pprint/pprint
-    (create-locale-date)
+    (create-locale-data)
     (clojure.java.io/writer locale-target))
   )
 
@@ -372,8 +374,7 @@
      2:00	Russia	EE%sT	2011 Mar 27  2:00s
      3:00	-	+03")
   (extract-zones [:timezone (zone-parser test-zone :start :zone-definition)])
-  (def europe (read-zone :europe))
-  (zone-definition :europe)
+  kjkkjk
   (extract-zones europe)
   (extract-rules europe)
   (def data (extract-data europe))

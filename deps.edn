@@ -8,6 +8,7 @@
  :aliases
  {:tz {:extra-paths ["src/tz"]
        :extra-deps 
-       {me.raynes/fs {:mvn/version "1.4.6"}}}
+       {me.raynes/fs {:mvn/version "1.4.6"}
+        instaparse {:mvn/version "1.4.10"}}}
   :holidays {:extra-paths ["src/holidays"]}
   :cron {:extra-paths ["src/cron"]}}}
