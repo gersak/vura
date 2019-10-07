@@ -6,9 +6,14 @@
   org.clojure/core.async {:mvn/version "0.4.474"}}
  :paths ["src/core" "test"]
  :aliases
- {:tz {:extra-paths ["src/tz"]
-       :extra-deps 
-       {me.raynes/fs {:mvn/version "1.4.6"}
-        instaparse {:mvn/version "1.4.10"}}}
+ {:tz 
+  {:extra-paths ["src/tz" "resources/src"]
+   :extra-deps {me.raynes/fs {:mvn/version "1.4.6"}
+                instaparse {:mvn/version "1.4.10"}}}
+  :tz-compile 
+  {:extra-paths ["src/tz" "resources/src"]
+   :extra-deps {me.raynes/fs {:mvn/version "1.4.6"}
+                instaparse {:mvn/version "1.4.10"}}
+   :main-opts ["-m" "vura.timezones.compile"]}
   :holidays {:extra-paths ["src/holidays"]}
   :cron {:extra-paths ["src/cron"]}}}

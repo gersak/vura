@@ -1,11 +1,17 @@
 (ns vura.timezones.compile
   (:require
     [clojure.java.io :as io]
-    [vura.timezones.parser :as parser]
     [me.raynes.fs :as fs]
     [me.raynes.fs.compression 
      :refer [gunzip untar]]))
 
+
+
+;; Clear db.cljc with default empty db.init file
+(fs/copy+ (io/resource "db.init") "src/core/vura/timezones/db.cljc")
+
+;; Require parser
+(require '[vura.timezones.parser :as parser])
 
 
 (def uri "https://data.iana.org/time-zones/tzdata-latest.tar.gz")
@@ -31,12 +37,31 @@
     f''))
 
 
+(defn generate-db-namespace [locales zones]
+  (let [f (slurp (io/resource "db.template"))]
+    (->
+      f
+      (clojure.string/replace
+        #"<<locales>>"
+        (with-out-str 
+          (clojure.pprint/pprint
+            locales)))
+      (clojure.string/replace  
+        #"<<zones>>" 
+        (with-out-str 
+          (clojure.pprint/pprint
+            zones))))))
+
 
 (defn -main []
   (let [tz-dir (extract (download))]
-    (binding [parser/*tz-dir* (str tz-dir "/")]
-      #_(parser/create-locale-data)
-      (parser/create-timezone-data))))
+    (try
+      (binding [parser/*tz-dir* (str tz-dir "/")]
+        (let [ld (parser/create-locale-data)
+              zd (parser/create-timezone-data)] 
+          (spit "src/core/vura/timezones/db.cljc"
+                (generate-db-namespace ld zd))))
+      (finally (fs/delete-dir tz-dir)))))
 
 
 (comment

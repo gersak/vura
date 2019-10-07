@@ -2,10 +2,12 @@
   (:refer-clojure :exclude [second])
   (:require 
     [vura.core :refer :all]
-    [instaparse.core :as insta]))
+    [instaparse.core :as insta]
+    clojure.pprint))
 
 
 (def ^:dynamic *tz-dir* nil)
+(alter-var-root #'vura.core/*timezone* (constantly nil))
 
 (def zones ["europe" "africa" "northamerica" "pacificnew" "southamerica" "asia" "australasia" "etcetera" "backward"])
 
@@ -81,6 +83,7 @@
    timezone = (rule-definition | zone-definition | link-definition)+")
 
 (def zone-parser (insta/parser zone-grammar))
+
 
 (defn read-zone [zone]
   (insta/transform
@@ -209,15 +212,6 @@
     "max" MAX_YEAR
     to))
 
-; (defn rule-interval [{[_ from] :rule-from
-;                       [_ to :as rule-to] :rule-to}]
-;   (case rule-to
-;     "only" [(-> (utc-date from) date->utc-value)
-;             (-> from inc utc-date date->utc-value)]
-;     "max" [(-> from utc-date date->utc-value)
-;            MAX_YEAR_VALUE]
-;     [(-> from utc-date date->utc-value) (-> to inc utc-date date->utc-value)]))
-
 
 (defn rule-interval [{[_ from] :rule-from
                       [_ to :as rule-to] :rule-to}]
@@ -320,8 +314,7 @@
        :asia
        :australasia
        :backward
-       :etcetera
-       ]))
+       :etcetera]))
 
 
 (defn create-locale-data []
@@ -374,7 +367,6 @@
      2:00	Russia	EE%sT	2011 Mar 27  2:00s
      3:00	-	+03")
   (extract-zones [:timezone (zone-parser test-zone :start :zone-definition)])
-  kjkkjk
   (extract-zones europe)
   (extract-rules europe)
   (def data (extract-data europe))
