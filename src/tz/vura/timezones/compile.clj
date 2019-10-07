@@ -6,9 +6,10 @@
      :refer [gunzip untar]]))
 
 
+(def +target+ "generated/timezone/vura/timezones/db.cljc")
 
 ;; Clear db.cljc with default empty db.init file
-(fs/copy+ (io/resource "db.init") "src/core/vura/timezones/db.cljc")
+(fs/copy+ (io/resource "db.init") +target+)
 
 ;; Require parser
 (require '[vura.timezones.parser :as parser])
@@ -59,8 +60,7 @@
       (binding [parser/*tz-dir* (str tz-dir "/")]
         (let [ld (parser/create-locale-data)
               zd (parser/create-timezone-data)] 
-          (spit "src/core/vura/timezones/db.cljc"
-                (generate-db-namespace ld zd))))
+          (spit +target+ (generate-db-namespace ld zd))))
       (finally (fs/delete-dir tz-dir)))))
 
 

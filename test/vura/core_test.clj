@@ -193,22 +193,18 @@
 
 (deftest LeapTests
   (testing  "Leap times in Northern hemisphere"
-    (let [[summer-before summer-at summer-after] (with-time-configuration
-                                                   {:timezone "Europe/Zagreb"}
-                                                   [(date 2018 3 25 1 59 59 999)
+    (with-time-configuration
+      {:timezone "Europe/Zagreb"}
+      (let [[summer-before summer-at summer-after] [(date 2018 3 25 1 59 59 999)
                                                     (date 2018 3 25 2)
-                                                    (date 2018 3 25 3)])
-          [winter-before winter-at] (with-time-configuration
-                                      {:timezone "Europe/Zagreb"}
-                                      [(date 2018 10 28 2 59 59 999)
-                                       (date 2018 10 28 3)])]
+                                                    (date 2018 3 25 3)]
+            [winter-before winter-at] [(date 2018 10 28 2 59 59 999)
+                                       (date 2018 10 28 3)]]
 
-      (is (= summer-before (-> summer-before date->value value->date)) "date->value->date")
-      (is (= summer-at (-> summer-at date->value value->date)) "date->value->date")
-      (is (= winter-before (-> winter-before date->value value->date)) "date->value->date")
-      (is (= winter-at (-> winter-at date->value value->date)) "date->value->date")
-      (with-time-configuration
-        {:timezone "Europe/Zagreb"} 
+        (is (= summer-before (-> summer-before date->value value->date)) "date->value->date")
+        (is (= summer-at (-> summer-at date->value value->date)) "date->value->date")
+        (is (= winter-before (-> winter-before date->value value->date)) "date->value->date")
+        (is (= winter-at (-> winter-at date->value value->date)) "date->value->date")
         (is (= 
               (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 3 25 3 0 0 0 (ZoneId/of "Europe/Zagreb"))))
               (date 2018 3 25 3 0 0 0)))
@@ -224,23 +220,7 @@
         (is 
           (= 
             (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 10 28 3 0 0 0 (ZoneId/of "Europe/Zagreb"))))
-            (date 2018 10 28 3 0 0 0))))
-      (with-time-configuration
-        {:timezone "America/Sao_Paulo"}
-        (is
-          (= 
-            (java.util.Date/from (.toInstant (ZonedDateTime/of 2018 11 4 0 0 0 0 (ZoneId/of "America/Sao_Paulo"))))
-            (date 2018 11 4 0 0 0)))
-        #_(is
-            (=
-             ;; TODO - Invesitigate this... Looks like Java is returning wrong
-             ;; offset for this situation. Should be -3 but it is -2
-             (java.util.Date/from 
-               (.toInstant 
-                 (ZonedDateTime/of 
-                   2018 10 31 23 59 0 0
-                   (ZoneId/of "America/Sao_Paulo"))))
-             (date 2018 10 31 23 59 0 0)))))))
+            (date 2018 10 28 3 0 0 0)))))))
 
 
 (deftest Teleportation

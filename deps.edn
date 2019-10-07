@@ -1,19 +1,31 @@
 {:deps
- {org.clojure/tools.logging {:mvn/version "0.4.0"}
-  org.clojure/data.json {:mvn/version "0.2.6"}
-  kovacnica/dreamcatcher {:mvn/version "1.0.9-SNAPSHOT"}
-  org.clojure/clojurescript {:mvn/version "1.10.520"}
-  org.clojure/core.async {:mvn/version "0.4.474"}}
- :paths ["src/core" "test"]
+ {org.clojure/clojurescript {:mvn/version "1.10.520"}}
+ :paths ["src/core" 
+         "generated/timezone"]
  :aliases
  {:tz 
   {:extra-paths ["src/tz" "resources/src"]
    :extra-deps {me.raynes/fs {:mvn/version "1.4.6"}
                 instaparse {:mvn/version "1.4.10"}}}
-  :tz-compile 
+  ;;
+  :compile/tzdb
   {:extra-paths ["src/tz" "resources/src"]
    :extra-deps {me.raynes/fs {:mvn/version "1.4.6"}
                 instaparse {:mvn/version "1.4.10"}}
    :main-opts ["-m" "vura.timezones.compile"]}
+  ;;
+  :test {:extra-paths ["test"]}
+  ;;
+  :run/tests {:extra-deps {com.cognitect/test-runner
+                           {:git/url "https://github.com/cognitect-labs/test-runner.git"
+                            :sha "209b64504cb3bd3b99ecfec7937b358a879f55c1"}}
+              :main-opts ["-m" "cognitect.test-runner"]}
+  ;;
   :holidays {:extra-paths ["src/holidays"]}
-  :cron {:extra-paths ["src/cron"]}}}
+  ;;
+  :cron {:extra-deps 
+         {kovacnica/dreamcatcher {:mvn/version "1.0.9-SNAPSHOT"}
+          org.clojure/tools.logging {:mvn/version "0.4.0"}
+          org.clojure/data.json {:mvn/version "0.2.6"}
+          org.clojure/core.async {:mvn/version "0.4.474"}} 
+         :extra-paths ["src/cron"]}}}
