@@ -227,16 +227,6 @@
                                              v
                                              day)) 
                                          limit))))))]
-            ;; {:year 1973 :month 10 :day-in-monht 31}
-            ; (when (nil? value)
-            ;   (println "AKDSAL: " (pr-str until))
-            ;   (println "OPERATOR: " operator-def)
-            ;   (println "VALUE:" 
-            ;            (take 100
-            ;                    (map day-time-context 
-            ;                         (iterate 
-            ;                           (partial + day) 
-            ;                           limit)))))
             (+ value (hours hour) (minutes minute))))
         (date->utc-value (utc-date year month day-in-month hour minute))))))
 

@@ -5,38 +5,33 @@
   <artifactId>vura</artifactId>
   <version>0.5.3-SNAPSHOT</version>
   <name>vura</name>
-  <packaging>pom</packaging>
+  <packaging>jar</packaging>
 
-  <modules>
-    <module>timezones</module>
-    <module>core</module>
-    <module>cron</module>
-    <module>holidays</module>
-  </modules>
-  <profiles>
-    <profile>
-      <id>core</id>
-      <modules>
-        <module>core</module>
-      </modules>
-    </profile>
-    <profile>
-      <id>timezones</id>
-      <modules>
-        <module>timezones</module>
-      </modules>
-    </profile>
-  </profiles>  
   <dependencies>
     <dependency>
-      <groupId>org.clojure</groupId>
-      <artifactId>clojure</artifactId>
-      <version>1.10.1</version>
+      <groupId>kovacnica</groupId>
+      <artifactId>vura.core</artifactId>
+      <version>0.5.3-SNAPSHOT</version>
     </dependency>
     <dependency>
-      <groupId>org.clojure</groupId>
-      <artifactId>clojurescript</artifactId>
-      <version>1.10.520</version>
+      <groupId>kovacnica</groupId>
+      <artifactId>vura.core</artifactId>
+      <version>0.5.3-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>kovacnica</groupId>
+      <artifactId>vura.timezones</artifactId>
+      <version>0.5.3-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>kovacnica</groupId>
+      <artifactId>vura.cron</artifactId>
+      <version>0.5.3-SNAPSHOT</version>
+    </dependency>
+    <dependency>
+      <groupId>kovacnica</groupId>
+      <artifactId>vura.holidays</artifactId>
+      <version>0.5.3-SNAPSHOT</version>
     </dependency>
   </dependencies>
 
@@ -56,6 +51,21 @@
           </execution>
         </executions>
       </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-shade-plugin</artifactId>
+        <version>3.2.1</version>
+        <executions>
+          <execution>
+            <id>create-fat-jar</id>
+            <phase>package</phase>
+            <goals>
+              <goal>shade</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+
     </plugins>
   </build>
       
