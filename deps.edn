@@ -4,12 +4,12 @@
          "timezones/generated"]
  :aliases
  {:tz 
-  {:extra-paths ["timezones/src"]
+  {:extra-paths ["timezones/src" "resources/src"]
    :extra-deps {me.raynes/fs {:mvn/version "1.4.6"}
                 instaparse {:mvn/version "1.4.10"}}}
   ;;
   :compile/tzdb
-  {:extra-paths ["timezones"]
+  {:extra-paths ["timezones/src" "resources/src"]
    :extra-deps {me.raynes/fs {:mvn/version "1.4.6"}
                 instaparse {:mvn/version "1.4.10"}}
    :main-opts ["-m" "vura.timezones.compile"]}
