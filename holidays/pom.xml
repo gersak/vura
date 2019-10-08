@@ -2,9 +2,9 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>kovacnica</groupId>
-  <artifactId>vura.core</artifactId>
+  <artifactId>vura.holidays</artifactId>
   <version>0.5.3-SNAPSHOT</version>
-  <name>vura.core</name>
+  <name>vura.holidays</name>
   <packaging>jar</packaging>
   
   <build>
@@ -14,7 +14,7 @@
       </resource>
     </resources>
   </build>
-      
+
   <distributionManagement>
     <repository>
       <id>clojars</id>
@@ -22,8 +22,8 @@
       <url>https://clojars.org/repo</url>
     </repository>
   </distributionManagement>
-
-  <description>Vura core functions</description>
+      
+  <description>Vura holidays</description>
   <url>https://github.com/gersak/vura</url>
   <licenses>
     <license>

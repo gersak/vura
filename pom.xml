@@ -10,8 +10,8 @@
   <modules>
     <module>timezones</module>
     <module>core</module>
-    <!-- <module>holidays</module> -->
-    <!-- <module>cron</module> -->
+    <module>cron</module>
+    <module>holidays</module>
   </modules>
   <profiles>
     <profile>
