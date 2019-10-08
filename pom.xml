@@ -2,10 +2,31 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
   <groupId>kovacnica</groupId>
-  <artifactId>vura.core</artifactId>
+  <artifactId>vura</artifactId>
   <version>0.5.3-SNAPSHOT</version>
   <name>vura</name>
-  
+  <packaging>pom</packaging>
+
+  <modules>
+    <module>timezones</module>
+    <module>core</module>
+    <!-- <module>holidays</module> -->
+    <!-- <module>cron</module> -->
+  </modules>
+  <profiles>
+    <profile>
+      <id>core</id>
+      <modules>
+        <module>core</module>
+      </modules>
+    </profile>
+    <profile>
+      <id>timezones</id>
+      <modules>
+        <module>timezones</module>
+      </modules>
+    </profile>
+  </profiles>  
   <dependencies>
     <dependency>
       <groupId>org.clojure</groupId>
@@ -36,14 +57,6 @@
         </executions>
       </plugin>
     </plugins>
-    <resources>
-      <resource>
-        <directory>src/generated/timezone</directory>
-      </resource>
-      <resource>
-        <directory>src/core</directory>
-      </resource>
-    </resources>
   </build>
       
   <repositories>
