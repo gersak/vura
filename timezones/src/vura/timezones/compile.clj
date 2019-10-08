@@ -6,7 +6,7 @@
      :refer [gunzip untar]]))
 
 
-(def +target+ "generated/timezone/vura/timezones/db.cljc")
+(def +target+ "timezones/generated/vura/timezones/db.cljc")
 
 ;; Clear db.cljc with default empty db.init file
 (fs/copy+ (io/resource "db.init") +target+)
