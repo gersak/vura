@@ -1,16 +1,13 @@
-(defproject vura "0.5.2"
-  :aot :all
-  :description "Vura is tiny library that is intendend for task
+(defproject vura "0.5.3"
+  :description "Vura is tiny library that tackles time
                managment and scheduling"
-  :dependencies [[org.clojure/clojure "1.7.0"]
-                 [kovacnica/dreamcatcher "1.0.4"]
-                 [org.clojure/core.async "0.2.374"]
-                 [com.taoensso/timbre "4.2.0"]
-                 [com.andrewmcveigh/cljs-time "0.3.14"]
-                 [clj-time "0.11.0"]]
-  :source-paths ["src"]
-  :cljsbuild
-  {:builds [{:source-paths ["src"]
-             :compiler {:output-to "war/javascript/vura.js"}
-             :optimizations :whitespace
-             :pretty-print true}]})
+  :dependencies [[org.clojure/clojure "1.10.1"]
+                 [org.clojure/clojurescript "1.10.520"]
+                 [kovacnica/dreamcatcher "1.0.9-SNAPSHOT"]
+                 [org.clojure/core.async "0.4.474"]
+                 [org.clojure/tools.logging "0.4.0"]]
+  :plugins [[lein-codox "0.10.7"]]
+  :source-paths ["core/src" 
+                 "cron/src" 
+                 "timezones/generated" 
+                 "holidays/src"])

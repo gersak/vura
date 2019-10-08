@@ -4,7 +4,7 @@
 
 # Vura (core)
 
-[![Clojars Project](https://img.shields.io/clojars/v/kovacnica/vura.core.svg)](https://clojars.org/kovacnica/vura.core)
+[![Clojars Project](https://img.shields.io/clojars/v/kovacnica/vura.svg)](https://clojars.org/kovacnica/vura)
 
 Vura is small Clojure/script **zero dependency** time computation and
 manipulation library. Library uses numeric representation of time to compute
