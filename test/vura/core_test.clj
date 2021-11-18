@@ -6,8 +6,7 @@
     [vura.timezones.db :as db]
     [clojure.data :as data])
   (:import
-    [java.time ZonedDateTime LocalDateTime ZoneId]
-    [java.util TimeZone Calendar]))
+    [java.time ZonedDateTime ZoneId]))
 
 (def positive-number (rand 100000))
 (def negative-number (rand -10000))

@@ -13,23 +13,23 @@
   "Function returns round number that is devidable by target-number.
   Rounding strategy can be specified in round-how? options:
 
-   :floor
-   :ceil
-   :up
-   :down
-  
+  :floor
+  :ceil
+  :up
+  :down
+
   Rounding number strategy is symetric to 0. This means that :ceil will round
   negative numbers to lower target-number. I.E (round-number -9.5 1 :ceil) would return -10.
   Rounding happens in absolute domain and sign is inserted afterwards.
-   
+
   Negative target-numbers are not supported. Can't reason about that yet. Maybe for imaginary numbers?"
   ([number] (round-number number 1))
   ([number target-number] (round-number number target-number :down))
   ([number target-number round-how] (round-number number target-number round-how false))
   ([number target-number round-how? symetric?]
    {:pre [(or
-           (zero? target-number)
-           (pos? target-number))]}
+            (zero? target-number)
+            (pos? target-number))]}
    (case target-number
      0 0
      ;; First normalize numbers to floating point or integer
@@ -95,7 +95,8 @@
 
 (defn ^:no-doc
   system-timezone []
-  #?(:clj (.. (java.util.TimeZone/getDefault) (getID))
+  #?(;:clj (.. (java.util.TimeZone/getDefault) (getID))
+     :clj (str (java.time.ZoneId/systemDefault))
      :cljs (goog.object/get (.resolvedOptions (js/Intl.DateTimeFormat)) "timeZone")))
 
 (def
@@ -965,15 +966,15 @@
      clojure.lang.Ratio
      (value->time [this] (value->date this))
      (time->value [this] this)
-     clojure.lang.ASeq
+     clojure.lang.ISeq
      (value->time [this] (map value->time this))
      (time->value [this] (map time->value this))
-     clojure.lang.APersistentMap
+     clojure.lang.IPersistentMap
      (time->value [this] (context->value this))
-     clojure.lang.APersistentVector
+     clojure.lang.IPersistentVector
      (value->time [this] (mapv value->date this))
      (time->value [this] (mapv time->value this))
-     clojure.lang.APersistentSet
+     clojure.lang.IPersistentSet
      (value->time [this] (set (map value->date this)))
      (time->value [this] (set (map time->value this)))
 
@@ -1192,6 +1193,7 @@
                   "time-as-value allows only Symbols in bindings"))))))
 
 (comment
+  (+ 1 1)
   (time (time->value (date 2019 1 7)))
   (time 
     (clojure.pprint/pprint

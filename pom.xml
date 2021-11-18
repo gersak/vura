@@ -1,56 +1,51 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>kovacnica</groupId>
+  <groupId>com.github.gersak</groupId>
   <artifactId>vura</artifactId>
-  <version>0.5.3</version>
+  <version>0.5.4</version>
   <name>vura</name>
   <packaging>jar</packaging>
 
   <dependencies>
     <dependency>
-      <groupId>kovacnica</groupId>
+      <groupId>com.github.gersak</groupId>
       <artifactId>vura.core</artifactId>
-      <version>0.5.3-SNAPSHOT</version>
+      <version>0.5.4</version>
     </dependency>
     <dependency>
-      <groupId>kovacnica</groupId>
-      <artifactId>vura.core</artifactId>
-      <version>0.5.3-SNAPSHOT</version>
-    </dependency>
-    <dependency>
-      <groupId>kovacnica</groupId>
+      <groupId>com.github.gersak</groupId>
       <artifactId>vura.timezones</artifactId>
-      <version>0.5.3-SNAPSHOT</version>
+      <version>0.5.3</version>
     </dependency>
     <dependency>
-      <groupId>kovacnica</groupId>
+      <groupId>com.github.gersak</groupId>
       <artifactId>vura.cron</artifactId>
-      <version>0.5.3-SNAPSHOT</version>
+      <version>0.5.3</version>
     </dependency>
     <dependency>
-      <groupId>kovacnica</groupId>
+      <groupId>com.github.gersak</groupId>
       <artifactId>vura.holidays</artifactId>
-      <version>0.5.3-SNAPSHOT</version>
+      <version>0.5.3</version>
     </dependency>
   </dependencies>
 
   <build>
     <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-gpg-plugin</artifactId>
-        <version>1.6</version>
-        <executions>
-          <execution>
-            <id>sign-artifacts</id>
-            <phase>verify</phase>
-            <goals>
-              <goal>sign</goal>
-            </goals>
-          </execution>
-        </executions>
-      </plugin>
+      <!-- <plugin> -->
+      <!--   <groupId>org.apache.maven.plugins</groupId> -->
+      <!--   <artifactId>maven-gpg-plugin</artifactId> -->
+      <!--   <version>1.6</version> -->
+      <!--   <executions> -->
+      <!--     <execution> -->
+      <!--       <id>sign-artifacts</id> -->
+      <!--       <phase>verify</phase> -->
+      <!--       <goals> -->
+      <!--         <goal>sign</goal> -->
+      <!--       </goals> -->
+      <!--     </execution> -->
+      <!--   </executions> -->
+      <!-- </plugin> -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-shade-plugin</artifactId>

@@ -1,6 +1,8 @@
 (ns vura.timezones.parser
   (:refer-clojure :exclude [second])
   (:require 
+    clojure.string
+    clojure.java.io
     [vura.core :refer :all]
     [instaparse.core :as insta]
     clojure.pprint))
