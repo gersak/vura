@@ -4,7 +4,9 @@
  :paths ["core/src" 
          "timezones/generated"]
  :aliases
- {:tz 
+ {:cider
+  {:extra-deps {cider/cider-nrepl {:mvn/version "0.27.2"}}}
+  :tz 
   {:extra-paths ["timezones/src" "resources/src"]
    :extra-deps {me.raynes/fs {:mvn/version "1.4.6"}
                 instaparse/instaparse {:mvn/version "1.4.10"}}}

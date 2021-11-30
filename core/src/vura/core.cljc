@@ -1054,27 +1054,25 @@
 
 
 ;; TIME FRAMES
-
-
 (defmulti calendar-frame
   "Returns sequence of days for given value that are contained in that frame-type. List is consisted
   of keys:
 
-   :value
-   :day
-   :week
-   :month
-   :day-in-month
-   :weekend?
-   :holiday?
-   :first-day-in-month?
-   :last-day-in-month?
+  :value
+  :day
+  :week
+  :month
+  :day-in-month
+  :weekend?
+  :holiday?
+  :first-day-in-month?
+  :last-day-in-month?
 
-   for Gregorian calendar. Frame types can be extened by implementing different calendar-frame functions.
-   Vura supports calendar-frames for:
-    * year
-    * month
-    * week"
+  for Gregorian calendar. Frame types can be extened by implementing different calendar-frame functions.
+  Vura supports calendar-frames for:
+  * year
+  * month
+  * week"
   (fn [value frame-type & options] frame-type))
 
 (defn day-time-context
@@ -1109,6 +1107,90 @@
 
 (def day-context day-time-context)
 
+
+(defn calendar-context
+  "Computes interval statistics based on start Date and end Date
+  * start
+  * end
+  * start-context
+  * end-context
+  * years
+  * months
+  * days
+  * hours
+  * minutes
+  * seconds
+  * holidays
+  * weekends"
+  ([start end] (calendar-context start end <))
+  ([start end comparator]
+   (let [{start :value :as start-context} (day-time-context (time->value start))
+         {end :value :as end-context} (day-time-context (time->value end))
+         delta day
+         marks (take-while
+                 #(comparator % end)
+                 (iterate #(+ % delta) start))
+         milliseconds (- end start)
+         seconds (/ milliseconds second)
+         minutes (/ seconds 60)
+         hours (/ minutes 60)
+         days (/ hours 24)
+         {:keys [weekends days holidays]
+          :as result} (reduce
+                        (fn [r {:keys [day day-in-month month year] :as context}]
+                          (let [weekend? (and (ifn? *weekend-days*) (*weekend-days* day))]
+                            (cond->
+                              (->
+                                r
+                                (update :months conj [year month])
+                                (update :years conj year))
+                              ;;
+                              (and (ifn? *holiday?*) (*holiday?* context))
+                              (update :holidays conj [year month day-in-month weekend?])
+                              ;;
+                              weekend?
+                              (update :weekends inc))))
+                        {:start start
+                         :end end
+                         :start-context start-context
+                         :end-context end-context
+                         :months (sorted-set)
+                         :years (sorted-set)
+                         :holidays (sorted-set)
+                         :weekends 0
+                         :days days
+                         :hours hours
+                         :minutes minutes
+                         :seconds seconds
+                         :milliseconds milliseconds}
+                        (map day-time-context marks))]
+     (assoc result :working-days 
+            (max 
+              (- 
+                days weekends 
+                (count
+                  (filter
+                    (fn [[_ _ w]] (nil? w))
+                    holidays)))
+              0)))))
+
+(comment
+  (def start (date 2021 3 20))
+  (def end (date 2021 12 1))
+  (time (calendar-context start end))
+  (defn holiday
+    [{:keys [day-in-month month]}]
+    (#{[4 4] [5 4]
+       [1 5] [30 5]
+       [3 6] [22 6]
+       [5 8] [15 8]
+       [1 11] [18 11]} [day-in-month month]))
+  (with-time-configuration
+    {:holiday? holiday}
+    (calendar-context start end))
+  (ifn? #{})
+  )
+
 (defmethod calendar-frame :year [value _]
   (let [{:keys [days-in-month year]} (day-time-context value)
         first-day (time->value (date year 1 1))]
@@ -1116,10 +1198,10 @@
            m 1
            r []]
       (if (> m 12) r
-          (recur
-           (+ cd (days days-in-month))
-           (inc m)
-           (concat r (calendar-frame cd :month)))))))
+        (recur
+          (+ cd (days days-in-month))
+          (inc m)
+          (concat r (calendar-frame cd :month)))))))
 
 (defmethod calendar-frame "year" [value _]
   (calendar-frame value :year))
@@ -1140,8 +1222,8 @@
                 week' (+
                        first-week
                        (quot
-                        (dec (+ d first-day-in-week))
-                        7))]]
+                         (dec (+ d first-day-in-week))
+                         7))]]
 
       {:value v
        :month month
