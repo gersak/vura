@@ -431,6 +431,7 @@
        :year j
        :leap-year? leap-year?
        :days-in-month days-in-month
+       :days-in-year (if leap-year? 366 365)
        :first-day-in-month? (== 1 d)
        :last-day-in-month? (== days-in-month d)})))
 
@@ -478,6 +479,7 @@
      :month (long m)
      :year (long j)
      :leap-year? leap-year?
+     :days-in-year (if leap-year? 366 365)
      :first-day-in-month? (== 1 d)
      :days-in-month days-in-month
      :last-day-in-month? (== d days-in-month)}))
@@ -506,7 +508,6 @@
 ;;  IIIc   11  1948440
 ;;  IVa    9   1948439
 ;;  IVc    9   1948440
-
 
 (defn ^:no-doc value->islamic-date [value]
   (letfn [(div [x y]
@@ -540,10 +541,15 @@
           m' (inc x1')
           days-in-month (if (== m m') 30 29)
           z1' (round-number (/ r1' 11) 1 :floor)
-          d' (inc z1')]
+          d' (inc z1')
+          year-in-cycle (mod j 30)
+          leap-year? (case year-in-cycle
+                       (2, 5, 7, 10, 13, 15, 18, 21, 24, 26, 29) true
+                       false)]
       {:day-in-month (long d)
        :month (long m)
        :year (long j)
+       :days-in-year (if leap-year? 355 354)
        :days-in-month days-in-month
        :first-day-in-month? (== 1 d)
        :last-day-in-month? (== days-in-month d)})))
@@ -678,6 +684,7 @@
        :day-in-month d
        :year-lenght year-length
        :days-in-month last-day
+       :days-in-year year-length
        :first-day-in-month? (= 1 d)
        :last-day-in-month? (= last-day d)})))
 
@@ -762,15 +769,20 @@
   [value]
   (:year (value->date-map value)))
 
+
+(defn value-in-year?
+  "Returns value relative to current year"
+  [value]
+  (let [start-year-value (date-map->value {:year (year? value)})]
+    (- value start-year-value)))
+
 (defn day-in-year?
   "Returns day in year period (1 - 366)"
   [value]
-  (let [start-year-value (date-map->value {:year (year? value)})]
-    (long 
-      (quot
-        (- value start-year-value)
-        day))))
-
+  (long 
+    (quot
+      (value-in-year? value) 
+      day)))
 
 (defn week-in-year?
   "Returns which week in year does input value belongs to. For example
@@ -925,7 +937,7 @@
            minute
            second
            millisecond]
-    :or {year 0
+    :or {year 1970
          month 1
          day-in-month 1
          hour 0
@@ -1108,7 +1120,7 @@
 (def day-context day-time-context)
 
 
-(defn calendar-context
+(defn calendar-period-context
   "Computes interval statistics based on start Date and end Date
   * start
   * end
@@ -1122,20 +1134,25 @@
   * seconds
   * holidays
   * weekends"
-  ([start end] (calendar-context start end <))
+  ([start end] (calendar-period-context start end <))
   ([start end comparator]
-   (let [{start :value :as start-context} (day-time-context (time->value start))
-         {end :value :as end-context} (day-time-context (time->value end))
+   (let [start (time->value start)
+         end (time->value end)
          delta day
-         marks (take-while
-                 #(comparator % end)
-                 (iterate #(+ % delta) start))
+         marks (conj
+                 (vec
+                   (take-while
+                     #(comparator % end)
+                     (iterate #(+ % delta) start)))
+                 end)
          milliseconds (- end start)
          seconds (/ milliseconds second)
          minutes (/ seconds 60)
          hours (/ minutes 60)
          days (/ hours 24)
-         {:keys [weekends days holidays]
+         contexts (map day-time-context marks)
+         
+         {:keys [weekends in/days holidays]
           :as result} (reduce
                         (fn [r {:keys [day day-in-month month year] :as context}]
                           (let [weekend? (and (ifn? *weekend-days*) (*weekend-days* day))]
@@ -1152,42 +1169,89 @@
                               (update :weekends inc))))
                         {:start start
                          :end end
-                         :start-context start-context
-                         :end-context end-context
                          :months (sorted-set)
                          :years (sorted-set)
                          :holidays (sorted-set)
                          :weekends 0
-                         :days days
-                         :hours hours
-                         :minutes minutes
-                         :seconds seconds
-                         :milliseconds milliseconds}
-                        (map day-time-context marks))]
-     (assoc result :working-days 
-            (max 
-              (- 
-                days weekends 
-                (count
-                  (filter
-                    (fn [[_ _ w]] (nil? w))
-                    holidays)))
-              0)))))
+                         :in/days days
+                         :in/hours hours
+                         :in/minutes minutes
+                         :in/seconds seconds
+                         :in/milliseconds milliseconds}
+                        contexts)
+         ;;
+         {start-year-days :days-in-year :as start-context} (first contexts)
+         {end-year-days :days-in-year :as end-context} (last contexts)
+         from-start-year-value (value-in-year? start)
+         to-end-year-value (value-in-year? end)
+         ;;
+         result
+         (assoc result
+                :in/years
+                (let [{:keys [years]} result
+                      from-start-year-part (/ 
+                                             (- start-year-days (/ from-start-year-value day))
+                                             start-year-days)
+                      to-end-year-part (/
+                                        (/ to-end-year-value day)
+                                        end-year-days)]
+                  (+ (count (drop 2 years)) from-start-year-part to-end-year-part))
+                ;;
+                :in/months
+                (let [{:keys [months]} result
+                      start-month-value (context->value (dissoc start-context :year :month))
+                      end-month-value (context->value (dissoc end-context :year :month))
+                      start-month-part (/
+                                        (- (:days-in-month start-context) (/ start-month-value day))
+                                        (:days-in-month start-context))
+                      end-month-part (/
+                                      (/ end-month-value day)
+                                      (:days-in-month end-context))]
+                  (+ (count (drop 2 months)) start-month-part end-month-part))
+                ;;
+                :working-days 
+                (max 
+                  (- 
+                    days weekends 
+                    (count
+                      (filter
+                        (fn [[_ _ w]] (nil? w))
+                        holidays)))
+                  0))]
+     #?(:clj (reduce-kv
+               (fn [r k _]
+                 (case (namespace k)
+                   "in" (update r k double)
+                   r))
+               result
+               result)
+        :cljs result))))
+
 
 (comment
-  (def start (date 2021 3 20))
-  (def end (date 2021 12 1))
-  (time (calendar-context start end))
+  (-> start time->value value->islamic-date)
+  (def start (date 2022 1 1 8 0 0))
+  (def end (date 2031 12 31 23 59 59))
+  (time (calendar-period-context start end))
   (defn holiday
     [{:keys [day-in-month month]}]
-    (#{[4 4] [5 4]
+    (#{[1 1] [6 1]
+       [4 4] [5 4]
        [1 5] [30 5]
        [3 6] [22 6]
        [5 8] [15 8]
-       [1 11] [18 11]} [day-in-month month]))
-  (with-time-configuration
-    {:holiday? holiday}
-    (calendar-context start end))
+       [1 11] [18 11]
+       [25 12 26 12]} [day-in-month month]))
+  (time
+    (with-time-configuration
+      {:holiday? holiday}
+      (calendar-period-context
+        (date 2021 1 1 10 20 30 523)
+        ; (date 2032 12 31 23 59 59 999)
+        (date 2033 1 1 10 20 30 524)
+        ; (date 2022 12 31 23 59 59 999)
+        ; (date 2023 1 1)
+        )))
   (ifn? #{})
   )
 
