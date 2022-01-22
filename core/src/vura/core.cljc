@@ -1,6 +1,7 @@
 (ns vura.core
   #?(:cljs (:require-macros [vura.core :refer [with-time-configuration]]))
   (:require [vura.timezones.db :refer [get-timezone get-rule]]
+            clojure.string
             #?(:cljs [goog.object]))
   (:refer-clojure :exclude [second]))
 
@@ -167,16 +168,15 @@
   #?(:cljs (js/Date. value)
      :clj (java.util.Date. value)))
 
-(defn date->utc-value [date]
+(defn date->utc-value
   "Returns number of milliseconds from UNIX epoch"
+  [date]
   (.getTime date))
 
 (defn ^:no-doc until-value
   [{:keys [year month day-in-month floating-day] :as until
     :or {month 1
-         day-in-month 1
-         hour 0
-         minute 0}}]
+         day-in-month 1}}]
   ;; Find calendar frame for this month
   (when until
     (let [days-mapping
@@ -784,6 +784,12 @@
       (value-in-year? value) 
       day)))
 
+(defn value-in-month?
+  "Returns value relative to current month"
+  [value]
+  (let [start-month-value (date-map->value {:year (year? value) :month (month? value)})]
+    (- value start-month-value)))
+
 (defn week-in-year?
   "Returns which week in year does input value belongs to. For example
   for date 15.02.2015 it will return number 6"
@@ -1120,6 +1126,7 @@
 (def day-context day-time-context)
 
 
+
 (defn calendar-period-context
   "Computes interval statistics based on start Date and end Date
   * start
@@ -1151,34 +1158,35 @@
          hours (/ minutes 60)
          days (/ hours 24)
          contexts (map day-time-context marks)
-         
          {:keys [weekends in/days holidays]
-          :as result} (reduce
-                        (fn [r {:keys [day day-in-month month year] :as context}]
-                          (let [weekend? (and (ifn? *weekend-days*) (*weekend-days* day))]
-                            (cond->
-                              (->
-                                r
-                                (update :months conj [year month])
-                                (update :years conj year))
-                              ;;
-                              (and (ifn? *holiday?*) (*holiday?* context))
-                              (update :holidays conj [year month day-in-month weekend?])
-                              ;;
-                              weekend?
-                              (update :weekends inc))))
-                        {:start start
-                         :end end
-                         :months (sorted-set)
-                         :years (sorted-set)
-                         :holidays (sorted-set)
-                         :weekends 0
-                         :in/days days
-                         :in/hours hours
-                         :in/minutes minutes
-                         :in/seconds seconds
-                         :in/milliseconds milliseconds}
-                        contexts)
+          :as result} (update
+                        (reduce
+                          (fn [r {:keys [day day-in-month month year] :as context}]
+                            (let [weekend? (and (ifn? *weekend-days*) (*weekend-days* day))]
+                              (cond->
+                                (->
+                                  r
+                                  (update :months conj [year month])
+                                  (update :years conj year))
+                                ;;
+                                (and (ifn? *holiday?*) (*holiday?* context))
+                                (update :holidays conj [year month day-in-month weekend?])
+                                ;;
+                                weekend?
+                                (update :weekends conj [year month day-in-month]))))
+                          {:start start
+                           :end end
+                           :months (sorted-set)
+                           :years (sorted-set)
+                           :holidays (sorted-set)
+                           :weekends #{}
+                           :in/days days
+                           :in/hours hours
+                           :in/minutes minutes
+                           :in/seconds seconds
+                           :in/milliseconds milliseconds}
+                          contexts)
+                        :weekends count)
          ;;
          {start-year-days :days-in-year :as start-context} (first contexts)
          {end-year-days :days-in-year :as end-context} (last contexts)
@@ -1189,25 +1197,46 @@
          (assoc result
                 :in/years
                 (let [{:keys [years]} result
-                      from-start-year-part (/ 
-                                             (- start-year-days (/ from-start-year-value day))
-                                             start-year-days)
-                      to-end-year-part (/
-                                        (/ to-end-year-value day)
-                                        end-year-days)]
-                  (+ (count (drop 2 years)) from-start-year-part to-end-year-part))
+                      year-count (count years)
+                      from-start-year-part
+                      (if-not (> year-count 1) 0
+                        (/ 
+                          (- start-year-days (/ from-start-year-value day))
+                          start-year-days))
+                      ;;
+                      to-end-year-part
+                      (if-not (> year-count 1) 0
+                        (/
+                         (/ to-end-year-value day)
+                         end-year-days))
+                      ;;
+                      same-year-part
+                      (if (not= year-count 1) 0
+                        (/
+                         (/ (- end start) day)
+                         start-year-days))]
+                  (+
+                   (count (drop 2 years))
+                   from-start-year-part
+                   to-end-year-part
+                   same-year-part))
                 ;;
                 :in/months
                 (let [{:keys [months]} result
                       start-month-value (context->value (dissoc start-context :year :month))
                       end-month-value (context->value (dissoc end-context :year :month))
-                      start-month-part (/
-                                        (- (:days-in-month start-context) (/ start-month-value day))
-                                        (:days-in-month start-context))
-                      end-month-part (/
-                                      (/ end-month-value day)
-                                      (:days-in-month end-context))]
-                  (+ (count (drop 2 months)) start-month-part end-month-part))
+                      month-count (count months)
+                      start-month-part (if-not (> month-count 1) 0
+                                         (/
+                                          (- (:days-in-month start-context) (/ start-month-value day))
+                                          (:days-in-month start-context)))
+                      end-month-part (if-not (> month-count 1) 0
+                                       (/ (/ end-month-value day) (:days-in-month end-context)))
+                      same-month-part (if-not (= 1 month-count) 0
+                                        (/ (- end-month-value start-month-value)
+                                           day
+                                           (:days-in-month start-context)))]
+                  (+ (count (drop 2 months)) start-month-part end-month-part same-month-part))
                 ;;
                 :working-days 
                 (max 
@@ -1252,7 +1281,6 @@
         ; (date 2022 12 31 23 59 59 999)
         ; (date 2023 1 1)
         )))
-  (ifn? #{})
   )
 
 (defmethod calendar-frame :year [value _]

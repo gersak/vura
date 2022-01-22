@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.github.gersak</groupId>
   <artifactId>vura</artifactId>
-  <version>0.5.4</version>
+  <version>0.5.7-SNAPSHOT</version>
   <name>vura</name>
   <packaging>jar</packaging>
 
@@ -11,7 +11,7 @@
     <dependency>
       <groupId>com.github.gersak</groupId>
       <artifactId>vura.core</artifactId>
-      <version>0.5.4</version>
+      <version>0.5.7-SNAPSHOT</version>
     </dependency>
     <dependency>
       <groupId>com.github.gersak</groupId>
