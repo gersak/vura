@@ -1,5 +1,4 @@
-{:deps {com.github.gersak/vura.core {:local/root "../core"}}
- :paths ["generated"]
+{:paths ["src"]
  :aliases
  {:dev
   {:extra-paths ["compiler" "resources"]
