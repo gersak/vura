@@ -1,5 +1,8 @@
 target/
 .shadow-cljs/
+.clj-kondo/
+.cpcache/
+.lsp/
 gpg.edn
 repl.clj
 .nrepl-port

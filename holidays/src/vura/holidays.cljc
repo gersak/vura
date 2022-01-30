@@ -1,13 +1,15 @@
-(ns vura.holidays.core
+(ns vura.holidays
   (:require
-   [clojure.data.json :as json]
-   [vura.core
-    :refer [day-time-context
-            time->value]]))
+    [clojure.data.json :as json]
+    [vura.core
+     :refer [day-time-context
+             time->value]]))
+
+(slurp "https://raw.githubusercontent.com/commenthol/date-holidays/master/data/countries/HR.yaml")
 
 (defn dispatch [dispatch _] dispatch)
 
-(def test-file "../date-holidays/data/holidays.json")
+; (def test-file "../date-holidays/data/holidays.json")
 ;; Holiday? - Date in calendar for given context country, or religion or locale
 ;; working-day? - true or false for given holiday and context
 ;; Holiday name - holiday in one context can have different name in other context
@@ -17,7 +19,7 @@
 ;   (holiday? [this dispatch] "Returns true if this is holiday. Namely for extending Date and PersistentMap")
 ;   (holiday-context [this dispatch] "Returns holiday context for given dispatch parameter"))
 
-(def db (json/read-str (slurp test-file)))
+; (def db (json/read-str (slurp test-file)))
 
 (defmulti is-holiday?
   "Multimethod for extending holiday? function. 'dispatch' parameter is used to 

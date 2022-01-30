@@ -1,0 +1,10 @@
+{:deps
+ {com.github.gersak/vura.core {:local/root "../core"}
+  com.github.gersak/vura.timezones {:local/root "../timezones"}
+  kovacnica/dreamcatcher {:mvn/version "1.0.9-SNAPSHOT"}
+  org.clojure/tools.logging {:mvn/version "0.4.0"}}
+ :paths ["src"]
+ :aliases
+ {:cider
+  {:extra-deps {cider/cider-nrepl {:mvn/version "0.27.2"}}}
+  :test {:extra-paths ["test"]}}}
