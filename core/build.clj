@@ -15,9 +15,12 @@
                 :resource-dirs ["src" "../timezones/src"]
                 :target "./"}))
 
+(defn jar [_]
+  (pom nil)
+  (b/process {:command-args ["mvn" "jar"]}))
+
 (defn deploy [_]
   (pom nil)
-  (b/process {:dir target
-              :command-args ["mvn" "deploy"]}))
+  (b/process {:command-args ["mvn" "deploy"]}))
 
 
