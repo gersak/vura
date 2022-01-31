@@ -6,20 +6,10 @@
   <artifactId>vura.core</artifactId>
   <version>0.5.7-SNAPSHOT</version>
   <name>vura.core</name>
-  <dependencies>
-    <dependency>
-      <groupId>org.clojure</groupId>
-      <artifactId>clojure</artifactId>
-      <version>1.10.3</version>
-    </dependency>
-  </dependencies>
   <build>
     <resources>
       <resource>
         <directory>src</directory>
-      </resource>
-      <resource>
-        <directory>../timezones/src</directory>
       </resource>
     </resources>
   </build>

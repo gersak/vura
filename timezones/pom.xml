@@ -10,7 +10,7 @@
   <build>
     <resources>
       <resource>
-        <directory>generated</directory>
+        <directory>src</directory>
       </resource>
     </resources>
   </build>
