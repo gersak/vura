@@ -2,7 +2,7 @@
   #?(:cljs [vura.holidays.macros :refer [static-holiday]])
   (:require
    [vura.core :as vura]
-   [vura.holidays.core :as c]
+   [vura.holidays :as c]
    #?(:clj [vura.holidays.macros :refer [static-holiday]])))
 
 (static-holiday epiphany? 1 6)
@@ -129,9 +129,9 @@
 (defmethod c/is-holiday? :religion/christian [_ day-context]
   (let [d (select-keys day-context [:day-in-month :month :year])]
     (boolean
-     (some
-      #(% day-context)
-      (keys holiday->context)))))
+      (some
+        #(% day-context)
+        (keys holiday->context)))))
 
 ; (defmethod c/holiday-name-impl [:country/croatia :country/croatia])
 

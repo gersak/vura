@@ -4,6 +4,14 @@
      :refer [day-time-context
              time->value]]))
 
+
+(defn static-holiday
+  "Given d as 'day' and m as month, function will generate function that accepts
+  vura.core/day-context value and returns true if day and month match input value"
+  [d m]
+  (fn [{:keys [day-in-month month]}]
+    (and (= month m) (= day-in-month d))))
+
 (defn dispatch [dispatch _] dispatch)
 
 ; (def test-file "../date-holidays/data/holidays.json")
@@ -34,7 +42,7 @@
   (throw (Exception. (str "Unkonwn dispatch " (pr-str dispatch) ". Are you sure that target multimethod implementation is loaded(required)?"))))
 
 (defn holiday? [data dispatch]
-  (is-holiday? dispatch (-> data time->value day-time-context)))
+  (boolean (is-holiday? dispatch (-> data time->value day-time-context))))
 
 (defmulti holiday-name-impl
   (fn
