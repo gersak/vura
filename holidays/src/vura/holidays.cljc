@@ -1,11 +1,8 @@
 (ns vura.holidays
   (:require
-    [clojure.data.json :as json]
     [vura.core
      :refer [day-time-context
              time->value]]))
-
-(slurp "https://raw.githubusercontent.com/commenthol/date-holidays/master/data/countries/HR.yaml")
 
 (defn dispatch [dispatch _] dispatch)
 
@@ -27,13 +24,13 @@
   but it can as well be religion or culture dispatch (key)words or any other data type"
   dispatch)
 
-(defmethod is-holiday? :default [dispatch day-context]
+(defmethod is-holiday? :default [dispatch _]
   (throw (Exception. (str "Unkonwn dispatch " (pr-str dispatch) ". Are you sure that target multimethod implementation is loaded(required)?"))))
 
 (defmulti is-working-day?
   dispatch)
 
-(defmethod is-working-day? :default [dispatch day-context]
+(defmethod is-working-day? :default [dispatch _]
   (throw (Exception. (str "Unkonwn dispatch " (pr-str dispatch) ". Are you sure that target multimethod implementation is loaded(required)?"))))
 
 (defn holiday? [data dispatch]
@@ -41,8 +38,8 @@
 
 (defmulti holiday-name-impl
   (fn
-    ([dispatch data] [dispatch dispatch])
-    ([dispatch data translation] [dispatch translation])))
+    ([dispatch _] [dispatch dispatch])
+    ([dispatch _ translation] [dispatch translation])))
 
 ; (defn holiday-contexts [holiday & dispatches]
 ;   (reduce

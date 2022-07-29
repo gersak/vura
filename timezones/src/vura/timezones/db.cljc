@@ -291,11 +291,11 @@
 (defn get-locale-timezone [locale]
   (get-in 
     locales 
-    [(clojure.string/upper-case locale) :zone]))
+    [(clojure.string/upper-case (name locale)) :zone]))
 
 
 (defn get-locale [locale]
-  (get locales (clojure.string/upper-case locale)))
+  (get locales (clojure.string/upper-case (name locale))))
 
 
 
