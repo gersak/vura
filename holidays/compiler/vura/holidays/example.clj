@@ -26,7 +26,6 @@
   (let [dt (-> (v/date year month day)
                v/time->value
                v/day-time-context)]
-    #_(clojure.pprint/pprint dt)
     dt))
 
 
@@ -152,22 +151,13 @@
   (- day-in-month (- today target)))
 
 
+
 (comment
-  (def day 4)
-  (def day 7)
-  ([1 2 3 4 10] 4)
-  (#{1 5 20 -10} 7)
-  ({:a 10 :b 20} :c)
-  ; za previous
-  ;(day-in-month - (today - monday))
-  ; za next
-  ;(day-in-month + (+ (- 7 today)) moday)
-  (+ (- 7 5) 1)
-  (- 26 (- 2 1))
-  (- 26 (- 3 1))
-  (next-week-day 26 5 1)
-  (map #(next-week-day 26 % 1) [4 5])
-  (map #(previous-week-day 26 % 1) [2 3]))
+  (->day-time-context 2022 1 0)
+  (def day-in-month 15)
+  (def month 1)
+  (def today 6)
+  (def target 5))
 
 
 (defn holiday-01-26-if
@@ -234,6 +224,19 @@
           (fn [statements]
             (map analyze-statement statements))))
 
+
+(defn dow-str->dow-num
+  [dow]
+  (case dow
+    "monday" 1
+    "tuesday" 2
+    "wednesday" 3
+    "thursday" 4
+    "friday" 5
+    "saturday" 6
+    "sunday" 7))
+
+
 (defn today? [today day]
   (some
    (fn [text]
@@ -247,6 +250,16 @@
        "sunday" (= 7 day)))
    today))
 
+
+(defn date-to-dow
+  [year month day]
+  (:day (->day-time-context year month day)))
+
+(defn check-day-value
+  [year month day]
+  (:day-in-month (->day-time-context year month day)))
+
+
 (comment
   (map #(today? ["saturday" "sunday"] %) (range 1 8)))
 
@@ -259,7 +272,8 @@
   ;; rezultat
   (fn [{d :day-in-month
         wd :day
-        m :month}]
+        m :month
+        y :year}]
     (some
      (fn [{:keys [today condition target]}]
        (println "Current day: " [d m wd])
@@ -268,17 +282,50 @@
        ;; ako se poklapa mjesec i dan, a wd nije u today kolekciji, vrati true
        ;; ako wd isti kao target, a mjesec i dan u mjesecu pripadaju nekom od today dana
        ;; inace false
-       (and
-        (= month m)
-        (= day-in-month d)
-        (not (today? today wd))))
+       (or
+        (and
+         (= month m)
+         (= day-in-month d)
+         (or (not (today? today wd)) and?))
+        (and
+         (today? [target] wd)
+         (let [h-day (if (= condition "next")
+                       (next-week-day day-in-month
+                                      (date-to-dow y month day-in-month)
+                                      (dow-str->dow-num target))
+                       (previous-week-day day-in-month
+                                          (date-to-dow y month day-in-month)
+                                          (dow-str->dow-num target)))]
+           (println "HDAY: "
+                    day-in-month target
+                    (date-to-dow y month day-in-month)
+                    (dow-str->dow-num target))
+           (= d (check-day-value y month h-day)))
+         )))
      statements)))
 
 (def test-compile (compile-holiday (first removed-unknown)))
+(def test-compile2
+  (compile-holiday
+   {:day-in-month 1,
+    :month 1,
+    :and? true,
+    :statements
+    '({:today ["sunday"],
+       :condition "next",
+       :target "monday"}
+      {:today ["saturday"],
+       :condition "previous",
+       :target "friday"})}))
 
 
 (comment
-  (test-compile (->day-time-context 2021 4 25))
+  (list 1 2 3)
+  '(1 2 3)
+  (test-compile (->day-time-context 2020 4 25))
+  (test-compile (->day-time-context 2020 4 26))
+  (test-compile (->day-time-context 2020 4 27))
+  (test-compile2 (->day-time-context 2021 12 31))
   (def holidays (clojure.edn/read-string (slurp "all_holidays.edn")))
   (def report (group-by vura.holidays.compile/analyze-holiday holidays))
   (def parsed-results (map parse-if (get report :static_condition)))
