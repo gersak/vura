@@ -271,7 +271,6 @@
         wd :day
         m :month
         value :value}]
-    (println "HELLO: " statements)
     (some
       (fn [{:keys [today condition target]}]
         ; (println "Current day: " [d m wd])
@@ -283,21 +282,23 @@
             (= day-in-month d)
             (or (not (today wd)) and?))
           (and
-            ;; Provjeri da li trenutni dan odgovora uvjetu iz statementa
+            ;; Check if current week day matches target from statment
             (= wd target)
             (case condition 
               "next"
-              ;; umanji vrijednost trenutnog dana za razliku 'dan u tjednu' - target u danima i dohvati
-              ;; day-time-context
               (some
                 (fn [target]
+                  ;; Current week day is in front of condition so find difference of current week day and today (statements)
+                  ;; in days
                   (let [next-delta (+ (- 7 target) wd)
+                        ;; subtract computed value from current date value and get day time context
                         {d :day-in-month m :month} (v/day-time-context (- value (v/days next-delta)))]
-                    ;; provjeri da li pomaknuti dan odgovara pocetnom uvjetu
+                    ;; Check if result day in month and month matches initial condition
                     (and
                       (= month m)
                       (= d day-in-month))))
                 today)
+              ;; Same as above with different delta computation
               "previous"
               (some
                 (fn [target]
