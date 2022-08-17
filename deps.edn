@@ -1,6 +1,6 @@
 {:deps
- {com.github.gersak/vura.core {:mvn/version "0.5.7-SNAPSHOT"}
-  com.github.gersak/vura.timezones {}
+ {com.github.gersak/vura.core {:local/root "core"}
+  com.github.gersak/vura.timezones {:local/root "timezones"}
   com.github.gersak/vura.holidays {:local/root "holidays"}
   com.github.gersak/vura.cron {:local/root "cron"}}
  :aliases

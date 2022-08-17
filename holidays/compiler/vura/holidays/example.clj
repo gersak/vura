@@ -144,22 +144,6 @@
   (holiday-01-01-if2 (->day-time-context 2025 01 01)))
 
 
-(defn next-week-day [day-in-month today target]
-  (+ day-in-month (+ (- 7 today)) target))
-
-(defn previous-week-day [day-in-month today target]
-  (- day-in-month (- today target)))
-
-
-
-(comment
-  (->day-time-context 2022 1 0)
-  (def day-in-month 15)
-  (def month 1)
-  (def today 6)
-  (def target 5))
-
-
 (defn holiday-01-26-if
   "01-26 if tuesday,wednesday then previous monday if thursday,friday then next monday"
   [{:keys [month day-in-month day]}]
@@ -212,11 +196,25 @@
            (update result :unknown (fnil conj []) word))))))
 
 
+(defn day-name->num
+  [day]
+  ; (println "WTF: " day)
+  (case day
+    "monday" 1
+    "tuesday" 2
+    "wednesday" 3
+    "thursday" 4
+    "friday" 5
+    "saturday" 6
+    "sunday" 7
+    nil))
+
+
 (defn analyze-statement
   [[today _ condition target]]
-  {:today (str/split today #",")
+  {:today (set (map day-name->num (str/split today #",")))
    :condition condition
-   :target target})
+   :target (day-name->num target)})
 
 
 (defn transform-statement [parsed-result]
@@ -239,16 +237,16 @@
 
 (defn today? [today day]
   (some
-   (fn [text]
-     (case text
-       "monday" (= 1 day)
-       "tuesday" (= 2 day)
-       "wednesday" (= 3 day)
-       "thursday" (= 4 day)
-       "friday" (= 5 day)
-       "saturday" (= 6 day)
-       "sunday" (= 7 day)))
-   today))
+    (fn [text]
+      (case text
+        "monday" (= 1 day)
+        "tuesday" (= 2 day)
+        "wednesday" (= 3 day)
+        "thursday" (= 4 day)
+        "friday" (= 5 day)
+        "saturday" (= 6 day)
+        "sunday" (= 7 day)))
+    today))
 
 
 (defn date-to-dow
@@ -267,56 +265,51 @@
   [{:keys [day-in-month
            month
            and?
-           statements]
-    :as record}]
+           statements]}]
   ;; rezultat
   (fn [{d :day-in-month
         wd :day
         m :month
-        y :year}]
+        value :value}]
+    (println "HELLO: " statements)
     (some
-     (fn [{:keys [today condition target]}]
-       (println "Current day: " [d m wd])
-       (println "Static: " (dissoc record :statements))
-       (println "Statement: " [today condition target])
-       ;; ako se poklapa mjesec i dan, a wd nije u today kolekciji, vrati true
-       ;; ako wd isti kao target, a mjesec i dan u mjesecu pripadaju nekom od today dana
-       ;; inace false
-       (or
-        (and
-         (= month m)
-         (= day-in-month d)
-         (or (not (today? today wd)) and?))
-        (and
-         (today? [target] wd)
-         (let [h-day (if (= condition "next")
-                       (next-week-day day-in-month
-                                      (date-to-dow y month day-in-month)
-                                      (dow-str->dow-num target))
-                       (previous-week-day day-in-month
-                                          (date-to-dow y month day-in-month)
-                                          (dow-str->dow-num target)))]
-           (println "HDAY: "
-                    day-in-month target
-                    (date-to-dow y month day-in-month)
-                    (dow-str->dow-num target))
-           (= d (check-day-value y month h-day)))
-         )))
-     statements)))
+      (fn [{:keys [today condition target]}]
+        ; (println "Current day: " [d m wd])
+        ; (println "Static: " (dissoc record :statements))
+        ; (println "Statement: " [today condition target])
+        (or
+          (and
+            (= month m)
+            (= day-in-month d)
+            (or (not (today wd)) and?))
+          (and
+            ;; Provjeri da li trenutni dan odgovora uvjetu iz statementa
+            (= wd target)
+            (case condition 
+              "next"
+              ;; umanji vrijednost trenutnog dana za razliku 'dan u tjednu' - target u danima i dohvati
+              ;; day-time-context
+              (some
+                (fn [target]
+                  (let [next-delta (+ (- 7 target) wd)
+                        {d :day-in-month m :month} (v/day-time-context (- value (v/days next-delta)))]
+                    ;; provjeri da li pomaknuti dan odgovara pocetnom uvjetu
+                    (and
+                      (= month m)
+                      (= d day-in-month))))
+                today)
+              "previous"
+              (some
+                (fn [target]
+                  (let [previous-delta (- target wd)
+                        {d :day-in-month m :month} (v/day-time-context (+ value (v/days previous-delta)))]
+                    (and
+                      (= month m)
+                      (= day-in-month d))))
+                today)))))
+      statements)))
 
-(def test-compile (compile-holiday (first removed-unknown)))
-(def test-compile2
-  (compile-holiday
-   {:day-in-month 1,
-    :month 1,
-    :and? true,
-    :statements
-    '({:today ["sunday"],
-       :condition "next",
-       :target "monday"}
-      {:today ["saturday"],
-       :condition "previous",
-       :target "friday"})}))
+
 
 
 (comment
@@ -325,7 +318,10 @@
   (test-compile (->day-time-context 2020 4 25))
   (test-compile (->day-time-context 2020 4 26))
   (test-compile (->day-time-context 2020 4 27))
-  (test-compile2 (->day-time-context 2021 12 31))
+  (test-compile (->day-time-context 2021 12 31))
+  (test-compile (->day-time-context 2022 1 1))
+  (test-compile (->day-time-context 2022 1 2))
+  (test-compile (->day-time-context 2023 1 2))
   (def holidays (clojure.edn/read-string (slurp "all_holidays.edn")))
   (def report (group-by vura.holidays.compile/analyze-holiday holidays))
   (def parsed-results (map parse-if (get report :static_condition)))
@@ -335,6 +331,15 @@
               (some? (:unknown %))
               (empty? (:statements %)))
             transformed-statements))
+  (def test-compile (compile-holiday (first removed-unknown)))
+  (def test-compile
+    (compile-holiday
+      {:day-in-month 1,
+       :month 1,
+       :and? true,
+       :statements
+       '({:today #{6}, :condition "previous", :target 5}
+        {:today #{7}, :condition "next", :target 1})}))
   (spit "transformed_statements.edn"
         (with-out-str
           (clojure.pprint/pprint removed-unknown)))
