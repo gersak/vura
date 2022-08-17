@@ -6,7 +6,6 @@
    [vura.holidays.catholic :as catholic]))
 
 
-
 (defn holiday [day-context]
   (some
    (fn [[k v]] (when (k day-context) v))
@@ -28,137 +27,6 @@
                v/day-time-context)]
     dt))
 
-
-(defn holiday-11-29
-  "11-29 and if sunday then next monday"
-  [{:keys [month day-in-month day]}]
-  (or
-   (and
-    (not= day 7)
-    (= month 11)
-    (= day-in-month 29))
-   (and
-    (= day 1)
-    (= day-in-month 30)
-    (= month 11))))
-
-(comment
-  (holiday-11-29 (->day-time-context 2026 11 29))
-  (holiday-11-29 (->day-time-context 2026 11 30))
-  (holiday-11-29 (->day-time-context 2022 11 29)))
-
-
-
-(defn holiday-05-04
-  "05-04 and if saturday,sunday then next monday"
-  [{:keys [month day-in-month day]}]
-  (or
-   (and
-    (and (not= day 6) (not= day 7))
-    (= month 5)
-    (= day-in-month 4))
-   (and
-    (= day 1)
-    (= month 5)
-    (or (= day-in-month 5) (= day-in-month 6)))))
-
-(comment
-  (holiday-05-04 (->day-time-context 2025 05 04))
-  (holiday-05-04 (->day-time-context 2025 05 05))
-  (holiday-05-04 (->day-time-context 2026 05 04))
-  (holiday-05-04 (->day-time-context 2024 05 07))
-  (holiday-05-04 (->day-time-context 2022 05 04)))
-
-
-
-(defn holiday-01-16
-  "01-16 and if sunday then next tuesday"
-  [{:keys [month day-in-month day]}]
-  (or
-   (and
-    (not= day 7)
-    (= month 1)
-    (= day-in-month 16))
-   (and
-    (= day 2)
-    (= month 1)
-    (= day-in-month 18))))
-
-(comment
-  (holiday-01-16 (->day-time-context 2022 01 18))
-  (holiday-01-16 (->day-time-context 2023 01 16))
-  (holiday-01-16 (->day-time-context 2028 01 16))
-  (holiday-01-16 (->day-time-context 2028 01 17))
-  (holiday-01-16 (->day-time-context 2028 01 18)))
-
-
-
-(defn holiday-01-01-if
-  "01-01 and if Saturday then next Monday if Sunday then next Tuesday"
-  [{:keys [month day-in-month day]}]
-  (or
-   (and
-    (and (not= day 6) (not= day 7))
-    (= month 1)
-    (= day-in-month 1))
-   (and
-    (or (= day 1) (= day 2))
-    (= month 1)
-    (= day-in-month 3))))
-
-(comment
-  (holiday-01-01-if (->day-time-context 2022 01 01))
-  (holiday-01-01-if (->day-time-context 2022 01 02))
-  (holiday-01-01-if (->day-time-context 2022 01 03))
-  (holiday-01-01-if (->day-time-context 2023 01 01))
-  (holiday-01-01-if (->day-time-context 2023 01 02))
-  (holiday-01-01-if (->day-time-context 2023 01 03))
-  (holiday-01-01-if (->day-time-context 2025 01 01)))
-
-
-
-(defn holiday-01-01-if2
-  "01-01 and if sunday then next monday if saturday then previous friday"
-  [{:keys [month day-in-month day]}]
-  (or
-   (and
-    (and (not= day 6) (not= day 7))
-    (= month 1)
-    (= day-in-month 1))
-   (and
-    (= day 1)
-    (= month 1)
-    (= day-in-month 2))
-   (and
-    (= day 5)
-    (= month 12)
-    (= day-in-month 31))))
-
-(comment
-  (holiday-01-01-if2 (->day-time-context 2022 01 01))
-  (holiday-01-01-if2 (->day-time-context 2022 01 02))
-  (holiday-01-01-if2 (->day-time-context 2022 01 03))
-  (holiday-01-01-if2 (->day-time-context 2023 01 01))
-  (holiday-01-01-if2 (->day-time-context 2023 01 02))
-  (holiday-01-01-if2 (->day-time-context 2023 01 03))
-  (holiday-01-01-if2 (->day-time-context 2025 01 01)))
-
-
-(defn holiday-01-26-if
-  "01-26 if tuesday,wednesday then previous monday if thursday,friday then next monday"
-  [{:keys [month day-in-month day]}]
-  (or
-   (and
-    (not (#{2 3 4 5} day))
-    (= month 1)
-    (= day-in-month 26))
-   (and
-    (= day 1)
-    (= month 1)
-    (contains? (set [24 25 29 30]) day-in-month))))
-
-(comment
-  (def text "01-26 if tuesday,wednesday then previous Monday if thursday,friday then next monday"))
 
 (defn parse-if
   [text]
@@ -223,44 +91,6 @@
             (map analyze-statement statements))))
 
 
-(defn dow-str->dow-num
-  [dow]
-  (case dow
-    "monday" 1
-    "tuesday" 2
-    "wednesday" 3
-    "thursday" 4
-    "friday" 5
-    "saturday" 6
-    "sunday" 7))
-
-
-(defn today? [today day]
-  (some
-    (fn [text]
-      (case text
-        "monday" (= 1 day)
-        "tuesday" (= 2 day)
-        "wednesday" (= 3 day)
-        "thursday" (= 4 day)
-        "friday" (= 5 day)
-        "saturday" (= 6 day)
-        "sunday" (= 7 day)))
-    today))
-
-
-(defn date-to-dow
-  [year month day]
-  (:day (->day-time-context year month day)))
-
-(defn check-day-value
-  [year month day]
-  (:day-in-month (->day-time-context year month day)))
-
-
-(comment
-  (map #(today? ["saturday" "sunday"] %) (range 1 8)))
-
 (defn compile-holiday
   [{:keys [day-in-month
            month
@@ -309,8 +139,6 @@
                       (= day-in-month d))))
                 today)))))
       statements)))
-
-
 
 
 (comment
@@ -366,31 +194,6 @@
   (holiday-01-26-if (->day-time-context 2023 01 28))
   (holiday-01-26-if (->day-time-context 2023 01 29))
   (holiday-01-26-if (->day-time-context 2023 01 30)))
-
-
-
-(defn holiday-12-26
-  "12-26 if Sunday then next Monday if Monday then next Tuesday"
-  [{:keys [month day-in-month day]}]
-  (or
-   (and
-    (and (not= day 7) (not= day 1))
-    (= month 12)
-    (= day-in-month 26))
-   (and
-    (or (= day 1) (= day 2))
-    (= month 12)
-    (= day-in-month 27))))
-
-(comment
-  (holiday-12-26 (->day-time-context 2022 12 26))
-  (holiday-12-26 (->day-time-context 2022 12 27))
-  (holiday-12-26 (->day-time-context 2021 12 26))
-  (holiday-12-26 (->day-time-context 2021 12 27))
-  (holiday-12-26 (->day-time-context 2021 12 28))
-  (holiday-12-26 (->day-time-context 2023 12 26))
-  (holiday-12-26 (->day-time-context 2023 12 27))
-  (holiday-12-26 (->day-time-context 2023 12 25)))
 
 
 
