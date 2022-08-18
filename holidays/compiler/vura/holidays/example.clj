@@ -102,55 +102,49 @@
         m :month
         value :value}]
     (some
-      (fn [{:keys [today condition target]}]
+     (fn [{:keys [today condition target]}]
         ; (println "Current day: " [d m wd])
         ; (println "Static: " (dissoc record :statements))
         ; (println "Statement: " [today condition target])
-        (or
-          (and
-            (= month m)
-            (= day-in-month d)
-            (or (not (today wd)) and?))
-          (and
+        ; (println "Not today: " (not (today wd)))
+        ; (println "Today content: " today)
+        ; (println "Week day: " wd)
+       (or
+        (and
+         (= month m)
+         (= day-in-month d)
+         (or (not (today wd)) and?))
+        (and
             ;; Check if current week day matches target from statment
-            (= wd target)
-            (case condition 
-              "next"
-              (some
-                (fn [target]
+         (= wd target)
+         (case condition
+           "next"
+           (some
+            (fn [target]
                   ;; Current week day is in front of condition so find difference of current week day and today (statements)
                   ;; in days
-                  (let [next-delta (+ (- 7 target) wd)
+              (let [next-delta (+ (- 7 target) wd)
                         ;; subtract computed value from current date value and get day time context
-                        {d :day-in-month m :month} (v/day-time-context (- value (v/days next-delta)))]
+                    {d :day-in-month m :month} (v/day-time-context (- value (v/days next-delta)))]
                     ;; Check if result day in month and month matches initial condition
-                    (and
-                      (= month m)
-                      (= d day-in-month))))
-                today)
+                (and
+                 (= month m)
+                 (= d day-in-month))))
+            today)
               ;; Same as above with different delta computation
-              "previous"
-              (some
-                (fn [target]
-                  (let [previous-delta (- target wd)
-                        {d :day-in-month m :month} (v/day-time-context (+ value (v/days previous-delta)))]
-                    (and
-                      (= month m)
-                      (= day-in-month d))))
-                today)))))
-      statements)))
+           "previous"
+           (some
+            (fn [target]
+              (let [previous-delta (- target wd)
+                    {d :day-in-month m :month} (v/day-time-context (+ value (v/days previous-delta)))]
+                (and
+                 (= month m)
+                 (= day-in-month d))))
+            today)))))
+     statements)))
 
 
 (comment
-  (list 1 2 3)
-  '(1 2 3)
-  (test-compile (->day-time-context 2020 4 25))
-  (test-compile (->day-time-context 2020 4 26))
-  (test-compile (->day-time-context 2020 4 27))
-  (test-compile (->day-time-context 2021 12 31))
-  (test-compile (->day-time-context 2022 1 1))
-  (test-compile (->day-time-context 2022 1 2))
-  (test-compile (->day-time-context 2023 1 2))
   (def holidays (clojure.edn/read-string (slurp "all_holidays.edn")))
   (def report (group-by vura.holidays.compile/analyze-holiday holidays))
   (def parsed-results (map parse-if (get report :static_condition)))
@@ -163,12 +157,119 @@
   (def test-compile (compile-holiday (first removed-unknown)))
   (def test-compile
     (compile-holiday
-      {:day-in-month 1,
-       :month 1,
-       :and? true,
-       :statements
-       '({:today #{6}, :condition "previous", :target 5}
+     {:day-in-month 1,
+      :month 1,
+      :and? true,
+      :statements
+      '({:today #{6}, :condition "previous", :target 5}
         {:today #{7}, :condition "next", :target 1})}))
+  (def test-compile
+    (compile-holiday
+     {:day-in-month 26,
+      :month 12,
+      :and? true,
+      :statements
+      '({:today #{6}, :condition "next", :target 1}
+        {:today #{7}, :condition "next", :target 2})}))
+  (def test-compile
+    (compile-holiday
+     {:day-in-month 26,
+      :month 1,
+      :statements
+      '({:today #{3 2}, :condition "previous", :target 1}
+        {:today #{4 5}, :condition "next", :target 1})}))
+  (def test-compile
+    (compile-holiday
+     {:day-in-month 21,
+      :month 10,
+      :statements
+      '({:today #{7}, :condition "next", :target 1}
+        {:today #{6}, :condition "previous", :target 5}
+        {:today #{3 2}, :condition "previous", :target 1}
+        {:today #{4}, :condition "next", :target 5})}))
+  (def test-compile
+    (compile-holiday
+     {:day-in-month 6,
+      :month 11,
+      :statements '({:today #{4 6 3 2 5}, :condition "next", :target 1})}))
+  ;; Holiday 04-25 and if Saturday,Sunday then next monday
+  (test-compile (->day-time-context 2020 4 25))
+  (test-compile (->day-time-context 2020 4 26))
+  (test-compile (->day-time-context 2020 4 27))
+  (test-compile (->day-time-context 2022 4 24))
+  (test-compile (->day-time-context 2022 4 25))
+  (test-compile (->day-time-context 2022 4 26))
+  ;; Holiday 01-01 and if Saturday then previous friday if Sunday then next monday
+  (test-compile (->day-time-context 2021 12 31))
+  (test-compile (->day-time-context 2022 1 1))
+  (test-compile (->day-time-context 2022 1 2))
+  (test-compile (->day-time-context 2022 1 3))
+  (test-compile (->day-time-context 2022 12 31))
+  (test-compile (->day-time-context 2023 1 1))
+  (test-compile (->day-time-context 2023 1 2))
+  (test-compile (->day-time-context 2023 1 3))
+  ;; Holiday 12-26 and if Saturday then next monday if Sunday then next tuesday
+  (test-compile (->day-time-context 2022 12 26))
+  (test-compile (->day-time-context 2023 12 26))
+  (test-compile (->day-time-context 2021 12 26))
+  (test-compile (->day-time-context 2021 12 27))
+  (test-compile (->day-time-context 2021 12 28))
+  (test-compile (->day-time-context 2021 12 29))
+  (test-compile (->day-time-context 2020 12 26))
+  (test-compile (->day-time-context 2020 12 27))
+  (test-compile (->day-time-context 2020 12 28))
+  (test-compile (->day-time-context 2020 12 29))
+  ;; Holiday 01-26 if tuesday,wednsday then previous monday if thursday,friday then next monday
+  (test-compile (->day-time-context 2025 01 24))
+  (test-compile (->day-time-context 2025 01 25))
+  (test-compile (->day-time-context 2025 01 26))
+  (test-compile (->day-time-context 2025 01 27))
+  (test-compile (->day-time-context 2025 01 28))
+  (test-compile (->day-time-context 2024 01 26)) ;; true (vaća true a trebalo bi nil)
+  (test-compile (->day-time-context 2024 01 27))
+  (test-compile (->day-time-context 2024 01 28))
+  (test-compile (->day-time-context 2024 01 29)) ;; true (samo ovo treba biti true)
+  (test-compile (->day-time-context 2024 01 30))
+  (test-compile (->day-time-context 2021 01 26)) ;; true (treba biti nil)
+  (test-compile (->day-time-context 2021 01 25)) ;; true (samo ovo treba biti true)
+  (test-compile (->day-time-context 2021 01 24))
+  (test-compile (->day-time-context 2022 01 26)) ;; true (isti slučaj kao gore)
+  (test-compile (->day-time-context 2022 01 25))
+  (test-compile (->day-time-context 2022 01 24)) ;; true (samo ovo treba biti true)
+  (test-compile (->day-time-context 2022 01 23))
+  ;; Holiday 10-21 if sunday then next monday if saturday then previous friday
+  ;; if tuesday,wednsday then previous monday if thursday then next friday
+  (test-compile (->day-time-context 2022 10 20))
+  (test-compile (->day-time-context 2022 10 21))
+  (test-compile (->day-time-context 2022 10 22))
+  (test-compile (->day-time-context 2023 10 21))
+  (test-compile (->day-time-context 2023 10 20))
+  (test-compile (->day-time-context 2023 10 22))
+  (test-compile (->day-time-context 2023 10 23))
+  (test-compile (->day-time-context 2021 10 15))
+  (test-compile (->day-time-context 2021 10 20))
+  (test-compile (->day-time-context 2021 10 21)) ;; true (ovdje isti slučaj kao gore)
+  (test-compile (->day-time-context 2021 10 22)) ;; nil (ovo bi trebalo biti true (21. je thursday a ovo je next friday))
+  (test-compile (->day-time-context 2021 10 23))
+  (test-compile (->day-time-context 2021 10 29)) ;; true (ovo vraća true, a zapravo je drugi friday iza thursdaya)
+  (test-compile (->day-time-context 2021 10 30))
+  ;; Holiday 11-06 if tuseday,wedsnday,thursday,friday,saturday then next monday
+  (test-compile (->day-time-context 2022 11 06)) ;; Za ovaj blagdan dobro radi "and" jer ima samo jedan statement
+  (test-compile (->day-time-context 2022 11 07))
+  (test-compile (->day-time-context 2023 11 06))
+  (test-compile (->day-time-context 2024 11 06))
+  (test-compile (->day-time-context 2024 11 07))
+  (test-compile (->day-time-context 2024 11 8))
+  (test-compile (->day-time-context 2024 11 9))
+  (test-compile (->day-time-context 2024 11 10))
+  (test-compile (->day-time-context 2024 11 11))
+  (test-compile (->day-time-context 2026 11 06))
+  (test-compile (->day-time-context 2026 11 07))
+  (test-compile (->day-time-context 2026 11 8))
+  (test-compile (->day-time-context 2026 11 9))
+  (test-compile (->day-time-context 2026 11 10))
+
+  (spit "transformed_statements.edn" (with-out-str (clojure.pprint/pprint removed-unknown)))
   (spit "transformed_statements.edn"
         (with-out-str
           (clojure.pprint/pprint removed-unknown)))
@@ -178,32 +279,17 @@
           (clojure.pprint/pprint (:static_condition report))))
   (-> parsed-results first)
   (parse-if "01-01 and if sunday then next monday if saturday then previous friday")
-  (holiday-01-26-if (->day-time-context 2022 01 26))
-  (holiday-01-26-if (->day-time-context 2022 01 25))
-  (holiday-01-26-if (->day-time-context 2022 01 24))
-  (holiday-01-26-if (->day-time-context 2022 01 27))
-  (holiday-01-26-if (->day-time-context 2022 01 28))
-  (holiday-01-26-if (->day-time-context 2022 01 29))
-  (holiday-01-26-if (->day-time-context 2022 01 30))
-
-  (holiday-01-26-if (->day-time-context 2023 01 26))
-  (holiday-01-26-if (->day-time-context 2023 01 25))
-  (holiday-01-26-if (->day-time-context 2023 01 24))
-  (holiday-01-26-if (->day-time-context 2023 01 23))
-  (holiday-01-26-if (->day-time-context 2023 01 27))
-  (holiday-01-26-if (->day-time-context 2023 01 28))
-  (holiday-01-26-if (->day-time-context 2023 01 29))
-  (holiday-01-26-if (->day-time-context 2023 01 30)))
 
 
 
-(defn holiday-2nd-monday-may
-  "2nd monday in May"
-  [{:keys [month day-in-month day]}]
-  (and
-   (= day 1)
-   (= month 5)
-   (and (> day-in-month 7) (< day-in-month 15))))
+  (defn holiday-2nd-monday-may
+    "2nd monday in May"
+    [{:keys [month day-in-month day]}]
+    (and
+     (= day 1)
+     (= month 5)
+     (and (> day-in-month 7) (< day-in-month 15))))
+  )
 
 (comment
   (holiday-2nd-monday-may (->day-time-context 2022 05 01))
