@@ -195,7 +195,7 @@
               (empty? (:statements %)))
             transformed-statements))
   (def test-compile (compile-holiday (first removed-unknown)))
-  (def test-compile
+  (def new-year?
     (compile-holiday
      {:day-in-month 1,
       :month 1,
@@ -203,7 +203,7 @@
       :statements
       '({:today #{6}, :condition "previous", :target 5}
         {:today #{7}, :condition "next", :target 1})}))
-  (def test-compile
+  (def boxing-day?
     (compile-holiday
      {:day-in-month 26,
       :month 12,
@@ -211,7 +211,7 @@
       :statements
       '({:today #{6}, :condition "next", :target 1}
         {:today #{7}, :condition "next", :target 2})}))
-  (def test-compile
+  (def 
     (compile-holiday
      {:day-in-month 26,
       :month 1,
