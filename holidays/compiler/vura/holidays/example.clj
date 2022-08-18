@@ -1,9 +1,11 @@
 (ns vura.holidays.example
   (:require
-   [clojure.string :as str]
-   [vura.holidays :as h]
-   [vura.core :as v]
-   [vura.holidays.catholic :as catholic]))
+    [clojure.set :as set]
+    [clojure.string :as str]
+    [clojure.test :refer [deftest is] :as test]
+    [vura.holidays :as h]
+    [vura.core :as v]
+    [vura.holidays.catholic :as catholic]))
 
 
 (defn holiday [day-context]
@@ -97,54 +99,92 @@
            and?
            statements]}]
   ;; rezultat
-  (fn [{d :day-in-month
-        wd :day
-        m :month
-        value :value}]
-    (some
-     (fn [{:keys [today condition target]}]
-        ; (println "Current day: " [d m wd])
-        ; (println "Static: " (dissoc record :statements))
-        ; (println "Statement: " [today condition target])
-        ; (println "Not today: " (not (today wd)))
-        ; (println "Today content: " today)
-        ; (println "Week day: " wd)
-       (or
-        (and
-         (= month m)
-         (= day-in-month d)
-         (or (not (today wd)) and?))
-        (and
-            ;; Check if current week day matches target from statment
-         (= wd target)
-         (case condition
-           "next"
-           (some
-            (fn [target]
-                  ;; Current week day is in front of condition so find difference of current week day and today (statements)
-                  ;; in days
-              (let [next-delta (+ (- 7 target) wd)
-                        ;; subtract computed value from current date value and get day time context
-                    {d :day-in-month m :month} (v/day-time-context (- value (v/days next-delta)))]
-                    ;; Check if result day in month and month matches initial condition
-                (and
-                 (= month m)
-                 (= d day-in-month))))
-            today)
-              ;; Same as above with different delta computation
-           "previous"
-           (some
-            (fn [target]
-              (let [previous-delta (- target wd)
-                    {d :day-in-month m :month} (v/day-time-context (+ value (v/days previous-delta)))]
-                (and
-                 (= month m)
-                 (= day-in-month d))))
-            today)))))
-     statements)))
+  (let [forbidden-days (reduce set/union (map :today statements))
+        allowed-days (complement forbidden-days)
+        valid-targets (set (map :target statements))]
+    (fn [{d :day-in-month
+          wd :day
+          m :month
+          value :value}]
+      (some
+        (fn [{:keys [today condition target] :as statement}]
+          ; (println "Current day: " [d m wd])
+          ; (println "Static: " (dissoc record :statements))
+          ; (println "Statement: " [today condition target])
+          ; (println "Not today: " (not (today wd)))
+          ; (println "Today content: " today)
+          ; (println "Week day: " wd)
+          (or
+            (and
+              (= month m)
+              (= day-in-month d)
+              (or (allowed-days wd) and?))
+            (and
+              ;; Check if current week day matches target from statment
+              (contains? valid-targets wd)
+              (case condition
+                "next"
+                (some
+                  (fn [target]
+                    ;; Current week day is in front of condition so find difference of current week day and today (statements)
+                    ;; in days
+                    (let [next-delta (if (< wd target)
+                                       (+ (- 7 target) wd)
+                                       (- wd target))
+                          ;; subtract computed value from current date value and get day time context
+                          {d :day-in-month m :month} (v/day-time-context (- value (v/days next-delta)))]
+                      ;; Check if result day in month and month matches initial condition
+                      (tap>
+                        {:statement statement
+                         :delta/next next-delta
+                         :current/day wd
+                         :target/day d
+                         :condition/day day-in-month})
+                      (and
+                        (= month m)
+                        (= d day-in-month))))
+                  today)
+                ;; Same as above with different delta computation
+                "previous"
+                (some
+                  (fn [target]
+                    (let [previous-delta (- target wd)
+                          {d :day-in-month m :month} (v/day-time-context (+ value (v/days previous-delta)))]
+                      (tap>
+                        {:statement statement
+                         :delta/previous previous-delta
+                         :current/day wd
+                         :target/day d
+                         :condition/day day-in-month})
+                      (and
+                        (= month m)
+                        (= day-in-month d))))
+                  today)))))
+        statements))))
+
+
+(deftest new-year
+  (let [new-year? (compile-holiday
+                    {:day-in-month 1,
+                     :month 1,
+                     :and? true,
+                     :statements
+                     '({:today #{6}, :condition "previous", :target 5}
+                       {:today #{7}, :condition "next", :target 1})})]
+    (is (true? (new-year? (->day-time-context 2021 12 31))) "31.12.2021 is Friday and it should be holiday")
+    (is (true? (new-year? (->day-time-context 2022 1 1))) "1.1.2022 is Sunday and it is holiday because of and condition")
+    (is (nil? (new-year? (->day-time-context 2022 1 2))) "1.1.2022 is Sunday and it is holiday because of and condition")
+    (is (nil? (new-year? (->day-time-context 2022 1 3))) "3.1.2022 is Monday and it is not holiday. Previous Friday was.")
+    (is (nil? (new-year? (->day-time-context 2022 12 31))) "31.12.2022 is Saturday and it NOT holiday")
+    (is (true? (new-year? (->day-time-context 2023 1 1))) "1.1.2023 is Sunday and it is holiday because of and condition")
+    (is (true? (new-year? (->day-time-context 2023 1 2))) "2.1.2023 is Monday and it is not holiday. Previous Friday was.")
+    (is (nil? (new-year? (->day-time-context 2023 1 3))) "3.1.2023 is Tuesday and it si NOT holiday")))
 
 
 (comment
+  (clojure-version)
+  (test/run-test new-year)
+  (add-tap println)
   (def holidays (clojure.edn/read-string (slurp "all_holidays.edn")))
   (def report (group-by vura.holidays.compile/analyze-holiday holidays))
   (def parsed-results (map parse-if (get report :static_condition)))
@@ -199,15 +239,6 @@
   (test-compile (->day-time-context 2022 4 24))
   (test-compile (->day-time-context 2022 4 25))
   (test-compile (->day-time-context 2022 4 26))
-  ;; Holiday 01-01 and if Saturday then previous friday if Sunday then next monday
-  (test-compile (->day-time-context 2021 12 31))
-  (test-compile (->day-time-context 2022 1 1))
-  (test-compile (->day-time-context 2022 1 2))
-  (test-compile (->day-time-context 2022 1 3))
-  (test-compile (->day-time-context 2022 12 31))
-  (test-compile (->day-time-context 2023 1 1))
-  (test-compile (->day-time-context 2023 1 2))
-  (test-compile (->day-time-context 2023 1 3))
   ;; Holiday 12-26 and if Saturday then next monday if Sunday then next tuesday
   (test-compile (->day-time-context 2022 12 26))
   (test-compile (->day-time-context 2023 12 26))
