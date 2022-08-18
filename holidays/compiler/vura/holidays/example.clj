@@ -129,11 +129,11 @@
                           {d :day-in-month m :month} (v/day-time-context (- value (v/days next-delta)))]
                       ;; Check if result day in month and month matches initial condition
                       (tap>
-                        {:statement statement
-                         :delta/next next-delta
-                         :current/day wd
-                         :target/day d
-                         :condition/day day-in-month})
+                        {::statement statement
+                         ::delta next-delta
+                         ::current wd
+                         ::target d
+                         ::condition day-in-month})
                       (and
                         (= month m)
                         (= d day-in-month))))
@@ -145,11 +145,11 @@
                     (let [previous-delta (- target wd)
                           {d :day-in-month m :month} (v/day-time-context (+ value (v/days previous-delta)))]
                       (tap>
-                        {:statement statement
-                         :delta/previous previous-delta
-                         :current/day wd
-                         :target/day d
-                         :condition/day day-in-month})
+                        {::statement statement
+                         ::delta previous-delta
+                         ::current wd
+                         ::target d
+                         ::condition day-in-month})
                       (and
                         (= month m)
                         (= day-in-month d))))
