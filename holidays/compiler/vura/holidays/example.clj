@@ -108,12 +108,6 @@
           value :value}]
       (some
         (fn [{:keys [today condition target] :as statement}]
-          ; (println "Current day: " [d m wd])
-          ; (println "Static: " (dissoc record :statements))
-          ; (println "Statement: " [today condition target])
-          ; (println "Not today: " (not (today wd)))
-          ; (println "Today content: " today)
-          ; (println "Week day: " wd)
           (or
             (and
               (= month m)
