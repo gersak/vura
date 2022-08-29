@@ -64,7 +64,7 @@
               (get-in val ["type"])))))
   ([yaml locale]
    (remove nil?
-           (distinct 
+           (distinct
             (for [val (vals (get-holiday-days yaml locale))]
               (get-in val ["type"]))))))
 
@@ -95,8 +95,8 @@
     #"^\d{2}-\d{2}$" :static_reocurring
     #"^\d{2}-\d{2}.*" :static_condition
     #"^julian.*" :julian
+    #".* (before|after) .*" :dayofweek_before_after
     #"^\d[a-zA-Z]{2}.*" :dayofweek_in_month
-    #"^[a-zA-Z]+ (before|after).*" :dayofweek_before_after
     #"^easter.*" :easter
     #"^orthodox.*" :orthodox
     nil))
@@ -128,12 +128,11 @@
    "unknown_holidays.edn"
    (with-out-str
      (clojure.pprint/pprint (get report nil))))
-  
+
   (keys locales)
   (keys (get-holiday-days :hr))
   (set (map #(get % "type") (vals (get-holiday-days :hr))))
   ;; (read-holiday-names)
   ((vals (get-holiday-days :hr)))
   (slurp "https://raw.githubusercontent.com/commenthol/date-holidays/master/data/countries")
-  (time (read-locale-holidays :hr))
-  )
+  (time (read-locale-holidays :hr)))
