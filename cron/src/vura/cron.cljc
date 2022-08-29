@@ -88,16 +88,16 @@
   (letfn [(transform-interval [x]
             (cond-> x
               (and
-               (:interval x)
-               (:fixed x)) ((fn [{:keys [interval fixed] :as x}]
-                              (let [anchorns (conj (sorted-set fixed))]
-                                (assoc x :sequence
-                                       (apply sorted-set
-                                              (reduce
-                                               concat
-                                               (map
-                                                #(range %  (-> x :max inc) interval)
-                                                anchorns)))))))
+                (:interval x)
+                (:fixed x)) ((fn [{:keys [interval fixed] :as x}]
+                               (let [anchorns (conj (sorted-set fixed))]
+                                 (assoc x :sequence
+                                        (apply sorted-set
+                                               (reduce
+                                                 concat
+                                                 (map
+                                                   #(range %  (-> x :max inc) interval)
+                                                   anchorns)))))))
               (:range x) ((fn [{:keys [sequence]
                                 :or {sequence (sorted-set)}
                                 :as x}]
@@ -203,11 +203,12 @@
   (first (future-timestamps timestamp cron-string)))
 
 (comment
-  (time (take 1 (future-timestamps (core/date) "* */10")))
+  (time (take 10 (future-timestamps (core/date) "* */10")))
+  (time (take 10 (future-timestamps (core/date) "0 */30")))
   (next-timestamp (core/date) "*/10")
   (next-timestamp (core/date) "0 0 0 1 1 * 2018")
   (binding [*now* (-> (core/date) core/time->value core/day-time-context)]
-    (parse-cron-string "*/10 *"))
+    (parse-cron-string "0 21/3 * * * *"))
   (next-timestamp (core/date 2018 2 9 15 50 30) "*/10")
   (next-timestamp (core/date 2018 2 9 15 50 30) "15 10 13 29 2 4 *")
   (def timestamp (core/date 2018 2 9 15 50 0))
