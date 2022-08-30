@@ -1367,6 +1367,7 @@
                   "time-as-value allows only Symbols in bindings"))))))
 
 (comment
+  (time (count (take 100 (map day-time-context (iterate #(+ day %) (time->value (date)))))))
   (+ 1 1)
   (time (time->value (date 2019 1 7)))
   (time 
