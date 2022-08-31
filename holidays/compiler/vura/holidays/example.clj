@@ -465,17 +465,22 @@
     :or {_nth 1
          rel-nth 1}
     :as definition}]
-  (letfn [(->nth [value _nth]
-            (if (= _nth 1) value
-                (+
-                 value
-                 (v/days ((case predicate
-                            :after identity
-                            :before identity)
-                          (* (dec _nth)
-                             (case predicate
-                               :after -7
-                               :before 7)))))))]
+  (letfn [(->nth
+           [value _nth]
+           (let [before? (= :before predicate)
+                 after? (not before?)
+                 first? (= _nth 1)]
+             (cond
+               (and first? before?)
+               (+ value v/week)
+               ;;
+               (and first? after?)
+               value
+               ;;
+               :else
+               (+ value (v/weeks (if before?
+                                   (* -1 (dec _nth))
+                                   (dec _nth)))))))]
     (fn [{:keys [value]
           week-day :day}]
       ;; Only if weekday matches
@@ -509,7 +514,7 @@
              (case predicate
                :after (let [diff (- (:day-in-month target) rel-day-in-month)]
                         (and (pos? diff) (<= diff 7)))
-               :before (let [diff (- rel-day-in-month (:day-in-month target))]
+               :before (let [diff (- (:day-in-month target) rel-day-in-month)]
                          (and (pos? diff) (<= diff 7))))))
           ;; Otherwise check based on relative week-day
           :else (throw (ex-info "Unknown definition" definition)))))))
@@ -525,7 +530,7 @@
   (monday-before-september (->day-time-context 2022 8 28))
 
   (def monday-before-september
-    (compile-before-after {:week-day 1, :predicate :before, :relative-to {:month 9 :day-in-month 4}}))
+    (compile-before-after {:week-day 1, :predicate :before, :relative-to {:month 9 :day-in-month 1}}))
   (monday-before-september (->day-time-context 2022 9 1))
   (monday-before-september (->day-time-context 2022 8 31))
   (monday-before-september (->day-time-context 2022 8 30))
