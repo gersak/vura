@@ -410,18 +410,18 @@
   (def predicate :before)
   (def predicate :after)
   (nth
-    (filter
+   (filter
       ;; ovdje ide uvjet... Tj. uvjet za filter
-      (fn [{:keys [day]}] (= day 1))
-      (map
-        v/day-time-context
-        (iterate
-          #((case predicate
-              :before -
-              :after +)
-            % v/day)
-          value)))
-    3)
+    (fn [{:keys [day]}] (= day 1))
+    (map
+     v/day-time-context
+     (iterate
+      #((case predicate
+          :before -
+          :after +)
+        % v/day)
+      value)))
+   3)
   (vura/date)
   (v/day-time-context (first-week-day 1 :after value)))
 
@@ -429,18 +429,18 @@
 (defn first-week-day
   [week-day predicate value]
   (when-some [{:keys [value]} (first
-                                (filter
-                                  (fn [{:keys [day]}] (= day week-day))
-                                  (map
-                                    (fn [value]
-                                      {:day (v/day? value)
-                                       :value value})
-                                    (iterate
-                                      #((case predicate
-                                          :before -
-                                          :after +)
-                                        % v/day)
-                                      value))))]
+                               (filter
+                                (fn [{:keys [day]}] (= day week-day))
+                                (map
+                                 (fn [value]
+                                   {:day (v/day? value)
+                                    :value value})
+                                 (iterate
+                                  #((case predicate
+                                      :before -
+                                      :after +)
+                                    % v/day)
+                                  value))))]
     value))
 
 
@@ -460,80 +460,99 @@
      rel-nth :nth
      rel-week-day :week-day
      rel-day-in-month :day-in-month
-     in? :in?} :relative-to
+     in? :in?
+     :or {rel-day-in-month 1}} :relative-to
     :or {_nth 1
-         rel-day-in-month 1}
+         rel-nth 1}
     :as definition}]
   (letfn [(->nth [value _nth]
             (if (= _nth 1) value
-              (+
-               value
-               (v/days (* (if (= :before predicate) -7 7) _nth)))))]
-    (fn [{:keys [month year]
-          week-day :day
-          :as current}]
+                (+
+                 value
+                 (v/days ((case predicate
+                            :after identity
+                            :before identity)
+                          (* (dec _nth)
+                             (case predicate
+                               :after -7
+                               :before 7)))))))]
+    (fn [{:keys [value]
+          week-day :day}]
       ;; Only if weekday matches
       (when (= week-day _week-day)
         ;; If specific day-in-month is present
         (cond
           ;; relative to nth day in month
           in?
-          (let [relative-value (first-week-day rel-week-day :after (-> (v/date year month) v/time->value))
-                target (->nth relative-value rel-nth)
-                final-value (first-week-day _week-day predicate target)]
-            (same-day? current (v/day-time-context final-value)))
+          (let [inverse-predicate (case predicate :before :after :before)
+                relative-value (first-week-day _week-day inverse-predicate value)
+                target-value (->nth relative-value _nth)
+                relative-target-value (first-week-day rel-week-day inverse-predicate target-value)
+                rctx (v/day-time-context relative-target-value)]
+            (println "REL: " rel-nth)
+            (println "Relative context: " rctx)
+            (and
+             (= (:month rctx) rel-month)
+             (= (:day rctx) rel-week-day)
+             (<=
+              (inc (* 7 (dec rel-nth)))
+              (:day-in-month rctx)
+              (* 7 rel-nth))))
           ;; relative to static date
           (and rel-day-in-month rel-month)
-          (let [anchor-value (first-week-day week-day predicate (-> (v/date year rel-month rel-day-in-month) v/time->value))
-                target (v/day-time-context (->nth anchor-value _nth))]
-            (same-day? current target))
+          (let [target (v/day-time-context (->nth value _nth))]
+            (println "Target: " target)
+            (println "Days: " (:day-in-month target) rel-day-in-month)
+            (println "sfajio" [predicate (<= (- (:day-in-month target) rel-day-in-month) 7)])
+            (and
+             (= (:month target) rel-month)
+             (case predicate
+               :after (let [diff (- (:day-in-month target) rel-day-in-month)]
+                        (and (pos? diff) (<= diff 7)))
+               :before (let [diff (- rel-day-in-month (:day-in-month target))]
+                         (and (pos? diff) (<= diff 7))))))
           ;; Otherwise check based on relative week-day
           :else (throw (ex-info "Unknown definition" definition)))))))
 
 
-;(defn compile-before-after
-;  [{:keys [nth
-;           week-day
-;           predicate
-;           relative-to]
-;    :or {nth 1}}]
-;  (fn [{d :day-in-month
-;        wd :day
-;        m :month
-;        y :year
-;        value :value}]
-;    (let [rel-month (:month relative-to)
-;          rel-day-in-month (if-some [day-in-month (:day-in-month relative-to)]
-;                             day-in-month
-;                             (get-nth-week-day-in-month y rel-month week-day nth))
-;          rel-context (->day-time-context y rel-month rel-day-in-month)
-;          rel-week-day (:day rel-context)
-;          rel-value (:value rel-context)]
-;      (case predicate
-;        :after
-;        (let [after-delta (if (< rel-week-day week-day)
-;                            (- week-day rel-week-day)
-;                            (+ (- 7 rel-week-day) week-day))
-;              delta-offset (if (= after-delta 0)
-;                             (* nth 7)
-;                             (* (- nth 1) 7))
-;              {day-in-month :day-in-month month :month}
-;              (v/day-time-context (+ rel-value (v/days (+ after-delta delta-offset))))]
-;          (and
-;            (= month m)
-;            (= d day-in-month)))
-;        ;; 
-;        :before
-;        (let [before-delta (if (< rel-week-day week-day)
-;                             (+ (- 7 week-day) rel-week-day)
-;                             (- rel-week-day week-day))
-;              delta-offset (if (= before-delta 0)
-;                             (* nth 7)
-;                             (* (- nth 1) 7))
-;              {day-in-month :day-in-month month :month} (v/day-time-context (- rel-value (v/days (+ before-delta delta-offset))))]
-;          (and
-;            (= month m)
-;            (= day-in-month d)))))))
+(comment
+  (def monday-before-september
+    (compile-before-after {:week-day 1, :predicate :before, :relative-to {:month 9}}))
+  (monday-before-september (->day-time-context 2022 9 1))
+  (monday-before-september (->day-time-context 2022 8 31))
+  (monday-before-september (->day-time-context 2022 8 30))
+  (monday-before-september (->day-time-context 2022 8 29)) ;; error!
+  (monday-before-september (->day-time-context 2022 8 28))
+
+  (def monday-before-september
+    (compile-before-after {:week-day 1, :predicate :before, :relative-to {:month 9 :day-in-month 4}}))
+  (monday-before-september (->day-time-context 2022 9 1))
+  (monday-before-september (->day-time-context 2022 8 31))
+  (monday-before-september (->day-time-context 2022 8 30))
+  (monday-before-september (->day-time-context 2022 8 29)) ;; error!
+  (monday-before-september (->day-time-context 2022 9 5))
+  (monday-before-september (->day-time-context 2022 8 28))
+
+  (def third-monday-after-12-25
+    (compile-before-after {:nth 3,
+                           :week-day 1,
+                           :predicate :after,
+                           :relative-to {:day-in-month 25, :month 12}}))
+  (third-monday-after-12-25 (->day-time-context 2022 12 25)) ;; ne radi
+  (third-monday-after-12-25 (->day-time-context 2022 12 26))
+  (third-monday-after-12-25 (->day-time-context 2023 1 2))
+  (third-monday-after-12-25 (->day-time-context 2023 1 9))
+  (third-monday-after-12-25 (->day-time-context 2023 1 16))
+
+  (def second-monday-before-first-tuesday-in-january
+    (compile-before-after {:nth 2,
+                           :week-day 1,
+                           :predicate :before,
+                           :relative-to {:nth 1, :week-day 2, :in? true, :month 1}}))
+  (second-monday-before-first-tuesday-in-january (->day-time-context 2022 1 1)) ;; ne radi
+  (second-monday-before-first-tuesday-in-january (->day-time-context 2022 1 4))
+  (second-monday-before-first-tuesday-in-january (->day-time-context 2021 12 27))
+  (second-monday-before-first-tuesday-in-january (->day-time-context 2021 12 20)))
 
 
 (comment
@@ -568,7 +587,8 @@
   (third-saturday-after-06-01 (->day-time-context 2022 06 02))
   (third-saturday-after-06-01 (->day-time-context 2022 06 04))
   (third-saturday-after-06-01 (->day-time-context 2022 06 11))
-  (third-saturday-after-06-01 (->day-time-context 2022 06 18))
+  (third-saturday-after-06-01 (->day-time-context 2022 06 18)) ;; krivo!
+  (third-saturday-after-06-01 (->day-time-context 2022 06 25)) ;; !!!!
 
   (def third-sunday-before-12-25
     (compile-before-after {:nth 3,
@@ -581,16 +601,27 @@
   (time (third-sunday-before-12-25 (->day-time-context 2022 12 3)))
   (time (third-sunday-before-12-25 (->day-time-context 2022 12 4)))
   (time (third-sunday-before-12-25 (->day-time-context 2022 12 5)))
-  )
+
+
+
+
+
+
+
+  (def first-monday-in-august
+    (compile-before-after {:nth 1, :week-day 1, :in? true, :month 8}))
+  (first-monday-in-august (->day-time-context 2022 8 1)) ;; error
+  (first-monday-in-august (->day-time-context 2021 8 1))
+  (first-monday-in-august (->day-time-context 2021 8 2)))
 
 
 (comment
   (v/day-time-context (first-week-day 7 :after (-> (v/date 2022 12 25) v/time->value)))
   (def first-wednesday-after-first-monday-in-august
     (compile-before-after
-      {:week-day 3,
-       :predicate :after,
-       :relative-to {:nth 1, :week-day 1, :in? true, :month 8}}))
+     {:week-day 3,
+      :predicate :after,
+      :relative-to {:nth 1, :week-day 1, :in? true, :month 8}}))
   (first-wednesday-after-first-monday-in-august (->day-time-context 2022 7 31))
   (first-wednesday-after-first-monday-in-august (->day-time-context 2022 8 1))
   (first-wednesday-after-first-monday-in-august (->day-time-context 2022 8 2))
@@ -600,7 +631,7 @@
   (first-wednesday-after-first-monday-in-august (->day-time-context 2023 8 8))
   (first-wednesday-after-first-monday-in-august (->day-time-context 2023 8 9))
   (first-wednesday-after-first-monday-in-august (->day-time-context 2023 8 10))
-  
+
 
 
 
