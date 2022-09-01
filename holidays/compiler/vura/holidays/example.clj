@@ -158,6 +158,8 @@
            words
            (update result :unknown (fnil conj []) word))))))
 
+
+;; TODO - remove this
 (defn parse-if
   [text]
   (loop [[word & words] (str/split
@@ -361,6 +363,8 @@
            (= day-in-month julian-d)
            (= month julian-m))))))
 
+
+
 (defn compile-julian
   [{:keys [day-in-month
            month]}]
@@ -375,18 +379,19 @@
        (= month m)))))
 
 
-; (defn compile-in-month
-;   [{:keys [nth
-;            week-day
-;            month]}]
-;   (fn [{d :day-in-month
-;         wd :day
-;         m :month}]
-;     (and
-;      (= m month)
-;      (= wd week-day)
-;      (>= d (+ (* (- nth 1) 7) 1))
-;      (<= d (* nth 7)))))
+;; ?????
+(defn compile-in-month
+  [{:keys [nth
+           week-day
+           month]}]
+  (fn [{d :day-in-month
+        wd :day
+        m :month}]
+    (and
+     (= m month)
+     (= wd week-day)
+     (>= d (+ (* (- nth 1) 7) 1))
+     (<= d (* nth 7)))))
 
 
 ; (defn get-nth-week-day-in-month
@@ -466,21 +471,19 @@
          rel-nth 1}
     :as definition}]
   (letfn [(->nth
-           [value _nth]
-           (let [before? (= :before predicate)
-                 after? (not before?)
-                 first? (= _nth 1)]
-             (cond
-               (and first? before?)
-               (+ value v/week)
+            [value _nth]
+            (let [before? (= :before predicate)
+                  after? (not before?)
+                  first? (= _nth 1)]
+              (cond
                ;;
-               (and first? after?)
-               value
+                (and first? after?)
+                value
                ;;
-               :else
-               (+ value (v/weeks (if before?
-                                   (* -1 (dec _nth))
-                                   (dec _nth)))))))]
+                :else
+                (+ value (v/weeks (if before?
+                                    (dec _nth)
+                                    (- (dec _nth))))))))]
     (fn [{:keys [value]
           week-day :day}]
       ;; Only if weekday matches
@@ -505,122 +508,347 @@
               (* 7 rel-nth))))
           ;; relative to static date
           (and rel-day-in-month rel-month)
-          (let [target (v/day-time-context (->nth value _nth))]
-            (println "Target: " target)
-            (println "Days: " (:day-in-month target) rel-day-in-month)
-            (println "sfajio" [predicate (<= (- (:day-in-month target) rel-day-in-month) 7)])
+          (let [target (as-> value t
+                         (->nth t _nth)
+                         (if (= predicate :before) (+ t v/week) t)
+                         (v/day-time-context t))]
+            ;(println "Target: " target)
+            ;(println "Days: " (:day-in-month target) rel-day-in-month)
+            ;(println "sfajio" [predicate
+            ;                   (let [diff (- (:day-in-month target) rel-day-in-month)]
+            ;                     (println diff))])
+            (println "DAYS: " [(:month target) (:day-in-month target)] [rel-month rel-day-in-month])
+            (println "DIFF: " (- (:day-in-month target) rel-day-in-month))
             (and
              (= (:month target) rel-month)
              (case predicate
                :after (let [diff (- (:day-in-month target) rel-day-in-month)]
-                        (and (pos? diff) (<= diff 7)))
+                        (and (>= diff 0) (< diff 7)))
                :before (let [diff (- (:day-in-month target) rel-day-in-month)]
-                         (and (pos? diff) (<= diff 7))))))
+                         (and (>=  diff 0) (< diff 7))))))
           ;; Otherwise check based on relative week-day
           :else (throw (ex-info "Unknown definition" definition)))))))
 
 
-(comment
-  (def monday-before-september
-    (compile-before-after {:week-day 1, :predicate :before, :relative-to {:month 9}}))
-  (monday-before-september (->day-time-context 2022 9 1))
-  (monday-before-september (->day-time-context 2022 8 31))
-  (monday-before-september (->day-time-context 2022 8 30))
-  (monday-before-september (->day-time-context 2022 8 29)) ;; error!
-  (monday-before-september (->day-time-context 2022 8 28))
-
-  (def monday-before-september
-    (compile-before-after {:week-day 1, :predicate :before, :relative-to {:month 9 :day-in-month 1}}))
-  (monday-before-september (->day-time-context 2022 9 1))
-  (monday-before-september (->day-time-context 2022 8 31))
-  (monday-before-september (->day-time-context 2022 8 30))
-  (monday-before-september (->day-time-context 2022 8 29)) ;; error!
-  (monday-before-september (->day-time-context 2022 9 5))
-  (monday-before-september (->day-time-context 2022 8 28))
-
-  (def third-monday-after-12-25
-    (compile-before-after {:nth 3,
-                           :week-day 1,
-                           :predicate :after,
-                           :relative-to {:day-in-month 25, :month 12}}))
-  (third-monday-after-12-25 (->day-time-context 2022 12 25)) ;; ne radi
-  (third-monday-after-12-25 (->day-time-context 2022 12 26))
-  (third-monday-after-12-25 (->day-time-context 2023 1 2))
-  (third-monday-after-12-25 (->day-time-context 2023 1 9))
-  (third-monday-after-12-25 (->day-time-context 2023 1 16))
-
-  (def second-monday-before-first-tuesday-in-january
-    (compile-before-after {:nth 2,
-                           :week-day 1,
-                           :predicate :before,
-                           :relative-to {:nth 1, :week-day 2, :in? true, :month 1}}))
-  (second-monday-before-first-tuesday-in-january (->day-time-context 2022 1 1)) ;; ne radi
-  (second-monday-before-first-tuesday-in-january (->day-time-context 2022 1 4))
-  (second-monday-before-first-tuesday-in-january (->day-time-context 2021 12 27))
-  (second-monday-before-first-tuesday-in-january (->day-time-context 2021 12 20)))
-
 
 (comment
-  (ortodox/orthodox-easter {:year 2022})
-  (def first-monday-before-06-01
-    (compile-before-after {:nth 1,
-                           :week-day 1,
-                           :predicate :before,
-                           :relative-to {:day-in-month 1, :month 6}}))
-  (first-monday-before-06-01 (->day-time-context 2022 06 1))
-  (first-monday-before-06-01 (->day-time-context 2022 05 31))
-  (first-monday-before-06-01 (->day-time-context 2022 05 30))
-  (first-monday-before-06-01 (->day-time-context 2022 05 29))
-
-  (def first-monday-after-10-12
-    (compile-before-after {:week-day 1,
-                           :predicate :after,
-                           :relative-to {:day-in-month 12, :month 10}}))
-  (first-monday-after-10-12 (->day-time-context 2022 10 12))
-  (first-monday-after-10-12 (->day-time-context 2022 10 13))
-  (first-monday-after-10-12 (->day-time-context 2022 10 14))
-  (first-monday-after-10-12 (->day-time-context 2022 10 15))
-  (first-monday-after-10-12 (->day-time-context 2022 10 16))
-  (first-monday-after-10-12 (->day-time-context 2022 10 17))
-
-  (def third-saturday-after-06-01
-    (compile-before-after {:nth 3,
-                           :week-day 6,
-                           :predicate :after,
-                           :relative-to {:day-in-month 1, :month 6}}))
-  (third-saturday-after-06-01 (->day-time-context 2022 06 01))
-  (third-saturday-after-06-01 (->day-time-context 2022 06 02))
-  (third-saturday-after-06-01 (->day-time-context 2022 06 04))
-  (third-saturday-after-06-01 (->day-time-context 2022 06 11))
-  (third-saturday-after-06-01 (->day-time-context 2022 06 18)) ;; krivo!
-  (third-saturday-after-06-01 (->day-time-context 2022 06 25)) ;; !!!!
-
+  (declare third-sunday-before-12-25 before-after-tests)
+  (test/run-test before-after-tests)
+  (third-sunday-before-12-25 (->day-time-context 2022 12 4))
+  (third-sunday-before-12-25 (->day-time-context 2022 12 11))
   (def third-sunday-before-12-25
     (compile-before-after {:nth 3,
                            :week-day 7,
                            :predicate :before,
-                           :relative-to {:day-in-month 25, :month 12}}))
-  (third-sunday-before-12-25 (->day-time-context 2022 12 25))
-  (third-sunday-before-12-25 (->day-time-context 2022 12 18))
-  (third-sunday-before-12-25 (->day-time-context 2022 12 11))
-  (time (third-sunday-before-12-25 (->day-time-context 2022 12 3)))
-  (time (third-sunday-before-12-25 (->day-time-context 2022 12 4)))
-  (time (third-sunday-before-12-25 (->day-time-context 2022 12 5)))
+                           :relative-to {:day-in-month 25, :month 12}})))
 
 
 
+(deftest before-after-tests
+  (let [monday-before-september (compile-before-after {:week-day 1,
+                                                       :predicate :before,
+                                                       :relative-to {:month 9}})
+        third-monday-after-12-25 (compile-before-after {:nth 3,
+                                                        :week-day 1,
+                                                        :predicate :after,
+                                                        :relative-to {:day-in-month 25, :month 12}})
+        second-monday-before-first-tuesday-in-january (compile-before-after {:nth 2,
+                                                                             :week-day 1,
+                                                                             :predicate :before,
+                                                                             :relative-to {:nth 1, :week-day 2, :in? true, :month 1}})
+        first-monday-before-06-01 (compile-before-after {:nth 1,
+                                                         :week-day 1,
+                                                         :predicate :before,
+                                                         :relative-to {:day-in-month 1, :month 6}})
+        first-monday-after-10-12 (compile-before-after {:week-day 1,
+                                                        :predicate :after,
+                                                        :relative-to {:day-in-month 12, :month 10}})
+        third-saturday-after-06-01 (compile-before-after {:nth 3,
+                                                          :week-day 6,
+                                                          :predicate :after,
+                                                          :relative-to {:day-in-month 1, :month 6}})
+        third-sunday-before-12-25 (compile-before-after {:nth 3,
+                                                         :week-day 7,
+                                                         :predicate :before,
+                                                         :relative-to {:day-in-month 25, :month 12}})
+        saturday-after-10-21 (compile-before-after {:week-day 6,
+                                                    :predicate :after,
+                                                    :relative-to {:day-in-month 21, :month 10}})
+        friday-after-4th-thursday-in-november (compile-before-after {:week-day 5,
+                                                                     :predicate :after,
+                                                                     :relative-to {:nth 4, :week-day 4, :in? true, :month 11}})
+        monday-after-07-01 (compile-before-after {:week-day 1,
+                                                  :predicate :after,
+                                                  :relative-to {:day-in-month 1, :month 7}})
+        first-sunday-before-12-25 (compile-before-after {:nth 1,
+                                                         :week-day 7,
+                                                         :predicate :before,
+                                                         :relative-to {:day-in-month 25, :month 12}})
+        monday-before-06-20 (compile-before-after {:week-day 1,
+                                                   :predicate :before,
+                                                   :relative-to {:day-in-month 20, :month 6}})
+        tuesday-after-2nd-monday-in-august (compile-before-after {:week-day 2,
+                                                                  :predicate :after,
+                                                                  :relative-to {:nth 2, :week-day 1, :in? true, :month 8}})
+        tuesday-after-1st-monday-in-november (compile-before-after {:week-day 2,
+                                                                    :predicate :after,
+                                                                    :relative-to {:nth 1, :week-day 1, :in? true, :month 11},
+                                                                    :unknown ["every" "4" "years" "since" "1848"]})
+        first-monday-in-august (compile-before-after {:nth 1, :week-day 1, :in? true, :month 8})]
+    (is (not (true? (monday-before-september (->day-time-context 2022 9 1)))))
+    (is (not (true? (monday-before-september (->day-time-context 2022 8 31)))))
+    (is (not (true? (monday-before-september (->day-time-context 2022 8 30)))))
+    (is (true? (monday-before-september (->day-time-context 2022 8 29))))
+    (is (not (true? (monday-before-september (->day-time-context 2022 8 28)))))
+    (is (not (true? (monday-before-september (->day-time-context 2022 9 5)))))
+    (is (not (true? (monday-before-september (->day-time-context 2023 9 5)))))
+    (is (not (true? (monday-before-september (->day-time-context 2023 9 1)))))
+    (is (not (true? (monday-before-september (->day-time-context 2023 9 4)))))
+    (is (not (true? (monday-before-september (->day-time-context 2023 8 29)))))
+    (is (true? (monday-before-september (->day-time-context 2023 8 28))))
+    (is (not (true? (monday-before-september (->day-time-context 2023 8 21)))))
+    (is (not (true? (monday-before-september (->day-time-context 2026 9 7)))))
+    (is (not (true? (monday-before-september (->day-time-context 2026 9 1)))))
+    (is (true? (monday-before-september (->day-time-context 2026 8 31))))
+    (is (not (true? (monday-before-september (->day-time-context 2026 8 24)))))
 
+    (is (not (true? (third-monday-after-12-25 (->day-time-context 2022 12 25)))))
+    (is (not (true? (third-monday-after-12-25 (->day-time-context 2022 12 26)))))
+    (is (not (true? (third-monday-after-12-25 (->day-time-context 2023 1 2)))))
+    (is (true? (third-monday-after-12-25 (->day-time-context 2023 1 9))))
+    (is (not (true? (third-monday-after-12-25 (->day-time-context 2023 1 16)))))
+    (is (not (true? (third-monday-after-12-25 (->day-time-context 2026 12 25)))))
+    (is (not (true? (third-monday-after-12-25 (->day-time-context 2026 12 28)))))
+    (is (not (true? (third-monday-after-12-25 (->day-time-context 2027 1 4)))))
+    (is (true? (third-monday-after-12-25 (->day-time-context 2027 1 11))))
+    (is (not (true? (third-monday-after-12-25 (->day-time-context 2027 1 18)))))
 
+    (is (not (true? (second-monday-before-first-tuesday-in-january (->day-time-context 2022 1 1)))))
+    (is (not (true? (second-monday-before-first-tuesday-in-january (->day-time-context 2022 1 4)))))
+    (is (true? (second-monday-before-first-tuesday-in-january (->day-time-context 2021 12 27))))
+    (is (not (true? (second-monday-before-first-tuesday-in-january (->day-time-context 2022 12 20)))))
+    (is (not (true? (second-monday-before-first-tuesday-in-january (->day-time-context 2025 1 1)))))
+    (is (not (true? (second-monday-before-first-tuesday-in-january (->day-time-context 2025 1 6)))))
+    (is (not (true? (second-monday-before-first-tuesday-in-january (->day-time-context 2025 1 7)))))
+    (is (true? (second-monday-before-first-tuesday-in-january (->day-time-context 2024 12 30))))
 
+    (is (not (true? (first-monday-before-06-01 (->day-time-context 2022 06 1)))))
+    (is (not (true? (first-monday-before-06-01 (->day-time-context 2022 05 31)))))
+    (is (true? (first-monday-before-06-01 (->day-time-context 2022 05 30))))
+    (is (not (true? (first-monday-before-06-01 (->day-time-context 2022 05 29)))))
+    (is (not (true? (first-monday-before-06-01 (->day-time-context 2019 06 01)))))
+    (is (true? (first-monday-before-06-01 (->day-time-context 2019 05 27))))
+    (is (not (true? (first-monday-before-06-01 (->day-time-context 2019 05 20)))))
+    (is (not (true? (first-monday-before-06-01 (->day-time-context 2019 06 03)))))
+    (is (not (true? (first-monday-before-06-01 (->day-time-context 2027 06 01)))))
+    (is (true? (first-monday-before-06-01 (->day-time-context 2027 05 31))))
+    (is (not (true? (first-monday-before-06-01 (->day-time-context 2027 05 24)))))
+    (is (not (true? (first-monday-before-06-01 (->day-time-context 2027 06 07)))))
 
-  (def first-monday-in-august
-    (compile-before-after {:nth 1, :week-day 1, :in? true, :month 8}))
-  (first-monday-in-august (->day-time-context 2022 8 1)) ;; error
-  (first-monday-in-august (->day-time-context 2021 8 1))
-  (first-monday-in-august (->day-time-context 2021 8 2)))
+    (is (not (true? (first-monday-after-10-12 (->day-time-context 2022 10 12)))))
+    (is (not (true? (first-monday-after-10-12 (->day-time-context 2022 10 13)))))
+    (is (not (true? (first-monday-after-10-12 (->day-time-context 2022 10 14)))))
+    (is (not (true? (first-monday-after-10-12 (->day-time-context 2022 10 15)))))
+    (is (not (true? (first-monday-after-10-12 (->day-time-context 2022 10 16)))))
+    (is (true? (first-monday-after-10-12 (->day-time-context 2022 10 17))))
+    (is (not (true? (first-monday-after-10-12 (->day-time-context 2022 10 18)))))
+    (is (true? (first-monday-after-10-12 (->day-time-context 2020 10 12))))
+    (is (not (true? (first-monday-after-10-12 (->day-time-context 2020 10 13)))))
+    (is (not (true? (first-monday-after-10-12 (->day-time-context 2020 10 11)))))
+    (is (not (true? (first-monday-after-10-12 (->day-time-context 2020 10 19)))))
+    (is (not (true? (first-monday-after-10-12 (->day-time-context 2020 10 5)))))
+    (is (not (true? (first-monday-after-10-12 (->day-time-context 2028 10 12)))))
+    (is (true? (first-monday-after-10-12 (->day-time-context 2028 10 16))))
+    (is (not (true? (first-monday-after-10-12 (->day-time-context 2028 10 9)))))
+    (is (not (true? (first-monday-after-10-12 (->day-time-context 2028 10 23)))))
+    (is (not (true? (first-monday-after-10-12 (->day-time-context 2028 10 11)))))
+    (is (not (true? (first-monday-after-10-12 (->day-time-context 2028 10 15)))))
+
+    (is (not (true? (third-saturday-after-06-01 (->day-time-context 2022 06 01)))))
+    (is (not (true? (third-saturday-after-06-01 (->day-time-context 2022 06 02)))))
+    (is (not (true? (third-saturday-after-06-01 (->day-time-context 2022 06 04)))))
+    (is (not (true? (third-saturday-after-06-01 (->day-time-context 2022 06 11)))))
+    (is (true? (third-saturday-after-06-01 (->day-time-context 2022 06 18))))
+    (is (not (true? (third-saturday-after-06-01 (->day-time-context 2022 06 25)))))
+    (is (not (true? (third-saturday-after-06-01 (->day-time-context 2024 06 1)))))
+    (is (not (true? (third-saturday-after-06-01 (->day-time-context 2024 06 8)))))
+    (is (true? (third-saturday-after-06-01 (->day-time-context 2024 06 15))))
+    (is (not (true? (third-saturday-after-06-01 (->day-time-context 2024 06 22)))))
+    (is (not (true? (third-saturday-after-06-01 (->day-time-context 2024 06 29)))))
+
+    (is (not (true? (third-sunday-before-12-25 (->day-time-context 2022 12 25)))))
+    (is (not (true? (third-sunday-before-12-25 (->day-time-context 2022 12 18)))))
+    (is (not (true? (third-sunday-before-12-25 (->day-time-context 2022 12 11)))))
+    (is (not (true? (third-sunday-before-12-25 (->day-time-context 2022 12 3)))))
+    (is (true? (third-sunday-before-12-25 (->day-time-context 2022 12 4))))
+    (is (not (true? (third-sunday-before-12-25 (->day-time-context 2022 12 5)))))
+    (is (true? (third-sunday-before-12-25 (->day-time-context 2023 12 10))))
+    (is (not (true? (third-sunday-before-12-25 (->day-time-context 2025 12 25)))))
+    (is (not (true? (third-sunday-before-12-25 (->day-time-context 2025 12 21)))))
+    (is (not (true? (third-sunday-before-12-25 (->day-time-context 2025 12 14)))))
+    (is (true? (third-sunday-before-12-25 (->day-time-context 2025 12 7))))
+    (is (not (true? (third-sunday-before-12-25 (->day-time-context 2025 11 30)))))
+
+    (is (not (true? (saturday-after-10-21 (->day-time-context 2022 10 21)))))
+    (is (true? (saturday-after-10-21 (->day-time-context 2022 10 22))))
+    (is (not (true? (saturday-after-10-21 (->day-time-context 2022 10 29)))))
+    (is (not (true? (saturday-after-10-21 (->day-time-context 2022 10 15)))))
+    (is (not (true? (saturday-after-10-21 (->day-time-context 2025 10 21)))))
+    (is (not (true? (saturday-after-10-21 (->day-time-context 2025 10 22)))))
+    (is (not (true? (saturday-after-10-21 (->day-time-context 2025 10 23)))))
+    (is (true? (saturday-after-10-21 (->day-time-context 2025 10 25))))
+    (is (not (true? (saturday-after-10-21 (->day-time-context 2025 11 1)))))
+    (is (not (true? (saturday-after-10-21 (->day-time-context 2025 10 18)))))
+    (is (true? (saturday-after-10-21 (->day-time-context 2028 10 21))))
+    (is (not (true? (saturday-after-10-21 (->day-time-context 2028 10 28)))))
+    (is (not (true? (saturday-after-10-21 (->day-time-context 2028 10 14)))))
+
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2022 11 24)))))
+    (is (true? (friday-after-4th-thursday-in-november (->day-time-context 2022 11 25))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2022 12 2)))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2022 11 18)))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2024 11 28)))))
+    (is (true? (friday-after-4th-thursday-in-november (->day-time-context 2024 11 29))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2024 12 6)))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2024 11 22)))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2018 11 22)))))
+    (is (true? (friday-after-4th-thursday-in-november (->day-time-context 2018 11 23))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2018 11 30)))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2018 11 16)))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2019 11 28)))))
+    (is (true? (friday-after-4th-thursday-in-november (->day-time-context 2019 11 29))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2019 11 22)))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2019 12 6)))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2020 11 26)))))
+    (is (true? (friday-after-4th-thursday-in-november (->day-time-context 2020 11 27))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2020 11 20)))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2020 12 4)))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2021 11 25)))))
+    (is (true? (friday-after-4th-thursday-in-november (->day-time-context 2021 11 26))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2021 11 19)))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2021 12 3)))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2023 11 23)))))
+    (is (true? (friday-after-4th-thursday-in-november (->day-time-context 2023 11 24))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2023 11 17)))))
+    (is (not (true? (friday-after-4th-thursday-in-november (->day-time-context 2023 12 1)))))
+
+    (is (not (true? (monday-after-07-01 (->day-time-context 2022 7 1)))))
+    (is (true? (monday-after-07-01 (->day-time-context 2022 7 4))))
+    (is (not (true? (monday-after-07-01 (->day-time-context 2022 7 11)))))
+    (is (true? (monday-after-07-01 (->day-time-context 2024 7 1))))
+    (is (not (true? (monday-after-07-01 (->day-time-context 2024 7 8)))))
+    (is (not (true? (monday-after-07-01 (->day-time-context 2029 7 1)))))
+    (is (true? (monday-after-07-01 (->day-time-context 2029 7 2))))
+    (is (not (true? (monday-after-07-01 (->day-time-context 2029 7 9)))))
+
+    (is (not (true? (first-sunday-before-12-25 (->day-time-context 2022 12 25)))))
+    (is (true? (first-sunday-before-12-25 (->day-time-context 2022 12 18))))
+    (is (not (true? (first-sunday-before-12-25 (->day-time-context 2022 12 11)))))
+    (is (not (true? (first-sunday-before-12-25 (->day-time-context 2024 12 25)))))
+    (is (true? (first-sunday-before-12-25 (->day-time-context 2024 12 22))))
+    (is (not (true? (first-sunday-before-12-25 (->day-time-context 2024 12 15)))))
+    (is (not (true? (first-sunday-before-12-25 (->day-time-context 2019 12 25)))))
+    (is (true? (first-sunday-before-12-25 (->day-time-context 2019 12 22))))
+    (is (not (true? (first-sunday-before-12-25 (->day-time-context 2019 12 15)))))
+
+    (is (not (true? (monday-before-06-20 (->day-time-context 2022 6 20)))))
+    (is (true? (monday-before-06-20 (->day-time-context 2022 6 13))))
+    (is (not (true? (monday-before-06-20 (->day-time-context 2025 6 20)))))
+    (is (true? (monday-before-06-20 (->day-time-context 2025 6 16))))
+    (is (not (true? (monday-before-06-20 (->day-time-context 2025 6 9)))))
+    (is (not (true? (monday-before-06-20 (->day-time-context 2019 6 20)))))
+    (is (true? (monday-before-06-20 (->day-time-context 2019 6 17))))
+    (is (not (true? (monday-before-06-20 (->day-time-context 2019 6 10)))))
+    (is (not (true? (monday-before-06-20 (->day-time-context 2019 6 24)))))
+
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2019 8 12)))))
+    (is (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2019 8 13))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2019 8 6)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2019 8 20)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2019 8 27)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2020 8 10)))))
+    (is (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2020 8 11))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2020 8 4)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2020 8 18)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2020 8 25)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2021 8 9)))))
+    (is (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2021 8 10))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2021 8 3)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2021 8 17)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2021 8 24)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2022 8 8)))))
+    (is (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2022 8 9))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2022 8 2)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2022 8 16)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2022 8 23)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2023 8 14)))))
+    (is (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2023 8 15))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2023 8 8)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2023 8 22)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2023 8 29)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2024 8 12)))))
+    (is (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2024 8 13))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2024 8 6)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2024 8 20)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2024 8 27)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2025 8 11)))))
+    (is (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2025 8 12))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2025 8 5)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2025 8 19)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2025 8 26)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2026 8 10)))))
+    (is (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2026 8 11))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2026 8 4)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2026 8 18)))))
+    (is (not (true? (tuesday-after-2nd-monday-in-august (->day-time-context 2026 8 25)))))
+
+    (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2021 11 1)))))
+    (is (true? (tuesday-after-1st-monday-in-november (->day-time-context 2021 11 2))))
+    (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2021 11 9)))))
+    (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2021 11 16)))))
+    (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2021 10 26)))))
+    (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2022 11 1)))))
+    (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2022 11 7)))))
+    (is (true? (tuesday-after-1st-monday-in-november (->day-time-context 2022 11 8))))
+    (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2022 11 15)))))
+    (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2022 10 25)))))
+    (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2023 11 1)))))
+    (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2023 11 6)))))
+    (is (true? (tuesday-after-1st-monday-in-november (->day-time-context 2023 11 7))))
+    (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2023 11 14)))))
+    (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2023 11 21)))))
+    (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2023 10 31)))))
+
+    ;;(is (true? (first-monday-in-august (->day-time-context 2022 8 1))))
+    ;;(is (not (true? (first-monday-in-august (->day-time-context 2022 8 2)))))
+    ;;(is (not (true? (first-monday-in-august (->day-time-context 2022 8 8)))))
+    ;;(is (not (true? (first-monday-in-august (->day-time-context 2022 8 15)))))
+    ;;(is (not (true? (first-monday-in-august (->day-time-context 2022 8 22)))))
+    ;;(is (not (true? (first-monday-in-august (->day-time-context 2022 8 29)))))
+    ;;(is (true? (first-monday-in-august (->day-time-context 2021 8 2))))
+    ))
 
 
 (comment
+  (test/run-test before-after-tests)
+
+  (->day-time-context 2022 9 1)
+  (first-week-day 3 :before 1661990400000)
+  (first-week-day 3 :before 1661904000000)
+
+  (def testing-ba (compile-before-after {:nth 3
+                                         :week-day 3
+                                         :predicate :after
+                                         :relative-to {:month 8 :day-in-month 15}}))
+  (testing-ba (->day-time-context 2022 8 31))
+  (def monday-before-06-20 (compile-before-after {:week-day 1,
+                                                  :predicate :before,
+                                                  :relative-to {:day-in-month 20, :month 6}}))
+  (def monday-after-07-01 (compile-before-after {:week-day 1,
+                                                 :predicate :after,
+                                                 :relative-to {:day-in-month 1, :month 7}}))
+
+
   (v/day-time-context (first-week-day 7 :after (-> (v/date 2022 12 25) v/time->value)))
   (def first-wednesday-after-first-monday-in-august
     (compile-before-after
@@ -636,8 +864,6 @@
   (first-wednesday-after-first-monday-in-august (->day-time-context 2023 8 8))
   (first-wednesday-after-first-monday-in-august (->day-time-context 2023 8 9))
   (first-wednesday-after-first-monday-in-august (->day-time-context 2023 8 10))
-
-
 
 
   (def christmas?
@@ -777,7 +1003,7 @@
 
   (def holidays (clojure.edn/read-string (slurp "all_holidays.edn")))
   (def report (group-by vura.holidays.compile/analyze-holiday holidays))
-  (def parsed-results (map parse-if (get report :static_condition)))
+  (def parsed-results (map parse-definition (get report :static_condition)))
   (def transformed-statements (map transform-statement parsed-results))
   (def removed-unknown
     (remove #(or
