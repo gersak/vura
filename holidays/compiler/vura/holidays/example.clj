@@ -6,7 +6,8 @@
    [vura.holidays :as h]
    [vura.core :as v]
    [vura.holidays.catholic :as catholic]
-   [vura.holidays.ortodox :as ortodox]))
+   [vura.holidays.ortodox :as ortodox]
+   [vura.holidays.compile :as c]))
 
 
 (defn holiday [day-context]
@@ -33,7 +34,6 @@
 
 (defn day-name->num
   [day]
-  ; (println "WTF: " day)
   (case day
     "monday" 1
     "tuesday" 2
@@ -70,9 +70,6 @@
                           (str/replace text #",\s+" ","))
                          #"\s+")
          result nil]
-    ;(println "Word: " word)
-    ;(println "Words: " words)
-    ;(println "Result: " result)
     (if (nil? word) result
         (condp re-find word
           #"orthodox"
@@ -105,6 +102,17 @@
                  (assoc result
                         :julian? true))
           ;;
+          #"\d+-\d+-\d+"
+          (recur words
+                 (let [split-date (str/split word #"(-|#)")
+                       year (Integer/parseInt (split-date 0))
+                       month (Integer/parseInt (split-date 1))
+                       day (Integer/parseInt (split-date 2))]
+                   (assoc result
+                          :year year
+                          :month month
+                          :day-in-month day)))
+          ;;
           #"\d+-\d+"
           (recur words
                  (let [split-date (str/split word #"(-|#)")
@@ -116,7 +124,6 @@
           ;;
           #"if$"
           (let [statement (take-while #(not= "if" %) words)]
-            ;(println "STATEMENT:" statement)
             (recur
              (drop (count statement) words)
              (update result :statements (fnil conj []) statement)))
@@ -159,43 +166,6 @@
            (update result :unknown (fnil conj []) word))))))
 
 
-;; TODO - remove this
-(defn parse-if
-  [text]
-  (loop [[word & words] (str/split
-                         (str/lower-case
-                          (str/replace text #",\s+" ","))
-                         #"\s+")
-         result nil]
-    ;(println "Word: " word)
-    ;(println "Words: " words)
-    ;(println "Result: " result)
-    (if (nil? word) result
-        (condp re-find word
-          #"\d+-\d+"
-          (recur words
-                 (let [split-date (str/split word #"(-|#)")
-                       day (Integer/parseInt (split-date 1))
-                       month (Integer/parseInt (split-date 0))]
-                   (assoc result
-                          :day-in-month day
-                          :month month)))
-          ;;
-          #"if$"
-          (let [statement (take-while #(not= "if" %) words)]
-            ;(println "STATEMENT:" statement)
-            (recur
-             (drop (count statement) words)
-             (update result :statements (fnil conj []) statement)))
-          ;;
-          #"and$"
-          (recur words (assoc result :and? true))
-          ;;
-          (recur
-           words
-           (update result :unknown (fnil conj []) word))))))
-
-
 (defn analyze-statement
   [[today _ condition target]]
   {:today (set (map day-name->num (str/split today #",")))
@@ -209,7 +179,7 @@
             (map analyze-statement statements))))
 
 
-(defn compile-holiday
+(defn compile-condition
   [{:keys [day-in-month
            month
            and?
@@ -273,8 +243,23 @@
        statements))))
 
 
+(defn compile-static
+  [{:keys [day-in-month
+           month
+           year]}]
+  (fn [{d :day-in-month
+        m :month
+        y :year}]
+    (and
+     (= day-in-month d)
+     (= month m)
+     (or
+      (nil? year)
+      (= y year)))))
+
+
 (defn compile-easter
-  [offset]
+  [{:keys [offset]}]
   (fn [{y :year
         value :value}]
     (let [easter (catholic/easter y)
@@ -285,20 +270,6 @@
       (= value easter-offset-value))))
 
 
-(defn orthodox-easter [year]
-  (let [a (mod year 4)
-        b (mod year 7)
-        c (mod year 19)
-        d (mod (+ (* 19 c) 15) 30)
-        e (mod (- (+ (* 2 a) (* 4 b) 34) d) 7)
-        month (quot (+ d e 114) 31)
-        day (+ 14 (mod (+ d e 114) 31))
-        day-overload (quot day 30)]
-    (if (pos? day-overload)
-      {:year year :month (inc month) :day-in-month (mod day 30)}
-      {:year year :month month :day-in-month day})))
-
-
 (defn compile-orthodox
   [{:keys [offset
            and?
@@ -307,17 +278,18 @@
         m :month
         y :year
         value :value}]
-    (let [orthodox (orthodox-easter y)
+    (let [orthodox (ortodox/orthodox-easter {:year y})
           orthodox-d (:day-in-month orthodox)
           orthodox-m (:month orthodox)
           orthodox-value (:value (->day-time-context y orthodox-m orthodox-d))
           orthodox-offset-context (v/day-time-context (+ orthodox-value (v/days offset)))]
       (if (empty? statements)
         (= value (:value orthodox-offset-context))
-        ((compile-holiday {:day-in-month (:day-in-month orthodox-offset-context)
+        ((compile-condition {:day-in-month (:day-in-month orthodox-offset-context)
                            :month (:month orthodox-offset-context)
                            :and? and?
                            :statements statements}) (->day-time-context y m d))))))
+
 
 (comment
   (def orthodox-8 (compile-orthodox {:orthodox? true, :offset 8, :statements ()}))
@@ -340,30 +312,6 @@
   (orthodox-0-if (->day-time-context 2023 4 17))
   (orthodox-0-if (->day-time-context 2023 4 18)))
 
-#_(defn compile-julian
-    [definition]
-    (println "Cale`ndar: " v/*calendar*)
-    (let [{:keys [day-in-month
-                  month
-                  year]}
-          (->
-           (v/with-time-configuration
-             {:calendar :julian}
-             (v/context->value definition))
-           v/day-time-context)]
-      (println "ZAPRAVO GADAM: " [month day-in-month year])
-      (fn [{d :day-in-month
-            m :month
-            y :year
-            value :value}]
-        (let [julian-context (v/value->julian-date value)
-              julian-m (:month julian-context)
-              julian-d (:day-in-month julian-context)]
-          (and
-           (= day-in-month julian-d)
-           (= month julian-m))))))
-
-
 
 (defn compile-julian
   [{:keys [day-in-month
@@ -379,7 +327,6 @@
        (= month m)))))
 
 
-;; ?????
 (defn compile-in-month
   [{:keys [nth
            week-day
@@ -392,43 +339,6 @@
      (= wd week-day)
      (>= d (+ (* (- nth 1) 7) 1))
      (<= d (* nth 7)))))
-
-
-; (defn get-nth-week-day-in-month
-;   [year month week-day nth]
-;   (some
-;    (fn [day-in-month]
-;      (let [context (->day-time-context year month day-in-month)
-;            wd (:day context)
-;            m (:month context)]
-;        (if (and (= wd week-day) (= month m))
-;          context
-;          nil)))
-;    (range (+ (* (- nth 1) 7) 1) (* nth 7))))
-
-
-(comment
-  (def day-in-month 1)
-  (def month 9)
-  (def year 2022)
-  (def value (:value (->day-time-context year month day-in-month)))
-  (def predicate :before)
-  (def predicate :after)
-  (nth
-   (filter
-      ;; ovdje ide uvjet... Tj. uvjet za filter
-    (fn [{:keys [day]}] (= day 1))
-    (map
-     v/day-time-context
-     (iterate
-      #((case predicate
-          :before -
-          :after +)
-        % v/day)
-      value)))
-   3)
-  (vura/date)
-  (v/day-time-context (first-week-day 1 :after value)))
 
 
 (defn first-week-day
@@ -530,6 +440,154 @@
           :else (throw (ex-info "Unknown definition" definition)))))))
 
 
+;; :julian
+;; :static
+;; :orthodox
+;; :easter
+;; :condition
+;; :before-after
+;; :nth
+
+(defn compile-type [definition]
+  (condp #(contains? %2 %1) definition
+    :julian?
+    (compile-julian definition)
+    ;;
+    :easter?
+    (compile-easter definition)
+    ;;
+    :orthodox?
+    (compile-orthodox definition)
+    ;;
+    :statements
+    (compile-condition definition)
+    ;;
+    :predicate
+    (compile-before-after definition)
+    ;;
+    :in?
+    (compile-in-month definition)
+    ;;
+    :unknown
+    (constantly false)
+    ;;
+    (compile-static definition)))
+
+
+(comment
+  (map parse-definition (keys (c/get-holiday-days :hr)))
+  (map compile-type (map parse-definition (keys (c/get-holiday-days :hr))))
+
+  (def definition (parse-definition "12-25"))
+  (def pred (compile-type definition))
+
+  (def holiday-mapping
+    (reduce-kv
+     (fn [result definition name-mapping]
+       (assoc result
+              (compile-type (parse-definition definition))
+              name-mapping))
+     nil
+     (c/get-holiday-days :hr)))
+  
+
+  (def pred (compile-static definition))
+  (def value (->day-time-context 2022 12 25))
+  (def value (->day-time-context 2022 5 1))
+  (def value (->day-time-context 2022 11 18))
+  
+  (some
+   (fn [[pred naming]]
+     (println "PREDI: " pred)
+     (println "NAMING: " naming)
+     (when (pred value)
+       naming))
+   holiday-mapping)
+  ) 
+;; Ovak bi trebao izleda file
+
+
+(def holidays
+  {"01-01" {"_name" "01-01", "type" "public"},
+   "01-06" {"_name" "01-06", "type" "public"},
+   "easter -47" {"_name" "easter -47", "type" "observance"},
+   "easter" {"_name" "easter", "type" "public"},
+   "easter 1" {"_name" "easter 1", "type" "public"},
+   "easter 60" {"_name" "easter 60", "type" "public"},
+   "03-08" {"_name" "03-08", "type" "observance"},
+   "05-01" {"_name" "05-01", "type" "public"},
+   "05-30" {"name" {"hr" "Dan državnosti", "en" "National Day"}, "type" "public", "active" [{"from" "2020-01-01"}]},
+   "2nd sunday in May" {"_name" "Mothers Day", "type" "observance"},
+   "06-22" {"name" {"hr" "Dan antifašističke borbe", "en" "Anti-Fascist Struggle Day"}, "type" "public"},
+   "06-25 #1" {"name" {"hr" "Dan državnosti", "en" "Statehood Day"}, "type" "public", "active" [{"to" "2020-01-01"}]},
+   "06-25"
+   {"name" {"hr" "Dan neovisnosti", "en" "Independence Day"}, "type" "observance", "active" [{"from" "2020-01-01"}]},
+   "08-05"
+   {"name"
+    {"hr" "Dan pobjede i domovinske zahvalnosti i Dan hrvatskih branitelja",
+     "en" "Victory and Homeland Thanksgiving Day and the Day of Croatian defenders"},
+    "type" "public"},
+   "08-15" {"_name" "08-15", "type" "public"},
+   "10-08 #1"
+   {"name" {"hr" "Dan neovisnosti", "en" "Independence Day"}, "type" "public", "active" [{"to" "2020-01-01"}]},
+   "10-08"
+   {"name" {"hr" "Dan Hrvatskoga sabora", "en" "Day of the Croatian Parliament"},
+    "type" "observence",
+    "active" [{"from" "2020-01-01"}]},
+   "11-01" {"_name" "11-01", "type" "public"},
+   "11-18 #1"
+   {"name" {"hr" "Dan sjećanja na žrtvu Vukovara i Škabrnje", "en" "Remembrance Day"},
+    "type" "observance",
+    "active" [{"to" "2020-01-01"}]},
+   "11-18"
+   {"name"
+    {"hr" "Dan sjećanja na žrtve Domovinskog rata i Dan sjećanja na žrtvu Vukovara i Škabrnje", "en" "Remembrance Day"},
+    "type" "public",
+    "active" [{"from" "2020-01-01"}]},
+   "12-25" {"_name" "12-25", "type" "public"},
+   "12-26" {"_name" "12-26", "type" "public"},
+   "orthodox"
+   {"_name" "orthodox",
+    "type" "optional",
+    "note" "Orthodox believers (legally defined as Christians who follow the Julian Calender)"},
+   "orthodox 1"
+   {"_name" "orthodox 1",
+    "type" "optional",
+    "note" "Orthodox believers (legally defined as Christians who follow the Julian Calender)"},
+   "julian 12-25"
+   {"_name" "julian 12-25",
+    "type" "optional",
+    "note" "Orthodox believers (legally defined as Christians who follow the Julian Calender)"},
+   "10 Dhu al-Hijjah" {"_name" "10 Dhu al-Hijjah", "type" "optional", "note" "Muslim believers"},
+   "1 Shawwal" {"_name" "1 Shawwal", "type" "optional", "note" "Muslim believers"},
+   "1 Tishrei" {"_name" "10 Tishrei", "type" "optional", "note" "Jewish believers"},
+   "10 Tishrei" {"_name" "10 Tishrei", "type" "optional", "note" "Jewish believers"}})
+
+(def locale-holiday-mapping
+  (reduce-kv
+    (fn [result definition name-mapping]
+      (assoc result
+             (compile-type (parse-definition definition))
+             name-mapping))
+    nil
+    holidays))
+
+
+(defn holiday?
+  [context]
+  (some
+   (fn [[pred naming]]
+     (when (pred context)
+       naming))
+   locale-holiday-mapping))
+
+
+(comment
+  (time (locale-holiday-mapping :hr))
+  (time (holiday? (->day-time-context 2022 11 18)))
+  )
+
+
 
 (comment
   (declare third-sunday-before-12-25 before-after-tests)
@@ -593,8 +651,7 @@
         tuesday-after-1st-monday-in-november (compile-before-after {:week-day 2,
                                                                     :predicate :after,
                                                                     :relative-to {:nth 1, :week-day 1, :in? true, :month 11},
-                                                                    :unknown ["every" "4" "years" "since" "1848"]})
-        first-monday-in-august (compile-before-after {:nth 1, :week-day 1, :in? true, :month 8})]
+                                                                    :unknown ["every" "4" "years" "since" "1848"]})]
     (is (not (true? (monday-before-september (->day-time-context 2022 9 1)))))
     (is (not (true? (monday-before-september (->day-time-context 2022 8 31)))))
     (is (not (true? (monday-before-september (->day-time-context 2022 8 30)))))
@@ -817,76 +874,16 @@
     (is (true? (tuesday-after-1st-monday-in-november (->day-time-context 2023 11 7))))
     (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2023 11 14)))))
     (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2023 11 21)))))
-    (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2023 10 31)))))
-
-    ;;(is (true? (first-monday-in-august (->day-time-context 2022 8 1))))
-    ;;(is (not (true? (first-monday-in-august (->day-time-context 2022 8 2)))))
-    ;;(is (not (true? (first-monday-in-august (->day-time-context 2022 8 8)))))
-    ;;(is (not (true? (first-monday-in-august (->day-time-context 2022 8 15)))))
-    ;;(is (not (true? (first-monday-in-august (->day-time-context 2022 8 22)))))
-    ;;(is (not (true? (first-monday-in-august (->day-time-context 2022 8 29)))))
-    ;;(is (true? (first-monday-in-august (->day-time-context 2021 8 2))))
-    ))
+    (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2023 10 31)))))))
 
 
 (comment
   (test/run-test before-after-tests)
-
-  (->day-time-context 2022 9 1)
-  (first-week-day 3 :before 1661990400000)
-  (first-week-day 3 :before 1661904000000)
-
-  (def testing-ba (compile-before-after {:nth 3
-                                         :week-day 3
-                                         :predicate :after
-                                         :relative-to {:month 8 :day-in-month 15}}))
-  (testing-ba (->day-time-context 2022 8 31))
-  (def monday-before-06-20 (compile-before-after {:week-day 1,
-                                                  :predicate :before,
-                                                  :relative-to {:day-in-month 20, :month 6}}))
-  (def monday-after-07-01 (compile-before-after {:week-day 1,
-                                                 :predicate :after,
-                                                 :relative-to {:day-in-month 1, :month 7}}))
-
-
-  (v/day-time-context (first-week-day 7 :after (-> (v/date 2022 12 25) v/time->value)))
-  (def first-wednesday-after-first-monday-in-august
-    (compile-before-after
-     {:week-day 3,
-      :predicate :after,
-      :relative-to {:nth 1, :week-day 1, :in? true, :month 8}}))
-  (first-wednesday-after-first-monday-in-august (->day-time-context 2022 7 31))
-  (first-wednesday-after-first-monday-in-august (->day-time-context 2022 8 1))
-  (first-wednesday-after-first-monday-in-august (->day-time-context 2022 8 2))
-  (first-wednesday-after-first-monday-in-august (->day-time-context 2022 8 3))
-  (first-wednesday-after-first-monday-in-august (->day-time-context 2023 8 4))
-  (first-wednesday-after-first-monday-in-august (->day-time-context 2023 8 1))
-  (first-wednesday-after-first-monday-in-august (->day-time-context 2023 8 8))
-  (first-wednesday-after-first-monday-in-august (->day-time-context 2023 8 9))
-  (first-wednesday-after-first-monday-in-august (->day-time-context 2023 8 10))
-
-
-  (def christmas?
-    (compile-julian
-     {:julian? true,
-      :day-in-month 25,
-      :month 12, :and? true,
-      :statements ['("sunday" "then" "next" "monday")]}))
-  (christmas? (->day-time-context 2022 1 7))
-  (christmas? (->day-time-context 2022 12 25))
-  (christmas? (->day-time-context 2022 1 6))
-  (christmas? (->day-time-context 2022 1 8))
-
-  (def is-julian-6-15
-    (compile-julian
-     {:julian? true,
-      :day-in-month 15,
-      :month 6}))
-  (is-julian-6-15 (->day-time-context 2022 6 28)))
+  )
 
 
 (deftest new-year
-  (let [new-year? (compile-holiday
+  (let [new-year? (compile-condition
                    {:day-in-month 1,
                     :month 1,
                     :and? true,
@@ -904,7 +901,7 @@
 
 
 (deftest holiday-04-25
-  (let [holiday-04-25? (compile-holiday
+  (let [holiday-04-25? (compile-condition
                         {:day-in-month 25,
                          :month 4,
                          :and? true,
@@ -917,7 +914,7 @@
 
 
 (deftest holiday-10-21
-  (let [holiday-10-21? (compile-holiday
+  (let [holiday-10-21? (compile-condition
                         {:day-in-month 21,
                          :month 10,
                          :statements
@@ -963,12 +960,6 @@
   (test/run-test holiday-definition-parsing)
   (test/run-tests)
   (add-tap println)
-  (def easter-4 (compile-easter 4))
-  (easter-4 (->day-time-context 2022 4 21))
-
-  (catholic/easter 2023)
-  (orthodox-easter 2023)
-  (->day-time-context 2023 4 9)
   (v/value->julian-date ((->day-time-context 2022 1 7) :value))
   (v/julian-date->value 2021)
   (v/with-time-configuration
@@ -993,12 +984,46 @@
      v/time->value
      v/day-time-context))
 
-  (->
-   (v/with-time-configuration
-     {:calendar :julian}
-     (v/date 2022 12 25))
-   v/time->value
-   v/day-time-context)
+
+  ;; "01-01" "01-06" "easter -47" "easter" "easter 1" "easter 60" "03-08" "05-01" "05-30"
+  ;; "2nd sunday in May" "06-22" "06-25 #1" "06-25" "08-05" "08-15" "10-08 #1" "10-08"
+  ;; "11-01" "11-18 #1" "11-18" "12-25" "12-26" "orthodox" "orthodox 1"
+  ;; "julian 12-25" "10 Dhu al-Hijjah" "1 Shawwal" "1 Tishrei" "10 Tishrei"
+
+  (def stat-test1 (compile-static (parse-definition "01-01")))
+  (stat-test1 (->day-time-context 2022 1 1))
+  (stat-test1 (->day-time-context 2021 12 31))
+  (stat-test1 (->day-time-context 2022 1 2))
+  (stat-test1 (->day-time-context 2022 4 4))
+  (stat-test1 (->day-time-context 2023 1 1))
+  (def stat-test2 (compile-static (parse-definition "01-06")))
+  (stat-test2 (->day-time-context 2022 1 6))
+  (stat-test2 (->day-time-context 2022 1 5))
+  (stat-test2 (->day-time-context 2022 1 7))
+  (stat-test2 (->day-time-context 2023 1 6))
+  (def easter-test1 (compile-easter (parse-definition "easter")))
+  (easter-test1 (->day-time-context 2022 4 4))
+  (def easter-test2 (compile-easter (parse-definition "easter -47")))
+  (easter-test2 (->day-time-context 2022 4 4))
+  (def nth-day-in-month-test1 (compile-in-month (parse-definition "2nd sunday in May")))
+  (nth-day-in-month-test1 (->day-time-context 2022 5 1))
+  (nth-day-in-month-test1 (->day-time-context 2022 5 7))
+  (nth-day-in-month-test1 (->day-time-context 2022 5 8))
+  (nth-day-in-month-test1 (->day-time-context 2022 5 15))
+  (def orthodox-test1 (compile-orthodox (parse-definition "orthodox")))
+  (orthodox-test1 (->day-time-context 2022 1 5))
+  (orthodox-test1 (->day-time-context 2022 4 24))
+  (orthodox-test1 (->day-time-context 2022 4 26))
+  (def orthodox-test2 (compile-orthodox (parse-definition "orthodox 1")))
+  (orthodox-test2 (->day-time-context 2022 1 5))
+  (orthodox-test2 (->day-time-context 2022 4 24))
+  (orthodox-test2 (->day-time-context 2022 4 25))
+  (orthodox-test2 (->day-time-context 2023 4 16))
+  (orthodox-test2 (->day-time-context 2023 4 17))
+  (def julian-test1 (compile-julian (parse-definition "julian 12-25")))
+  (julian-test1 (->day-time-context 2022 1 6))
+  (julian-test1 (->day-time-context 2022 1 7))
+  (julian-test1 (->day-time-context 2022 1 8))
 
 
   (def holidays (clojure.edn/read-string (slurp "all_holidays.edn")))
@@ -1015,9 +1040,17 @@
   (map parse-definition (get report :dayofweek_before_after))
   (spit "parsed_before_after.edn" (with-out-str (clojure.pprint/pprint (map parse-definition (get report :dayofweek_before_after)))))
   (spit "raw_before_after.edn" (with-out-str (clojure.pprint/pprint (get report :dayofweek_before_after))))
-  (def test-compile (compile-holiday (first removed-unknown)))
+  (spit "transformed_statements.edn"
+        (with-out-str
+          (clojure.pprint/pprint removed-unknown)))
+  (frequencies (map :unknown parsed-results))
+  (spit "static_with_condition.edn"
+        (with-out-str
+          (clojure.pprint/pprint (:static_condition report))))
+
+  (def test-compile (compile-condition (first removed-unknown)))
   (def new-year?
-    (compile-holiday
+    (compile-condition
      {:day-in-month 1,
       :month 1,
       :and? true,
@@ -1025,22 +1058,22 @@
       '({:today #{6}, :condition "previous", :target 5}
         {:today #{7}, :condition "next", :target 1})}))
   (def boxing-day?
-    (compile-holiday
+    (compile-condition
      {:day-in-month 26,
       :month 12,
       :and? true,
       :statements
       '({:today #{6}, :condition "next", :target 1}
         {:today #{7}, :condition "next", :target 2})}))
-  (def
-    (compile-holiday
+  (def t
+    (compile-condition
      {:day-in-month 26,
       :month 1,
       :statements
       '({:today #{3 2}, :condition "previous", :target 1}
         {:today #{4 5}, :condition "next", :target 1})}))
   (def test-compile
-    (compile-holiday
+    (compile-condition
      {:day-in-month 21,
       :month 10,
       :statements
@@ -1049,161 +1082,7 @@
         {:today #{3 2}, :condition "previous", :target 1}
         {:today #{4}, :condition "next", :target 5})}))
   (def test-compile
-    (compile-holiday
+    (compile-condition
      {:day-in-month 6,
       :month 11,
-      :statements '({:today #{4 6 3 2 5}, :condition "next", :target 1})}))
-  ;; Holiday 04-25 and if Saturday,Sunday then next monday
-  (test-compile (->day-time-context 2020 4 25))
-  (test-compile (->day-time-context 2020 4 26))
-  (test-compile (->day-time-context 2020 4 27))
-  (test-compile (->day-time-context 2022 4 24))
-  (test-compile (->day-time-context 2022 4 25))
-  (test-compile (->day-time-context 2022 4 26))
-  ;; Holiday 12-26 and if Saturday then next monday if Sunday then next tuesday
-  (test-compile (->day-time-context 2022 12 26))
-  (test-compile (->day-time-context 2023 12 26))
-  (test-compile (->day-time-context 2021 12 26))
-  (test-compile (->day-time-context 2021 12 27))
-  (test-compile (->day-time-context 2021 12 28))
-  (test-compile (->day-time-context 2021 12 29))
-  (test-compile (->day-time-context 2020 12 26))
-  (test-compile (->day-time-context 2020 12 27))
-  (test-compile (->day-time-context 2020 12 28))
-  (test-compile (->day-time-context 2020 12 29))
-  ;; Holiday 01-26 if tuesday,wednsday then previous monday if thursday,friday then next monday
-  (test-compile (->day-time-context 2025 01 24))
-  (test-compile (->day-time-context 2025 01 25))
-  (test-compile (->day-time-context 2025 01 26))
-  (test-compile (->day-time-context 2025 01 27))
-  (test-compile (->day-time-context 2025 01 28))
-  (test-compile (->day-time-context 2024 01 26)) ;; true (vaća true a trebalo bi nil)
-  (test-compile (->day-time-context 2024 01 27))
-  (test-compile (->day-time-context 2024 01 28))
-  (test-compile (->day-time-context 2024 01 29)) ;; true (samo ovo treba biti true)
-  (test-compile (->day-time-context 2024 01 30))
-  (test-compile (->day-time-context 2021 01 26)) ;; true (treba biti nil)
-  (test-compile (->day-time-context 2021 01 25)) ;; true (samo ovo treba biti true)
-  (test-compile (->day-time-context 2021 01 24))
-  (test-compile (->day-time-context 2022 01 26)) ;; true (isti slučaj kao gore)
-  (test-compile (->day-time-context 2022 01 25))
-  (test-compile (->day-time-context 2022 01 24)) ;; true (samo ovo treba biti true)
-  (test-compile (->day-time-context 2022 01 23))
-  ;; Holiday 10-21 if sunday then next monday if saturday then previous friday
-  ;; if tuesday,wednsday then previous monday if thursday then next friday
-  (test-compile (->day-time-context 2022 10 20))
-  (test-compile (->day-time-context 2022 10 21))
-  (test-compile (->day-time-context 2022 10 22))
-  (test-compile (->day-time-context 2023 10 21))
-  (test-compile (->day-time-context 2023 10 20))
-  (test-compile (->day-time-context 2023 10 22))
-  (test-compile (->day-time-context 2023 10 23))
-  (test-compile (->day-time-context 2021 10 15))
-  (test-compile (->day-time-context 2021 10 20))
-  (test-compile (->day-time-context 2021 10 21)) ;; true (ovdje isti slučaj kao gore)
-  (test-compile (->day-time-context 2021 10 22)) ;; nil (ovo bi trebalo biti true (21. je thursday a ovo je next friday))
-  (test-compile (->day-time-context 2021 10 23))
-  (test-compile (->day-time-context 2021 10 29)) ;; true (ovo vraća true, a zapravo je drugi friday iza thursdaya)
-  (test-compile (->day-time-context 2021 10 30))
-  ;; Holiday 11-06 if tuseday,wedsnday,thursday,friday,saturday then next monday
-  (test-compile (->day-time-context 2022 11 06)) ;; Za ovaj blagdan dobro radi "and" jer ima samo jedan statement
-  (test-compile (->day-time-context 2022 11 07))
-  (test-compile (->day-time-context 2023 11 06))
-  (test-compile (->day-time-context 2024 11 06))
-  (test-compile (->day-time-context 2024 11 07))
-  (test-compile (->day-time-context 2024 11 8))
-  (test-compile (->day-time-context 2024 11 9))
-  (test-compile (->day-time-context 2024 11 10))
-  (test-compile (->day-time-context 2024 11 11))
-  (test-compile (->day-time-context 2026 11 06))
-  (test-compile (->day-time-context 2026 11 07))
-  (test-compile (->day-time-context 2026 11 8))
-  (test-compile (->day-time-context 2026 11 9))
-  (test-compile (->day-time-context 2026 11 10))
-
-  (spit "transformed_statements.edn" (with-out-str (clojure.pprint/pprint removed-unknown)))
-  (spit "transformed_statements.edn"
-        (with-out-str
-          (clojure.pprint/pprint removed-unknown)))
-  (frequencies (map :unknown parsed-results))
-  (spit "static_with_condition.edn"
-        (with-out-str
-          (clojure.pprint/pprint (:static_condition report))))
-  (-> parsed-results first)
-  (parse-if "01-01 and if sunday then next monday if saturday then previous friday")
-
-
-
-  (defn holiday-2nd-monday-may
-    "2nd monday in May"
-    [{:keys [month day-in-month day]}]
-    (and
-     (= day 1)
-     (= month 5)
-     (and (> day-in-month 7) (< day-in-month 15)))))
-
-(comment
-  (holiday-2nd-monday-may (->day-time-context 2022 05 01))
-  (holiday-2nd-monday-may (->day-time-context 2022 05 02))
-  (holiday-2nd-monday-may (->day-time-context 2022 05 03))
-  (holiday-2nd-monday-may (->day-time-context 2022 05 04))
-  (holiday-2nd-monday-may (->day-time-context 2022 05 05))
-  (holiday-2nd-monday-may (->day-time-context 2022 05 06))
-  (holiday-2nd-monday-may (->day-time-context 2022 05 07))
-  (holiday-2nd-monday-may (->day-time-context 2022 05 8))
-  (holiday-2nd-monday-may (->day-time-context 2022 05 9))
-  (holiday-2nd-monday-may (->day-time-context 2022 05 10))
-  (holiday-2nd-monday-may (->day-time-context 2022 05 16)))
-
-
-
-(defn holiday-3rd-monday-november
-  "3rd monday in November"
-  [{:keys [month day-in-month day]}]
-  (and
-   (= day 1)
-   (= month 11)
-   (and (> day-in-month 14) (< day-in-month 22))))
-
-(comment
-  (holiday-3rd-monday-november (->day-time-context 2022 11 01))
-  (holiday-3rd-monday-november (->day-time-context 2022 11 02))
-  (holiday-3rd-monday-november (->day-time-context 2022 11 03))
-  (holiday-3rd-monday-november (->day-time-context 2022 11 8))
-  (holiday-3rd-monday-november (->day-time-context 2022 11 9))
-  (holiday-3rd-monday-november (->day-time-context 2022 11 10))
-  (holiday-3rd-monday-november (->day-time-context 2022 11 15))
-  (holiday-3rd-monday-november (->day-time-context 2022 11 16))
-  (holiday-3rd-monday-november (->day-time-context 2022 11 17))
-  (holiday-3rd-monday-november (->day-time-context 2022 11 20))
-  (holiday-3rd-monday-november (->day-time-context 2022 11 21))
-  (holiday-3rd-monday-november (->day-time-context 2022 11 22))
-  (holiday-3rd-monday-november (->day-time-context 2022 12 19))
-  (holiday-3rd-monday-november (->day-time-context 2026 11 15))
-  (holiday-3rd-monday-november (->day-time-context 2026 11 16))
-  (holiday-3rd-monday-november (->day-time-context 2026 11 23))
-  (->day-time-context 2022 12 -32))
-
-
-
-(defn holiday-2nd-sunday-before-12-25
-  "2nd sunday before 12-25"
-  [{:keys [month day-in-month day]}]
-  (and
-   (= day 7)
-   (= month 12)
-   (and (> day-in-month 7) (< day-in-month 15))))
-
-(comment
-  (holiday-2nd-sunday-before-12-25 (->day-time-context 2022 12 01))
-  (holiday-2nd-sunday-before-12-25 (->day-time-context 2022 12 02))
-  (holiday-2nd-sunday-before-12-25 (->day-time-context 2022 12 03))
-  (holiday-2nd-sunday-before-12-25 (->day-time-context 2022 12 04))
-  (holiday-2nd-sunday-before-12-25 (->day-time-context 2022 12 10))
-  (holiday-2nd-sunday-before-12-25 (->day-time-context 2022 12 11))
-  (holiday-2nd-sunday-before-12-25 (->day-time-context 2022 12 16))
-  (holiday-2nd-sunday-before-12-25 (->day-time-context 2022 12 17))
-  (holiday-2nd-sunday-before-12-25 (->day-time-context 2022 12 18))
-  (holiday-2nd-sunday-before-12-25 (->day-time-context 2022 12 19))
-  (holiday-2nd-sunday-before-12-25 (->day-time-context 2022 12 25))
-  (holiday-2nd-sunday-before-12-25 (->day-time-context 2022 12 26)))
+      :statements '({:today #{4 6 3 2 5}, :condition "next", :target 1})})))
