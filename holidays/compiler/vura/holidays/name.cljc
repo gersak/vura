@@ -970,7 +970,7 @@
 
 
 (defn get-name [id locale]
-  (get-in names id (str/upper-case (name locale))))
+  (get-in names [id (str/upper-case (name locale))]))
 
 (comment
   ;; USE THIS TO GENERATE names

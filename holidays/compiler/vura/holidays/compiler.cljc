@@ -1,4 +1,4 @@
-(ns vura.holidays.example
+(ns vura.holidays.compiler
   (:require
    [clojure.set :as set]
    [clojure.string :as str]
@@ -6,8 +6,7 @@
    [vura.holidays :as h]
    [vura.core :as v]
    [vura.holidays.catholic :as catholic]
-   [vura.holidays.ortodox :as ortodox]
-   [vura.holidays.compile :as c]))
+   [vura.holidays.ortodox :as ortodox]))
 
 
 (defn holiday [day-context]
@@ -185,9 +184,12 @@
            and?
            statements]}]
   ;; rezultat
-  (let [forbidden-days (reduce set/union (map :today statements))
+  (let [forbidden-days (if-some [pred (reduce set/union (map :today statements))]
+                         pred
+                         (constantly false))
         allowed-days (complement forbidden-days)
         valid-targets (set (map :target statements))]
+    (println "forbidden days: " forbidden-days)
     (fn [{d :day-in-month
           wd :day
           m :month
@@ -286,9 +288,9 @@
       (if (empty? statements)
         (= value (:value orthodox-offset-context))
         ((compile-condition {:day-in-month (:day-in-month orthodox-offset-context)
-                           :month (:month orthodox-offset-context)
-                           :and? and?
-                           :statements statements}) (->day-time-context y m d))))))
+                             :month (:month orthodox-offset-context)
+                             :and? and?
+                             :statements statements}) (->day-time-context y m d))))))
 
 
 (comment
@@ -489,21 +491,22 @@
               name-mapping))
      nil
      (c/get-holiday-days :hr)))
-  
+
 
   (def pred (compile-static definition))
   (def value (->day-time-context 2022 12 25))
   (def value (->day-time-context 2022 5 1))
   (def value (->day-time-context 2022 11 18))
-  
+
   (some
    (fn [[pred naming]]
      (println "PREDI: " pred)
      (println "NAMING: " naming)
      (when (pred value)
        naming))
-   holiday-mapping)
-  ) 
+   holiday-mapping))
+
+
 ;; Ovak bi trebao izleda file
 
 
@@ -565,12 +568,12 @@
 
 (def locale-holiday-mapping
   (reduce-kv
-    (fn [result definition name-mapping]
-      (assoc result
-             (compile-type (parse-definition definition))
-             name-mapping))
-    nil
-    holidays))
+   (fn [result definition name-mapping]
+     (assoc result
+            (compile-type (parse-definition definition))
+            name-mapping))
+   nil
+   holidays))
 
 
 (defn holiday?
@@ -584,8 +587,7 @@
 
 (comment
   (time (locale-holiday-mapping :hr))
-  (time (holiday? (->day-time-context 2022 11 18)))
-  )
+  (time (holiday? (->day-time-context 2022 11 18))))
 
 
 
@@ -878,8 +880,7 @@
 
 
 (comment
-  (test/run-test before-after-tests)
-  )
+  (test/run-test before-after-tests))
 
 
 (deftest new-year
@@ -1086,3 +1087,17 @@
      {:day-in-month 6,
       :month 11,
       :statements '({:today #{4 6 3 2 5}, :condition "next", :target 1})})))
+
+(comment
+  ((:name (mk/holiday? (->day-time-context 2023 1 1))) :hr)
+  ((:name (hr/holiday? (->day-time-context 2022 11 18))) :hr)
+  (mk/holiday? (->day-time-context 2023 1 1))
+  (mk/holiday? (->day-time-context 2022 1 7))
+  (mk/holiday? (->day-time-context 2022 2 23))
+  (mk/holiday? (->day-time-context 2022 12 25))
+  (hr/holiday? (->day-time-context 2022 12 25))
+  (hr/holiday? (->day-time-context 2022 11 18))
+  (hr/holiday? (->day-time-context 2022 11 1))
+  (hr/holiday? (->day-time-context 2022 2 23))
+  (hr/holiday? (->day-time-context 2022 4 17))
+  )

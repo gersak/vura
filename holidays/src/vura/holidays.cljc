@@ -1,4 +1,5 @@
 (ns vura.holidays
+  (:refer-clojure :exclude [name])
   (:require
     [vura.core
      :refer [day-time-context
@@ -41,8 +42,13 @@
 (defmethod is-working-day? :default [dispatch _]
   (throw (Exception. (str "Unkonwn dispatch " (pr-str dispatch) ". Are you sure that target multimethod implementation is loaded(required)?"))))
 
-(defn holiday? [data dispatch]
-  (boolean (is-holiday? dispatch (-> data time->value day-time-context))))
+(defn holiday? [date dispatch]
+  (is-holiday? dispatch (-> date time->value day-time-context)))
+
+(defn name [definition dispatch]
+  (when-some [{f :name} definition]
+    (when (fn? f)
+      (f dispatch))))
 
 (defmulti holiday-name-impl
   (fn
