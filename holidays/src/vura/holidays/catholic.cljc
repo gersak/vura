@@ -7,6 +7,10 @@
 
 (static-holiday epiphany? 1 6)
 
+
+;; From 
+;; https://github.com/eivindw/clj-easter-day/blob/master/src/easter_day.clj
+;; https://en.wikipedia.org/wiki/Computus
 (def easter
   (memoize
    (fn [year]

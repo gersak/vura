@@ -1,15 +1,16 @@
 (ns vura.holidays.compile
   (:require
+   clojure.pprint
    [clojure.string :as str]
    [yaml.core :as yaml]
    [vura.timezones.db :refer [locales]]
-   [vura.holidays.name :refer [get-name]]
    [clojure.java.io :as io]
    [clojure.edn :as edn]
    [clojure.walk :as walk]))
 
 
 (def +target+ "src/vura/holidays/")
+(def wanted-locales '("hr" "mk"))
 
 
 (defn read-locale-holidays
@@ -34,7 +35,6 @@
      (get-in yaml ["holidays"
                    (str/upper-case (name locale))
                    "days"]))))
-
 
 
 (defn get-holidays
@@ -185,31 +185,9 @@
 
 
 (defn -main []
-  (spit (str +target+ "mk.cljc") (generate-locale-holidays :mk)))
+  (map #(spit (str +target+ % ".cljc") (generate-locale-holidays (keyword %))) wanted-locales))
 
 
 (comment
-  (parse-names {"01-01 and if sunday then next monday"
-                {"substitute" true, "_name" "01-01"},
-                "05-24 and if sunday then next monday"
-                {"substitute" true,
-                 "name"
-                 {"mk" "Св. Кирил и Методиј", "en" "Saints Cyril and Methodius Day"}}})
-
-  (let [[hday & hdays] {"01-01 and if sunday then next monday"
-                        {"substitute" true, "_name" "01-01"},
-                        "05-24 and if sunday then next monday"
-                        {"substitute" true,
-                         "name"
-                         {"mk" "Св. Кирил и Методиј", "en" "Saints Cyril and Methodius Day"}}}]
-    (edn/read-string {:read-cond :preserve} (str "(partial n/get-name " "\"" (get (val hday) "_name") "\"" ")")))
-
-  (edn/read-string {:read-cond :preserve} (str "(partial n/get-name " "\"" "10-10" "\"" ")"))
-
-  (io/resource "locale_holidays.template")
-  (io/resource "clojure/java/io.clj")
-  (slurp (io/file "resources/locale_holidays.template"))
-  (slurp (io/file "/home/marko/Desktop/vura/holidays/resources/locale_holidays.template"))
-  (generate-locale-holidays :hr)
   (-main)
   (keys locales))
