@@ -2,7 +2,7 @@
   (:require
    [clojure.set :as set]
    [clojure.string :as str]
-   [vura.core :as v]     
+   [vura.core :as v]
    [vura.holidays.catholic :as catholic]
    [vura.holidays.ortodox :as ortodox])
   #?(:clj
@@ -382,6 +382,9 @@
 
 (defn compile-type [definition]
   (condp #(contains? %2 %1) definition
+    :unknown
+    (constantly false)
+    ;;
     :julian?
     (compile-julian definition)
     ;;
@@ -399,8 +402,5 @@
     ;;
     :in?
     (compile-in-month definition)
-    ;;
-    :unknown
-    (constantly false)
     ;;
     (compile-static definition)))

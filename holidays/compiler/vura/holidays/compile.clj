@@ -10,7 +10,7 @@
 
 
 (def +target+ "src/vura/holidays/")
-(def wanted-locales '("hr" "mk"))
+(def wanted-locales '("hr" "mk" "rs" "si" "hu" "ba" "al" "us" "it" "at" "ro"))
 
 
 (defn read-locale-holidays
@@ -149,7 +149,7 @@
   (loop [[hday & hdays] holidays
          result nil]
     (if (nil? hday) result
-        (condp #(contains? %2 %1) (val hday)
+        (condp #(and (map? (val hday))(contains? %2 %1)) (val hday)
           "name"
           (let [name-part (walk/keywordize-keys (get (val hday) "name"))
                 add-name-keyword (assoc (val hday) :name name-part)
@@ -174,20 +174,26 @@
      f
      (clojure.string/replace
       #"<<locale>>"
-      (with-out-str
-        (clojure.pprint/pprint
-         (edn/read-string (name locale)))))
+      (name locale))
      (clojure.string/replace
       #"<<holidays>>"
       (with-out-str
-        (clojure.pprint/pprint
-         (parse-names (get-holiday-days locale))))))))
+        (binding [clojure.core/*print-length* nil]
+          (clojure.pprint/pprint
+           (parse-names (get-holiday-days locale)))))))))
 
+
+#_(defn -main []
+  (map #(spit (str +target+ % ".cljc") (generate-locale-holidays (keyword %))) (map str/lower-case (keys locales))))
 
 (defn -main []
-  (map #(spit (str +target+ % ".cljc") (generate-locale-holidays (keyword %))) wanted-locales))
+  (doseq [local (map str/lower-case (keys locales))]
+    (spit (str +target+ local ".cljc") (generate-locale-holidays (keyword local)))))
 
 
 (comment
   (-main)
-  (keys locales))
+  (keys locales)
+  (spit (str +target+ "hr" ".cljc") (generate-locale-holidays :hr))
+  (count ( map str/lower-case (keys locales)))
+  (vura.holidays.hr/holiday? (vura.core/date 2022 12 25)))
