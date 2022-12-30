@@ -31,7 +31,9 @@
           current (get *now* at)
           interval (when interval (parse-number interval))
           fixed (filter
-                  #(<= min- % max-)
+                  #(if (and min- max-)
+                     (<= min- % max-)
+                     true)
                   (mapv
                     parse-number
                     (remove
@@ -58,19 +60,20 @@
                             (take-while #(>= % min-) (iterate #(- % interval) current))
 
                             (take-while #(<= % max-) (iterate #(+ % interval) current))))
-        :else (cond-> #{}
-                (seq (re-find #"-" element)) (into
-                                               (let [[f l] (str/split  (re-find #"\d+-\d+" element) #"-")]
-                                                 (range
-                                                   (parse-number f)
-                                                   (inc (parse-number l)))))
-                interval (into
-                           (case fixed
-                             ["*"] (range min- (inc max-) interval)
-                             (reduce
-                               concat
-                               (map #(range %  (inc max-) interval) fixed))))
-                true (into fixed))))))
+        :else (let [maybe-fixed (cond-> #{}
+                                  (seq (re-find #"-" element)) (into
+                                                                 (let [[f l] (str/split  (re-find #"\d+-\d+" element) #"-")]
+                                                                   (range
+                                                                     (parse-number f)
+                                                                     (inc (parse-number l)))))
+                                  interval (into
+                                             (case fixed
+                                               ["*"] (range min- (inc max-) interval)
+                                               (reduce
+                                                 concat
+                                                 (map #(range %  (inc max-) interval) fixed))))
+                                  true (into fixed))]
+                (if (empty? maybe-fixed) (constantly true) maybe-fixed))))))
 
 
 
