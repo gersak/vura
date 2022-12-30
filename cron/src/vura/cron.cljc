@@ -30,13 +30,15 @@
     (let [[element interval] (str/split element #"/")
           current (get *now* at)
           interval (when interval (parse-number interval))
-          fixed (mapv
-                  parse-number
-                  (remove
-                    #(or
-                       (re-find #"\d+-\d+" %)
-                       (re-find #"\*" %))
-                    (str/split element #",")))]
+          fixed (filter
+                  #(<= min- % max-)
+                  (mapv
+                    parse-number
+                    (remove
+                      #(or
+                         (re-find #"\d+-\d+" %)
+                         (re-find #"\*" %))
+                      (str/split element #","))))]
       (when (and
               interval
               (pos? interval)
