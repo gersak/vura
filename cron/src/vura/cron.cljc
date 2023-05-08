@@ -178,11 +178,17 @@
                   (after-timestamp? y m)
                   ((get mapping 4 (constantly true)) m))
           d (range 1 (inc (days-in-month y m)))
+          ; :when (and
+          ;         (after-timestamp? y m d)
+          ;         ((get mapping 5 (constantly true))
+          ;          (-> (core/date y m d) core/date->value core/day?))
+          ;         ((get mapping 3 (constantly true)) d))
           :when (and
                   (after-timestamp? y m d)
-                  ((get mapping 5 (constantly true))
-                   (-> (core/date y m d) core/date->value core/day?))
-                  ((get mapping 3 (constantly true)) d))
+                  (if-let [f (get mapping 5)]
+                    (-> (core/date y m d) core/date->value core/day? f)
+                    true)
+                  (if-let [f (get mapping 3)] (f d) true))
           h (range 24)
           :when (and
                   (after-timestamp? y m d h)

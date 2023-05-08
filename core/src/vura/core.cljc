@@ -303,7 +303,7 @@
           0)))))
 
 
-(defn- ^:no-doc <-local
+(defn ^:no-doc <-local
   "Given a local timestamp value function normalizes datetime to Greenwich timezone value"
   ([value] (<-local
             value
@@ -318,7 +318,7 @@
                 (* -1 (minutes (.getTimezoneOffset (value->utc-date value))))))))
   ([value offset] (+ value offset)))
 
-(defn- ^:no-doc ->local
+(defn ^:no-doc ->local
   "Given a Greenwich timestamp value function normalizes datetime to local timezone value"
   ([value] (->local
             value
