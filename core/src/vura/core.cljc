@@ -371,6 +371,13 @@
   (round-number value day :floor))
 
 
+(defn before-midnight
+  ([value] (before-midnight value false))
+  ([value strict?]
+    (- (+ (midnight value) day) 
+       (if strict? nanosecond second))))
+
+
 
 (def ^:no-doc julian-day-epoch
   (with-time-configuration
@@ -1272,31 +1279,7 @@
         :cljs result))))
 
 
-(comment
-  (-> start time->value value->islamic-date)
-  (def start (date 2022 1 1 8 0 0))
-  (def end (date 2031 12 31 23 59 59))
-  (time (calendar-period-context start end))
-  (defn holiday
-    [{:keys [day-in-month month]}]
-    (#{[1 1] [6 1]
-       [4 4] [5 4]
-       [1 5] [30 5]
-       [3 6] [22 6]
-       [5 8] [15 8]
-       [1 11] [18 11]
-       [25 12 26 12]} [day-in-month month]))
-  (time
-    (with-time-configuration
-      {:holiday? holiday}
-      (calendar-period-context
-        (date 2021 1 1 10 20 30 523)
-        ; (date 2032 12 31 23 59 59 999)
-        (date 2033 1 1 10 20 30 524)
-        ; (date 2022 12 31 23 59 59 999)
-        ; (date 2023 1 1)
-        )))
-  )
+
 
 (defmethod calendar-frame :year [value _]
   (let [{:keys [days-in-month year]} (day-time-context value)
@@ -1317,10 +1300,10 @@
   (let [{:keys [year month days-in-month
                 day-in-month]} (day-time-context value)
         current-day (midnight value)
-        first-week (week-in-year? value)
         first-day (-
                    current-day
                    (days (dec day-in-month)))
+        first-week (week-in-year? first-day)
         first-day-in-week (day? first-day)]
     (for [d (range days-in-month)
           :let [v (+ first-day (days d))
@@ -1346,10 +1329,12 @@
   (calendar-frame value :month))
 
 (defmethod calendar-frame :week [value _]
-  (let [w (week-in-year? value)]
-    (filter
-     (comp #{w} :week)
-     (calendar-frame value :month))))
+  (let [{:keys [day]} (day-time-context value)
+        current-day (midnight value)
+        first-day (- current-day (days (dec day)))]
+    (for [d (range 0 7)
+          :let [v (+ first-day (days d))]]
+      (day-time-context v))))
 
 (defmethod calendar-frame "week" [value _]
   (calendar-frame value :week))
