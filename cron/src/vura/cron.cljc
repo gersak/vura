@@ -24,9 +24,20 @@
   20-40/5
   */2 etc."
   [element [min- max- at]]
-  (letfn [(parse-number [x]
-            #?(:clj (Integer/valueOf x)
-               :cljs (js/parseInt x)))]
+  (letfn [(normalize [x]
+            (if-not (= at :day) x
+              (let [x (str/lower-case x)]
+                (case x
+                  ("mon" "monday") 1
+                  ("tue" "tuesday") 2
+                  ("wed" "wednesday") 3
+                  ("thu" "thursday") 4
+                  ("fri" "friday") 5 
+                  ("sat" "saturday") 6
+                  ("sun" "sunday") 7))))
+          (parse-number [x]
+            #?(:clj (Integer/valueOf (normalize x))
+               :cljs (js/parseInt (normalize x))))]
     (let [[element interval] (str/split element #"/")
           current (get *now* at)
           interval (when interval (parse-number interval))
@@ -89,35 +100,19 @@
   is valid to execute Job."
   [^String cron-record]
   (comment
-    (def cron-record "*/10 *"))
-  (letfn [(transform-interval [x]
-            (cond-> x
-              (and
-                (:interval x)
-                (:fixed x)) ((fn [{:keys [interval fixed] :as x}]
-                               (let [anchorns (conj (sorted-set fixed))]
-                                 (assoc x :sequence
-                                        (apply sorted-set
-                                               (reduce
-                                                 concat
-                                                 (map
-                                                   #(range %  (-> x :max inc) interval)
-                                                   anchorns)))))))
-              (:range x) ((fn [{:keys [sequence]
-                                :or {sequence (sorted-set)}
-                                :as x}]
-                            (let [[f l] (:range x)]
-                              (assoc x :sequence (into sequence (range f (inc l)))))))
-              true (dissoc :range :interval :fixed)))]
-    (let [elements (mapv str/trim (str/split cron-record  #"\s+"))
-          constraints [[0 59 :second]
-                       [0 59 :minute]
-                       [0 23 :hour]
-                       [1 31 :day-in-month]
-                       [1 12 :month]
-                       [1 7 :day]
-                       [nil nil]]]
-      (mapv cron-element-parserer elements constraints))))
+    (def cron-record "*/10 *")
+    (def cron-record "0 0 14* * 1-5")
+    (def cron-record "0 0 14 * * 1-5")
+    (def cron-record "0 15 9 * * TUE"))
+  (let [elements (mapv str/trim (str/split cron-record  #"\s+"))
+        constraints [[0 59 :second]
+                     [0 59 :minute]
+                     [0 23 :hour]
+                     [1 31 :day-in-month]
+                     [1 12 :month]
+                     [1 7 :day]
+                     [nil nil]]]
+    (mapv cron-element-parserer elements constraints)))
 
 (defn valid-timestamp?
   "Given a timestamp and cron definition function returns true
@@ -218,6 +213,7 @@
   (time (take 10 (future-timestamps (core/date) "0 */30")))
   (next-timestamp (core/date) "*/10")
   (next-timestamp (core/date) "0 0 0 1 1 * 2018")
+  (next-timestamp (core/date) "0 15 9 * * TUE")
   (binding [*now* (-> (core/date) core/time->value core/day-time-context)]
     (parse-cron-string "0 21/3 * * * *"))
   (next-timestamp (core/date 2018 2 9 15 50 30) "*/10")
