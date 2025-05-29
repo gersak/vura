@@ -1,170 +1,38 @@
 (ns vura.holidays.compiler
   (:require
    [clojure.set :as set]
-   [clojure.string :as str]
    [vura.core :as v]
-   [vura.holidays.catholic :as catholic]
-   [vura.holidays.ortodox :as ortodox])
-  #?(:clj
-     (:import java.lang.Integer)))
+   [vura.holiday.catholic :as catholic]
+   [vura.holiday.ortodox :as ortodox]
+   [vura.holiday.util
+    :refer [->day-time-context day-name->num]]))
 
-
-(defn parse-int [x]
-  #?(:clj (Integer/parseInt x)
-     :cljs (js/parseInt x)))
-
-(defn ->day-time-context
-  [year month day]
-  (let [dt (-> (v/date year month day)
-               v/time->value
-               v/day-time-context)]
-    dt))
-
-
-(defn day-name->num
-  [day]
-  (case day
-    "monday" 1
-    "tuesday" 2
-    "wednesday" 3
-    "thursday" 4
-    "friday" 5
-    "saturday" 6
-    "sunday" 7
-    nil))
-
-
-(defn month-name->num
-  [month]
-  (case month
-    "january" 1
-    "february" 2
-    "march" 3
-    "april" 4
-    "may" 5
-    "june" 6
-    "july" 7
-    "august" 8
-    "september" 9
-    "october" 10
-    "november" 11
-    "december" 12
-    nil))
-
-
-(defn parse-definition
-  [text]
-  (loop [[word & words] (str/split
-                         (str/lower-case
-                          (str/replace text #",\s+" ","))
-                         #"\s+")
-         result nil]
-    (if (nil? word) result
-        (condp re-find word
-          #"orthodox"
-          (let [[offset-word & words] words
-                offset-number (if (contains? #{"and" nil} offset-word)
-                                0
-                                (parse-int offset-word))]
-            (recur (if (= offset-word "and")
-                     (cons offset-word words)
-                     words)
-                   (assoc result
-                          :orthodox? true
-                          :offset offset-number)))
-          ;;
-          #"easter"
-          (let [[offset-word & words] words
-                offset-number (if (contains? #{"and" nil} offset-word)
-                                0
-                                (parse-int offset-word))]
-
-            (recur (if (= offset-word "and")
-                     (cons offset-word words)
-                     words)
-                   (assoc result
-                          :easter? true
-                          :offset offset-number)))
-          ;;
-          #"julian"
-          (recur words
-                 (assoc result
-                        :julian? true))
-          ;;
-          #"\d+-\d+-\d+"
-          (recur words
-                 (let [split-date (str/split word #"(-|#)")
-                       year (parse-int (split-date 0))
-                       month (parse-int (split-date 1))
-                       day (parse-int (split-date 2))]
-                   (assoc result
-                          :year year
-                          :month month
-                          :day-in-month day)))
-          ;;
-          #"\d+-\d+"
-          (recur words
-                 (let [split-date (str/split word #"(-|#)")
-                       day (parse-int (split-date 1))
-                       month (parse-int (split-date 0))]
-                   (assoc result
-                          :day-in-month day
-                          :month month)))
-          ;;
-          #"if$"
-          (let [statement (take-while #(not= "if" %) words)]
-            (recur
-             (drop (count statement) words)
-             (update result :statements (fnil conj []) statement)))
-          ;;
-          #"and$"
-          (recur words (assoc result :and? true))
-          ;;
-          #"\d[a-z]{2}"
-          (recur words (assoc result :nth (parse-int ((str/split word #"") 0))))
-          ;;
-          #"(monday|tuesday|wednesday|thursday|friday|saturday|sunday)"
-          (recur words (assoc result :week-day (day-name->num word)))
-          ;;
-          #"^in$"
-          (let [[target-month & words] words
-                target-month-number (month-name->num target-month)
-                results (if (nil? target-month-number) ;; ????
-                          (assoc result
-                                 :unknown [target-month])
-                          (assoc result
-                                 :in? true
-                                 :month target-month-number))]
-            (recur words results))
-          ;;
-          #"(before|after)"
-          (let [predicate (if (= word "before") :before :after)
-                temp (take-while #(nil? (re-find #"(\d+-\d+|january|february|march|april|may|june|july|august|september|october|november|december)" %)) words)
-                n (+ (count temp) 1)
-                what (take n words)]
-            (recur (drop (count what) words)
-                   (assoc result
-                          :predicate predicate
-                          :relative-to (parse-definition (str/join " " what)))))
-          ;;
-          #"(january|february|march|april|may|june|july|august|september|october|november|december)"
-          (recur words (assoc result :month (month-name->num word)))
-          ;;
-          (recur
-           words
-           (update result :unknown (fnil conj []) word))))))
-
+(defn parse-statement
+  "Converts a parsed statement sequence like ('saturday' 'then' 'previous' 'friday')
+   to the expected map format {:today #{6}, :condition 'previous', :target 5}"
+  [statement-seq]
+  (let [[today-str _ condition-str target-str & extra] statement-seq
+        today-day (day-name->num today-str)
+        target-day (day-name->num target-str)]
+    (cond-> {:today #{today-day}
+             :condition condition-str
+             :target target-day}
+      (seq extra) (assoc :unknown (vec extra)))))
 
 (defn compile-condition
   [{:keys [day-in-month
            month
            and?
            statements]}]
-  (let [forbidden-days (if-some [pred (reduce set/union (map :today statements))]
+  ;; Transform parsed statements from text format to expected map format
+  (let [transformed-statements (if (and statements (sequential? (first statements)))
+                                 (map parse-statement statements)
+                                 statements) ;; Already in correct format
+        forbidden-days (if-some [pred (reduce set/union (map :today transformed-statements))]
                          pred
                          (constantly false))
         allowed-days (complement forbidden-days)
-        valid-targets (set (map :target statements))]
+        valid-targets (set (map :target transformed-statements))]
     (fn [{d :day-in-month
           wd :day
           m :month
@@ -217,8 +85,7 @@
                    (= month m)
                    (= day-in-month d))))
               today)))))
-       statements))))
-
+       transformed-statements))))
 
 (defn compile-static
   [{:keys [day-in-month
@@ -227,13 +94,13 @@
   (fn [{d :day-in-month
         m :month
         y :year}]
-    (and
-     (= day-in-month d)
-     (= month m)
-     (or
-      (nil? year)
-      (= y year)))))
-
+    (when (and
+           (= day-in-month d)
+           (= month m)
+           (or
+            (nil? year)
+            (= y year)))
+      true)))
 
 (defn compile-easter
   [{:keys [offset]}]
@@ -244,8 +111,8 @@
           easter-m (:month easter)
           easter-value (:value (->day-time-context y easter-m easter-d))
           easter-offset-value (:value (v/day-time-context (+ easter-value (v/days offset))))]
-      (= value easter-offset-value))))
-
+      (when (= value easter-offset-value)
+        true))))
 
 (defn compile-orthodox
   [{:keys [offset
@@ -261,12 +128,12 @@
           orthodox-value (:value (->day-time-context y orthodox-m orthodox-d))
           orthodox-offset-context (v/day-time-context (+ orthodox-value (v/days offset)))]
       (if (empty? statements)
-        (= value (:value orthodox-offset-context))
+        (when (= value (:value orthodox-offset-context))
+          true)
         ((compile-condition {:day-in-month (:day-in-month orthodox-offset-context)
                              :month (:month orthodox-offset-context)
                              :and? and?
                              :statements statements}) (->day-time-context y m d))))))
-
 
 (defn compile-julian
   [{:keys [day-in-month
@@ -277,10 +144,10 @@
           (v/with-time-configuration
             {:calendar :julian}
             (v/day-time-context value))]
-      (and
-       (= day-in-month d)
-       (= month m)))))
-
+      (when (and
+             (= day-in-month d)
+             (= month m))
+        true))))
 
 (defn compile-in-month
   [{:keys [nth
@@ -289,12 +156,12 @@
   (fn [{d :day-in-month
         wd :day
         m :month}]
-    (and
-     (= m month)
-     (= wd week-day)
-     (>= d (+ (* (- nth 1) 7) 1))
-     (<= d (* nth 7)))))
-
+    (when (and
+           (= m month)
+           (= wd week-day)
+           (>= d (+ (* (- nth 1) 7) 1))
+           (<= d (* nth 7)))
+      true)))
 
 (defn first-week-day
   [week-day predicate value]
@@ -312,7 +179,6 @@
                                     % v/day)
                                   value))))]
     value))
-
 
 (defn compile-before-after
   [{:keys [predicate]
@@ -354,29 +220,30 @@
                 target-value (->nth relative-value _nth)
                 relative-target-value (first-week-day rel-week-day inverse-predicate target-value)
                 rctx (v/day-time-context relative-target-value)]
-            (and
-             (= (:month rctx) rel-month)
-             (= (:day rctx) rel-week-day)
-             (<=
-              (inc (* 7 (dec rel-nth)))
-              (:day-in-month rctx)
-              (* 7 rel-nth))))
+            (when (and
+                   (= (:month rctx) rel-month)
+                   (= (:day rctx) rel-week-day)
+                   (<=
+                    (inc (* 7 (dec rel-nth)))
+                    (:day-in-month rctx)
+                    (* 7 rel-nth)))
+              true))
           ;; relative to static date
           (and rel-day-in-month rel-month)
           (let [target (as-> value t
                          (->nth t _nth)
                          (if (= predicate :before) (+ t v/week) t)
                          (v/day-time-context t))]
-            (and
-             (= (:month target) rel-month)
-             (case predicate
-               :after (let [diff (- (:day-in-month target) rel-day-in-month)]
-                        (and (>= diff 0) (< diff 7)))
-               :before (let [diff (- (:day-in-month target) rel-day-in-month)]
-                         (and (>=  diff 0) (< diff 7))))))
+            (when (and
+                   (= (:month target) rel-month)
+                   (case predicate
+                     :after (let [diff (- (:day-in-month target) rel-day-in-month)]
+                              (and (>= diff 0) (< diff 7)))
+                     :before (let [diff (- (:day-in-month target) rel-day-in-month)]
+                               (and (>= diff 0) (< diff 7)))))
+              true))
           ;; Otherwise check based on relative week-day
           :else (throw (ex-info "Unknown definition" definition)))))))
-
 
 ;; Holiday types :julian :static :orthodox :easter :condition :before-after :nth
 

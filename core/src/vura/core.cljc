@@ -639,7 +639,7 @@
 (defn- ^:no-doc hebrew-c4 [x m] (+ (hebrew-c2 x) (hebrew-c3 x m)))
 
 
-(defn- ^:no-doc hebrew-date->value
+(defn hebrew-date->value
   [{:keys [day-in-month month year]
     :or {month 1 day-in-month 1}}]
   (let [c0 (round-number

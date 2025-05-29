@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.github.gersak</groupId>
   <artifactId>vura.cron</artifactId>
-  <version>0.5.3</version>
+  <version>0.5.5</version>
   <name>vura.cron</name>
   <packaging>jar</packaging>
   

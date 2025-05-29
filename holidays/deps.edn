@@ -1,10 +1,14 @@
 {:deps
  {com.github.gersak/vura.core {:local/root "../core"}
-  com.github.gersak/vura.timezones {:local/root "../timezones"}
-  io.forward/yaml {:mvn/version "1.0.11"}}
- :paths ["src"]
+  com.github.gersak/vura.timezones {:local/root "../timezones"}}
+ :paths ["generated" "src"]
  :aliases
- {:cider
-  {:extra-deps {org.clojure/clojure {:mvn/version "1.11.1"}
-                cider/cider-nrepl {:mvn/version "0.27.3"}}
-   :main-opts ["-m" "nrepl.cmdline" "--middleware" "[cider.nrepl/cider-middleware]"]}}}
+ {:compile
+  {:extra-paths ["compiler" "test"]
+   :extra-deps {io.forward/yaml {:mvn/version "1.0.11"}}}
+  :test
+  {:extra-paths ["test" "compiler"]
+   :extra-deps {org.clojure/test.check {:mvn/version "0.10.0"}
+                com.cognitect/test-runner
+                {:git/url "https://github.com/cognitect-labs/test-runner.git"
+                 :sha "209b64504cb3bd3b99ecfec7937b358a879f55c1"}}}}}

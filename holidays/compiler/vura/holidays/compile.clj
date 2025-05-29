@@ -8,10 +8,7 @@
    [clojure.edn :as edn]
    [clojure.walk :as walk]))
 
-
-(def +target+ "src/vura/holidays/")
-(def wanted-locales '("hr" "mk" "rs" "si" "hu" "ba" "al" "us" "it" "at" "ro"))
-
+(def +target+ "generated/vura/holiday/")
 
 (defn read-locale-holidays
   [locale]
@@ -21,7 +18,6 @@
      "https://raw.githubusercontent.com/commenthol/date-holidays/master/data/countries/%s.yaml"
      (str/upper-case (name locale))))
    :keywords false))
-
 
 (defn get-holiday-days
   "Function task locale input and reads yaml file from date-holidays
@@ -36,20 +32,17 @@
                    (str/upper-case (name locale))
                    "days"]))))
 
-
 (defn get-holidays
   ([locale]
    (keys (get-holiday-days locale)))
   ([yaml locale]
    (keys (get-holiday-days yaml locale))))
 
-
 (defn get-holiday-details
   ([locale holiday]
    (get-in (get-holiday-days locale) [holiday]))
   ([yaml locale holiday]
    (get-in (get-holiday-days yaml locale) [holiday])))
-
 
 (defn get-holidays-identifiers
   ([locale]
@@ -60,7 +53,6 @@
    (remove nil?
            (for [val (vals (get-holiday-days yaml locale))]
              (get-in val ["_name"])))))
-
 
 (defn get-holiday-types
   ([locale]
@@ -74,26 +66,20 @@
             (for [val (vals (get-holiday-days yaml locale))]
               (get-in val ["type"]))))))
 
-
-
 (defn get-locale-types [locale]
   (try
     (set (map #(get % "type") (vals (get-holiday-days locale))))
     (catch Throwable _ #{})))
 
-
 (defn get-all-types
   []
   (reduce into #{} (map get-locale-types (keys locales))))
-
 
 (defn get-all-holidays
   []
   (reduce into (sorted-set) (map get-holidays (keys locales))))
 
-
 (def holiday-types {nil "observance" "optional" "observence" "public" "Observance" "bank" "school"})
-
 
 (defn analyze-holiday [text]
   (condp re-find text
@@ -106,7 +92,6 @@
     #"^easter.*" :easter
     #"^orthodox.*" :orthodox
     nil))
-
 
 (comment
   (def text "02-08")
@@ -143,13 +128,12 @@
   (slurp "https://raw.githubusercontent.com/commenthol/date-holidays/master/data/countries")
   (time (read-locale-holidays :hr)))
 
-
 (defn parse-names
   [holidays]
   (loop [[hday & hdays] holidays
          result nil]
     (if (nil? hday) result
-        (condp #(and (map? (val hday))(contains? %2 %1)) (val hday)
+        (condp #(and (map? (val hday)) (contains? %2 %1)) (val hday)
           "name"
           (let [name-part (walk/keywordize-keys (get (val hday) "name"))
                 add-name-keyword (assoc (val hday) :name name-part)
@@ -159,13 +143,12 @@
           "_name"
           (let [name-part (edn/read-string
                            {:read-cond :preserve}
-                           (str "(partial n/get-name " "\"" (get (val hday) "_name") "\"" ")"))
+                           (str "(partial get-name " "\"" (get (val hday) "_name") "\"" ")"))
                 add-name-keyword (assoc (val hday) :name name-part)
                 remove-old-name (dissoc add-name-keyword "_name")]
             (recur hdays (assoc result (key hday) remove-old-name)))
           ;;
           (recur hdays result)))))
-
 
 (defn generate-locale-holidays [locale]
   ;;   (slurp (io/resource "locale_holidays.template"))
@@ -182,18 +165,22 @@
           (clojure.pprint/pprint
            (parse-names (get-holiday-days locale)))))))))
 
+(comment
+  (get-holiday-days :sl))
 
 #_(defn -main []
-  (map #(spit (str +target+ % ".cljc") (generate-locale-holidays (keyword %))) (map str/lower-case (keys locales))))
+    (map #(spit (str +target+ % ".cljc") (generate-locale-holidays (keyword %))) (map str/lower-case (keys locales))))
 
 (defn -main []
   (doseq [local (map str/lower-case (keys locales))]
     (spit (str +target+ local ".cljc") (generate-locale-holidays (keyword local)))))
 
-
 (comment
   (-main)
   (keys locales)
+  (clojure.java.io/make-parents (str +target+ "hr" ".cljc"))
   (spit (str +target+ "hr" ".cljc") (generate-locale-holidays :hr))
-  (count ( map str/lower-case (keys locales)))
+  (def h (vura.holidays/holiday? (vura.core/date 2022 05 05) :hr))
+  (vura.holidays/name h :hr)
+  (count (map str/lower-case (keys locales)))
   (vura.holidays.hr/holiday? (vura.core/date 2022 12 25)))

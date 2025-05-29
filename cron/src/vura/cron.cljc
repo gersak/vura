@@ -1,7 +1,7 @@
 (ns vura.cron
   (:require
-    [clojure.string :as str]
-    [vura.core :as core]))
+   [clojure.string :as str]
+   [vura.core :as core]))
 
 (def ^:dynamic *now*
   {:day 1
@@ -14,8 +14,6 @@
    :year 0
    :week 1})
 
-
-
 (defn cron-element-parserer
   "Parses CRON like element. Elements are in form
   1-25/0
@@ -26,15 +24,16 @@
   [element [min- max- at]]
   (letfn [(normalize [x]
             (if-not (= at :day) x
-              (let [x (str/lower-case x)]
-                (case x
-                  ("mon" "monday") 1
-                  ("tue" "tuesday") 2
-                  ("wed" "wednesday") 3
-                  ("thu" "thursday") 4
-                  ("fri" "friday") 5 
-                  ("sat" "saturday") 6
-                  ("sun" "sunday") 7))))
+                    (let [x (str/lower-case x)]
+                      (case x
+                        ("mon" "monday") 1
+                        ("tue" "tuesday") 2
+                        ("wed" "wednesday") 3
+                        ("thu" "thursday") 4
+                        ("fri" "friday") 5
+                        ("sat" "saturday") 6
+                        ("sun" "sunday") 7
+                        x))))
           (parse-number [x]
             #?(:clj (Integer/valueOf (normalize x))
                :cljs (js/parseInt (normalize x))))]
@@ -42,52 +41,44 @@
           current (get *now* at)
           interval (when interval (parse-number interval))
           fixed (filter
-                  #(if (and min- max-)
-                     (<= min- % max-)
-                     true)
-                  (mapv
-                    parse-number
-                    (remove
-                      #(or
-                         (re-find #"\d+-\d+" %)
-                         (re-find #"\*" %))
-                      (str/split element #","))))]
+                 #(if (and min- max-)
+                    (<= min- % max-)
+                    true)
+                 (mapv
+                  parse-number
+                  (remove
+                   #(or
+                     (re-find #"\d+-\d+" %)
+                     (re-find #"\*" %))
+                   (str/split element #","))))]
       (when (and
-              interval
-              (pos? interval)
-              (or
-                (> interval max-)
-                (< interval min-)
-                (zero? interval)))
+             interval
+             (pos? interval)
+             (or
+              (> interval max-)
+              (< interval min-)
+              (zero? interval)))
         (throw (ex-info (str "Out of bounds. Interval cannot be outside " [min- max-])
                         {:min min-
                          :max max-
                          :interval interval})))
       (cond
         (and (= element "*") (not interval)) (constantly true)
-        (= element "*") (set 
-                          (concat
-                            [current]
-                            (take-while #(>= % min-) (iterate #(- % interval) current))
-
-                            (take-while #(<= % max-) (iterate #(+ % interval) current))))
+        (= element "*") (set (range min- (inc max-) interval))
         :else (let [maybe-fixed (cond-> #{}
                                   (seq (re-find #"-" element)) (into
-                                                                 (let [[f l] (str/split  (re-find #"\d+-\d+" element) #"-")]
-                                                                   (range
-                                                                     (parse-number f)
-                                                                     (inc (parse-number l)))))
+                                                                (let [[f l] (str/split (re-find #"\d+-\d+" element) #"-")]
+                                                                  (range
+                                                                   (parse-number f)
+                                                                   (inc (parse-number l)))))
                                   interval (into
-                                             (case fixed
-                                               ["*"] (range min- (inc max-) interval)
-                                               (reduce
-                                                 concat
-                                                 (map #(range %  (inc max-) interval) fixed))))
+                                            (case fixed
+                                              ["*"] (range min- (inc max-) interval)
+                                              (reduce
+                                               concat
+                                               (map #(range % (inc max-) interval) fixed))))
                                   true (into fixed))]
                 (if (empty? maybe-fixed) (constantly true) maybe-fixed))))))
-
-
-
 
 (defn parse-cron-string
   "Parses CRON string e.g.
@@ -100,11 +91,12 @@
   is valid to execute Job."
   [^String cron-record]
   (comment
+    (def cron-record "0 0,30 10,11,12,13 * * 1-5")
     (def cron-record "*/10 *")
     (def cron-record "0 0 14* * 1-5")
     (def cron-record "0 0 14 * * 1-5")
     (def cron-record "0 15 9 * * TUE"))
-  (let [elements (mapv str/trim (str/split cron-record  #"\s+"))
+  (let [elements (mapv str/trim (str/split cron-record #"\s+"))
         constraints [[0 59 :second]
                      [0 59 :minute]
                      [0 23 :hour]
@@ -120,19 +112,18 @@
   [timestamp cron-string]
   (let [tv (core/date->value timestamp)
         {:keys [year month day-in-month hour minute second] :as now} (core/day-time-context tv)
-        elements [year month day-in-month hour minute second]
+        elements [second minute hour day-in-month month (core/day? tv)]
         constraints (binding [*now* now] (parse-cron-string cron-string))]
     ; (partition 2 (interleave constraints elements))
     (every?
-      (fn [[validator value]] (validator value))
-      (partition 2 (interleave constraints elements)))))
-
+     (fn [[validator value]] (validator value))
+     (partition 2 (interleave constraints elements)))))
 
 (defn days-in-month [year month]
-  (let [leap-year?  (if ((comp not zero?) (mod year 4)) false
-                      (if ((comp not zero?) (mod year 100)) true
-                        (if ((comp not zero?) (mod year 400)) false
-                          true)))]
+  (let [leap-year? (if ((comp not zero?) (mod year 4)) false
+                       (if ((comp not zero?) (mod year 100)) true
+                           (if ((comp not zero?) (mod year 400)) false
+                               true)))]
     (case month
       1 31
       2 (if leap-year? 29 28)
@@ -147,7 +138,6 @@
       11 30
       12 31)))
 
-
 (defn future-timestamps
   [timestamp cron-string]
   (let [timestamp-value (core/date->value timestamp)
@@ -155,23 +145,23 @@
         mapping (binding [*now* now] (parse-cron-string cron-string))
         timestamp-elements [year month day-in-month hour minute second]
         timestamp-min-values (reduce
-                               (fn [r v]
-                                 (let [v' (core/date->value
-                                            (apply core/date (take v timestamp-elements)))]
-                                   (conj r v')))
-                               []
-                               (range 7))
+                              (fn [r v]
+                                (let [v' (core/date->value
+                                          (apply core/date (take v timestamp-elements)))]
+                                  (conj r v')))
+                              []
+                              (range 7))
         after-timestamp? (fn [& args]
                            (>=
-                             (core/date->value (apply core/date args))
-                             (get timestamp-min-values (count args))))]
+                            (core/date->value (apply core/date args))
+                            (get timestamp-min-values (count args))))]
     (for [y (iterate inc year)
           :while (>= y year)
           :when (and y (get mapping 6 (constantly true)))
           m (range 1 13)
           :when (and
-                  (after-timestamp? y m)
-                  ((get mapping 4 (constantly true)) m))
+                 (after-timestamp? y m)
+                 ((get mapping 4 (constantly true)) m))
           d (range 1 (inc (days-in-month y m)))
           ; :when (and
           ;         (after-timestamp? y m d)
@@ -179,28 +169,27 @@
           ;          (-> (core/date y m d) core/date->value core/day?))
           ;         ((get mapping 3 (constantly true)) d))
           :when (and
-                  (after-timestamp? y m d)
-                  (if-let [f (get mapping 5)]
-                    (-> (core/date y m d) core/date->value core/day? f)
-                    true)
-                  (if-let [f (get mapping 3)] (f d) true))
+                 (after-timestamp? y m d)
+                 (if-let [f (get mapping 5)]
+                   (-> (core/date y m d) core/date->value core/day? f)
+                   true)
+                 (if-let [f (get mapping 3)] (f d) true))
           h (range 24)
           :when (and
-                  (after-timestamp? y m d h)
-                  ((get mapping 2 (constantly true)) h))
+                 (after-timestamp? y m d h)
+                 ((get mapping 2 (constantly true)) h))
           minutes (range 60)
           :when (and
-                  (after-timestamp? y m d h minutes)
-                  ((get mapping 1 (constantly true)) minutes))
+                 (after-timestamp? y m d h minutes)
+                 ((get mapping 1 (constantly true)) minutes))
           s (range 60)
           :when (and
-                  (after-timestamp? y m d h minutes s)
-                  (>
-                   (core/date->value (core/date y m d h minutes s))
-                   (+ timestamp-value core/second))
-                  ((get mapping 0 (constantly true)) s))]
+                 (after-timestamp? y m d h minutes s)
+                 (>
+                  (core/date->value (core/date y m d h minutes s))
+                  (+ timestamp-value core/second))
+                 ((get mapping 0 (constantly true)) s))]
       (core/date y m d h minutes s))))
-
 
 (defn next-timestamp
   "Return next valid timestamp after input timestamp. If there is no such timestamp,
