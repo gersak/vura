@@ -52,6 +52,42 @@
     "december" 12
     nil))
 
+(defn islamic-month-name->num
+  "Convert Islamic month name to number (1-12)"
+  [month]
+  (case (str/lower-case month)
+    "muharram" 1
+    "safar" 2
+    ("rabi" "rabi'" "rabi-al-awwal" "rabi al-awwal") 3
+    ("rabi-al-thani" "rabi al-thani") 4
+    ("jumada" "jumada-al-awwal" "jumada al-awwal") 5
+    ("jumada-al-thani" "jumada al-thani") 6
+    "rajab" 7
+    ("sha'ban" "shaban") 8
+    "ramadan" 9
+    "shawwal" 10
+    ("dhu-al-qidah" "dhu al-qidah" "dhu-al-qi'dah" "dhu al-qi'dah") 11
+    ("dhu-al-hijjah" "dhu al-hijjah") 12
+    nil))
+
+(defn astronomical-event-name->info
+  "Convert astronomical event names to calculation info"
+  [event-name]
+  (case (str/lower-case event-name)
+    "equinox" {:type :equinox :season nil}
+    ("march equinox" "march-equinox" "spring-equinox") {:type :equinox :season :spring}
+    ("september equinox" "september-equinox" "autumn-equinox" "autumnal-equinox") {:type :equinox :season :autumn}
+    ("june solstice" "june-solstice" "summer-solstice") {:type :solstice :season :summer}
+    ("december solstice" "december-solstice" "winter-solstice") {:type :solstice :season :winter}
+    nil))
+
+(defn chinese-month-name->num
+  "Convert Chinese month names or numbers to month number"
+  [month-str]
+  (cond
+    (re-matches #"\d+" month-str) (parse-int month-str)
+    :else nil)) ; Could extend with Chinese month names
+
 (defn parse-definition
   [text]
   (loop [[word & words] (str/split
@@ -70,8 +106,8 @@
                      (cons offset-word words)
                      words)
                    (assoc result
-                     :orthodox? true
-                     :offset offset-number)))
+                          :orthodox? true
+                          :offset offset-number)))
           ;;
           #"easter"
           (let [[offset-word & words] words
@@ -83,13 +119,13 @@
                      (cons offset-word words)
                      words)
                    (assoc result
-                     :easter? true
-                     :offset offset-number)))
+                          :easter? true
+                          :offset offset-number)))
           ;;
           #"julian"
           (recur words
                  (assoc result
-                   :julian? true))
+                        :julian? true))
           ;;
           #"\d+-\d+-\d+"
           (recur words
@@ -98,9 +134,9 @@
                        month (parse-int (split-date 1))
                        day (parse-int (split-date 2))]
                    (assoc result
-                     :year year
-                     :month month
-                     :day-in-month day)))
+                          :year year
+                          :month month
+                          :day-in-month day)))
           ;;
           #"\d+-\d+"
           (recur words
@@ -108,8 +144,8 @@
                        day (parse-int (split-date 1))
                        month (parse-int (split-date 0))]
                    (assoc result
-                     :day-in-month day
-                     :month month)))
+                          :day-in-month day
+                          :month month)))
           ;;
           #"if$"
           (let [statement (take-while #(not= "if" %) words)]
@@ -119,6 +155,15 @@
           ;;
           #"and$"
           (recur words (assoc result :and? true))
+          ;;
+          ;; ISO 8601 duration pattern like P2DT, P2DT0H0M - must come before numeric patterns  
+          #"p\d+d(?:t(?:\d+h)?(?:\d+m)?)?"
+          (let [match (re-find #"p(\d+)d(?:t(?:(\d+)h)?(?:(\d+)m)?)?" word)]
+            (recur words
+                   (assoc result
+                          :period {:days (parse-int (nth match 1))
+                                   :hours (when (nth match 2) (parse-int (nth match 2)))
+                                   :minutes (when (nth match 3) (parse-int (nth match 3)))})))
           ;;
           #"\d[a-z]{2}"
           (recur words (assoc result :nth (parse-int ((str/split word #"") 0))))
@@ -131,10 +176,10 @@
                 target-month-number (month-name->num target-month)
                 results (if (nil? target-month-number) ;; ????
                           (assoc result
-                            :unknown [target-month])
+                                 :unknown [target-month])
                           (assoc result
-                            :in? true
-                            :month target-month-number))]
+                                 :in? true
+                                 :month target-month-number))]
             (recur words results))
           ;;
           #"(before|after)"
@@ -144,15 +189,105 @@
                 what (take n words)]
             (recur (drop (count what) words)
                    (assoc result
-                     :predicate predicate
-                     :relative-to (parse-definition (str/join " " what)))))
+                          :predicate predicate
+                          :relative-to (parse-definition (str/join " " what)))))
           ;;
-          #"(january|february|march|april|may|june|july|august|september|october|november|december)"
-          (recur words (assoc result :month (month-name->num word)))
+          ;; Check for astronomical events first, then regular month names
+          #"^(january|february|march|april|may|june|july|august|september|october|november|december)$"
+          (let [[next-word & remaining-words] words]
+            (if (= next-word "equinox")
+              ;; This is an astronomical event like "march equinox"  
+              (let [[timezone & final-words] remaining-words
+                    event-info (astronomical-event-name->info (str word " equinox"))]
+                (if event-info
+                  (recur final-words
+                         (assoc result
+                                :astronomical? true
+                                :event-type (:type event-info)
+                                :season (:season event-info)
+                                :month (month-name->num word)
+                                :timezone timezone))
+                  ;; Not a recognized astronomical event
+                  (recur words (assoc result :month (month-name->num word)))))
+              ;; Regular month name
+              (recur words (assoc result :month (month-name->num word)))))
+          ;;
+          ;; Chinese calendar pattern like "chinese 01-0-00"  
+          #"chinese"
+          (let [[date-part & remaining-words] words]
+            (if (and date-part (re-matches #"\d+-\d+-\d+" date-part))
+              (let [parts (str/split date-part #"-")
+                    month (parse-int (nth parts 0))
+                    leap (parse-int (nth parts 1)) ; 0 = regular, 1 = leap month
+                    day (parse-int (nth parts 2))]
+                (recur remaining-words
+                       (assoc result
+                              :chinese? true
+                              :month month
+                              :day-in-month day
+                              :leap-month? (= leap 1))))
+              ;; Invalid Chinese date format
+              (recur words (update result :unknown (fnil conj []) word))))
+          ;;
+          ;; Solar terms like "solarterm"
+          #"solarterm"
+          (recur words (assoc result :solarterm? true))
+          ;;
+          ;; Islamic calendar months - handle single and multi-word names
+          #"(muharram|safar|rabi|jumada|rajab|sha'ban|shaban|ramadan|shawwal|dhu)"
+          (let [;; Try single word first
+                single-month (islamic-month-name->num word)
+                ;; Try combining with next word for multi-word names like "dhu al-hijjah"
+                [next-word & remaining-words] words
+                combined-word (when next-word (str word " " next-word))
+                combined-month (when combined-word (islamic-month-name->num combined-word))]
+            (cond
+              ;; Found two-word Islamic month and there's a pending day  
+              (and combined-month (:temp-day result))
+              (recur remaining-words (-> result
+                                         (dissoc :temp-day)
+                                         (assoc :islamic? true
+                                                :day-in-month (:temp-day result)
+                                                :month combined-month)))
+
+              ;; Found single-word Islamic month and there's a pending day
+              (and single-month (:temp-day result))
+              (recur words (-> result
+                               (dissoc :temp-day)
+                               (assoc :islamic? true
+                                      :day-in-month (:temp-day result)
+                                      :month single-month)))
+
+              ;; Islamic month word but no pending day - treat as unknown
+              :else
+              (recur words (update result :unknown (fnil conj []) word))))
+          ;;
+          ;; Check if word is a number (potential Islamic day)
+          #"^\d+$"
+          (let [day-num (parse-int word)]
+            (if (and (>= day-num 1) (<= day-num 30))
+              ;; Store the day number temporarily in case next word is Islamic month
+              (recur words (assoc result :temp-day day-num))
+              ;; Not a valid day number
+              (recur words (update result :unknown (fnil conj []) word))))
+          ;;
+          ;; ISO 8601 duration pattern like P2DT, P2DT0H0M
+          #"p\d+d(?:t(?:\d+h)?(?:\d+m)?)?"
+          (let [match (re-find #"p(\d+)d(?:t(?:(\d+)h)?(?:(\d+)m)?)?" word)]
+            (recur words
+                   (assoc result
+                          :period {:days (parse-int (nth match 1))
+                                   :hours (when (nth match 2) (parse-int (nth match 2)))
+                                   :minutes (when (nth match 3) (parse-int (nth match 3)))})))
           ;;
           (recur
            words
            (update result :unknown (fnil conj []) word))))))
+
+ ;; Test period parsing separately
+(comment
+  (parse-definition "01-01 P2DT")
+  (parse-definition "P2DT"))
 
 (def names
   {"12-08"

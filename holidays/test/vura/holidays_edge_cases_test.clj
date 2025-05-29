@@ -2,7 +2,7 @@
   (:require
    [vura.core :as v]
    [clojure.test :refer [deftest is testing]]
-   [vura.holidays.compiler :as c]
+   [vura.holiday.compiler :as c]
    [vura.holiday.util :refer [parse-definition]]))
 
 (defn ->day-time-context
@@ -365,3 +365,179 @@
     (is (= (parse-definition "friday after 4th thursday in November")
            {:predicate :after :week-day 5
             :relative-to {:nth 4 :week-day 4 :in? true :month 11}}))))
+
+ ;; =============================================================================
+;; EDGE CASE TESTS FOR PERIOD HOLIDAYS (ISO 8601 DURATION)
+;; =============================================================================
+
+(deftest period-holiday-edge-cases
+  (testing "P2DT - 2 day period starting from specific date"
+    (let [new-year-period (c/compile-type
+                           (parse-definition "01-01 P2DT"))]
+
+      ;; 2024: New Year period should cover Jan 1-2
+      (is (true? (new-year-period (->day-time-context 2024 1 1)))
+          "Jan 1, 2024 should be within New Year period")
+      (is (true? (new-year-period (->day-time-context 2024 1 2)))
+          "Jan 2, 2024 should be within New Year period")
+      (is (nil? (new-year-period (->day-time-context 2024 1 3)))
+          "Jan 3, 2024 should NOT be within New Year period")
+      (is (nil? (new-year-period (->day-time-context 2023 12 31)))
+          "Dec 31, 2023 should NOT be within New Year period")
+
+      ;; Test different years
+      (is (true? (new-year-period (->day-time-context 2025 1 1)))
+          "Jan 1, 2025 should be within New Year period")
+      (is (true? (new-year-period (->day-time-context 2025 1 2)))
+          "Jan 2, 2025 should be within New Year period")))
+
+  (testing "P2DT0H0M - 2 day period with explicit hours/minutes"
+    (let [complex-period (c/compile-type
+                          (parse-definition "06-01 P2DT0H0M"))]
+
+      ;; Children's Day period June 1-2
+      (is (true? (complex-period (->day-time-context 2024 6 1)))
+          "June 1, 2024 should be within Children's Day period")
+      (is (true? (complex-period (->day-time-context 2024 6 2)))
+          "June 2, 2024 should be within Children's Day period")
+      (is (nil? (complex-period (->day-time-context 2024 6 3)))
+          "June 3, 2024 should NOT be within Children's Day period")
+      (is (nil? (complex-period (->day-time-context 2024 5 31)))
+          "May 31, 2024 should NOT be within Children's Day period")))
+
+  (testing "Period holidays across month boundaries"
+    (let [month-boundary-period (c/compile-type
+                                 (parse-definition "01-31 P2DT"))]
+
+      ;; Period starting Jan 31 should cover Jan 31 - Feb 1  
+      (is (true? (month-boundary-period (->day-time-context 2024 1 31)))
+          "Jan 31, 2024 should be within period")
+      (is (true? (month-boundary-period (->day-time-context 2024 2 1)))
+          "Feb 1, 2024 should be within period (crosses month boundary)")
+      (is (nil? (month-boundary-period (->day-time-context 2024 2 2)))
+          "Feb 2, 2024 should NOT be within period")))
+
+  (testing "Period holidays across year boundaries"
+    (let [year-boundary-period (c/compile-type
+                                (parse-definition "12-31 P2DT"))]
+
+      ;; Period starting Dec 31 should cover Dec 31 - Jan 1 next year
+      (is (true? (year-boundary-period (->day-time-context 2023 12 31)))
+          "Dec 31, 2023 should be within period")
+      (is (true? (year-boundary-period (->day-time-context 2024 1 1)))
+          "Jan 1, 2024 should be within period (crosses year boundary)")
+      (is (nil? (year-boundary-period (->day-time-context 2024 1 2)))
+          "Jan 2, 2024 should NOT be within period")))
+
+  (testing "Leap year handling with periods"
+    (let [leap-day-period (c/compile-type
+                           (parse-definition "02-28 P2DT"))]
+
+      ;; 2024 is a leap year - period should be Feb 28-29
+      (is (true? (leap-day-period (->day-time-context 2024 2 28)))
+          "Feb 28, 2024 (leap year) should be within period")
+      (is (true? (leap-day-period (->day-time-context 2024 2 29)))
+          "Feb 29, 2024 (leap day) should be within period")
+      (is (nil? (leap-day-period (->day-time-context 2024 3 1)))
+          "Mar 1, 2024 should NOT be within period")
+
+      ;; 2023 is not a leap year - period should be Feb 28 - Mar 1
+      (is (true? (leap-day-period (->day-time-context 2023 2 28)))
+          "Feb 28, 2023 (non-leap year) should be within period")
+      (is (true? (leap-day-period (->day-time-context 2023 3 1)))
+          "Mar 1, 2023 should be within period (no leap day)")
+      (is (nil? (leap-day-period (->day-time-context 2023 3 2)))
+          "Mar 2, 2023 should NOT be within period")))
+
+  (testing "Period parsing edge cases"
+    ;; Test various ISO 8601 duration formats
+    (is (= (parse-definition "01-01 P2DT")
+           {:day-in-month 1 :month 1 :period {:days 2 :hours nil :minutes nil}})
+        "P2DT should parse correctly")
+
+    (is (= (parse-definition "01-01 P3DT2H5M")
+           {:day-in-month 1 :month 1 :period {:days 3 :hours 2 :minutes 5}})
+        "P3DT2H5M should parse correctly")
+
+    (is (= (parse-definition "01-01 P1DT0H0M")
+           {:day-in-month 1 :month 1 :period {:days 1 :hours 0 :minutes 0}})
+        "P1DT0H0M should parse correctly")))
+
+ ;; =============================================================================
+;; EDGE CASE TESTS FOR ISLAMIC CALENDAR HOLIDAYS
+;; =============================================================================
+
+(deftest islamic-calendar-edge-cases
+  (testing "Islamic calendar date parsing"
+    ;; Test basic Islamic calendar date parsing
+    (is (= (parse-definition "10 Muharram")
+           {:islamic? true :day-in-month 10 :month 1})
+        "10 Muharram should parse correctly")
+
+    (is (= (parse-definition "1 Shawwal")
+           {:islamic? true :day-in-month 1 :month 10})
+        "1 Shawwal should parse correctly")
+
+    (is (= (parse-definition "21 Ramadan")
+           {:islamic? true :day-in-month 21 :month 9})
+        "21 Ramadan should parse correctly")
+
+    (is (= (parse-definition "12 Dhu al-Hijjah")
+           {:islamic? true :day-in-month 12 :month 12})
+        "12 Dhu al-Hijjah should parse correctly"))
+
+  (testing "Islamic calendar holidays - major celebrations"
+    (let [ashura (c/compile-type (parse-definition "10 Muharram"))
+          eid-fitr (c/compile-type (parse-definition "1 Shawwal"))
+          eid-adha (c/compile-type (parse-definition "10 Dhu al-Hijjah"))]
+
+      ;; Test known Islamic dates (approximate Gregorian equivalents)
+      ;; Note: Islamic calendar is lunar, so dates shift each year
+
+      ;; Test Ashura (10 Muharram) - July 17, 2024 = 10 Muharram 1446
+      (let [ashura-ctx (->day-time-context 2024 7 17)]
+        (is (true? (ashura ashura-ctx))
+            "10 Muharram should be recognized as Ashura"))
+
+      ;; Test Eid Fitr (1 Shawwal) - April 10, 2024 = 1 Shawwal 1445
+      (let [eid-fitr-ctx (->day-time-context 2024 4 10)]
+        (is (true? (eid-fitr eid-fitr-ctx))
+            "1 Shawwal should be recognized as Eid Fitr"))
+
+      ;; Test Eid Adha (10 Dhu al-Hijjah) - June 17, 2024 = 10 Dhu al-Hijjah 1445
+      (let [eid-adha-ctx (->day-time-context 2024 6 17)]
+        (is (true? (eid-adha eid-adha-ctx))
+            "10 Dhu al-Hijjah should be recognized as Eid Adha"))))
+
+  (testing "Islamic calendar year boundaries"
+    ;; Islamic calendar has 354-355 days, so it shifts relative to Gregorian
+    (let [muharram-1 (c/compile-type (parse-definition "1 Muharram"))]
+
+    ;; 1 Muharram is Islamic New Year - July 8, 2024 = 1 Muharram 1446
+      (let [islamic-new-year-ctx (->day-time-context 2024 7 8)]
+        (is (true? (muharram-1 islamic-new-year-ctx))
+            "1 Muharram should be recognized as Islamic New Year"))))
+
+  (testing "Islamic month name variations"
+    ;; Test different spellings/variations of Islamic month names
+    (is (= (parse-definition "15 Jumada al-awwal")
+           {:islamic? true :day-in-month 15 :month 5})
+        "Jumada al-awwal should parse correctly")
+
+    (is (= (parse-definition "27 Rajab")
+           {:islamic? true :day-in-month 27 :month 7})
+        "Rajab should parse correctly")
+
+    (is (= (parse-definition "15 Sha'ban")
+           {:islamic? true :day-in-month 15 :month 8})
+        "Sha'ban should parse correctly"))
+
+  (testing "Islamic calendar with other date patterns"
+    ;; Test Islamic dates combined with other patterns (should not interfere)
+    (is (= (parse-definition "julian 01-01")
+           {:julian? true :day-in-month 1 :month 1})
+        "Julian dates should still work with Islamic support")
+
+    (is (= (parse-definition "01-01 P2DT")
+           {:day-in-month 1 :month 1 :period {:days 2 :hours nil :minutes nil}})
+        "Period dates should still work with Islamic support")))

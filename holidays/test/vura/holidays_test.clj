@@ -3,7 +3,7 @@
    [vura.core :as v]
    [clojure.test
     :refer [deftest is]]
-   [vura.holidays.compiler :as c]
+   [vura.holiday.compiler :as c]
    [vura.holiday.util :refer [parse-definition]]))
 
 (defn ->day-time-context
@@ -26,14 +26,12 @@
          {:easter? true, :offset 26}))
   (is (= (parse-definition "easter -2 prior to 2019")
          {:easter? true, :offset -2, :unknown ["prior" "to" "2019"]}))
-  (is (= (parse-definition "easter -6 P7D")
-         {:easter? true, :offset -6, :unknown ["p7d"]}))
+  (is (= (parse-definition "easter -6 P7D") {:easter? true, :offset -6, :period {:days 7, :hours nil, :minutes nil}}))
   (is (= (parse-definition "julian 06-15")
          {:julian? true, :day-in-month 15, :month 6}))
   (is (= (parse-definition "julian 12-25 and if saturday, sunday then next monday")
          {:julian? true, :day-in-month 25, :month 12, :and? true, :statements ['("saturday,sunday" "then" "next" "monday")]}))
-  (is (= (parse-definition "julian 12-25 P2D")
-         {:julian? true, :day-in-month 25, :month 12, :unknown ["p2d"]})))
+  (is (= (parse-definition "julian 12-25 P2D") {:julian? true, :day-in-month 25, :month 12, :period {:days 2, :hours nil, :minutes nil}})))
 
 (deftest before-after-tests
   (let [monday-before-september (c/compile-before-after {:week-day 1,

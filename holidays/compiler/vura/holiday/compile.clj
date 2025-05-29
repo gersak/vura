@@ -1,4 +1,4 @@
-(ns vura.holidays.compile
+(ns vura.holiday.compile
   (:require
    clojure.pprint
    [clojure.string :as str]
@@ -171,9 +171,22 @@
 #_(defn -main []
     (map #(spit (str +target+ % ".cljc") (generate-locale-holidays (keyword %))) (map str/lower-case (keys locales))))
 
+(defn generate-all-namespace
+  []
+  (spit (str +target+ "all.cljc")
+        (let [locales (map str/lower-case (keys locales))]
+          (str
+           "(ns vura.holiday.all\n"
+           " (:require\n  "
+           (str/join "\n  " (for [locale locales]
+                              (symbol (str "[vura.holiday." locale "]"))))
+           "))"))))
+
 (defn -main []
+  (clojure.java.io/make-parents +target+)
   (doseq [local (map str/lower-case (keys locales))]
-    (spit (str +target+ local ".cljc") (generate-locale-holidays (keyword local)))))
+    (spit (str +target+ local ".cljc") (generate-locale-holidays (keyword local))))
+  (generate-all-namespace))
 
 (comment
   (-main)

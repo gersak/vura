@@ -22,10 +22,12 @@
 (defn ? [date dispatch]
   (is-holiday? dispatch (-> date time->value day-time-context)))
 
-(defn name [definition dispatch]
-  (when-some [{f :name} definition]
-    (when (fn? f)
-      (f dispatch))))
+(defn name
+  ([definition] (name definition :en))
+  ([definition dispatch]
+   (when-some [{f :name} definition]
+     (when (fn? f)
+       (f dispatch)))))
 
 (def locale ::locale)
 (def religion ::religion)
@@ -34,3 +36,6 @@
 (derive locale :vura.core/holiday)
 (derive religion :vura.core/holiday)
 (derive country :vura.core/holiday)
+
+(comment
+  (name (? (vura.core/date 2028 12 26) :sl) :sl))

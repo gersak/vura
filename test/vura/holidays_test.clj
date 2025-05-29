@@ -12,7 +12,6 @@
                v/day-time-context)]
     dt))
 
-
 (deftest holiday-definition-parsing
   (is (= (c/parse-definition "orthodox")
          {:orthodox? true, :offset 0}))
@@ -34,7 +33,6 @@
          {:julian? true, :day-in-month 25, :month 12, :and? true, :statements ['("saturday,sunday" "then" "next" "monday")]}))
   (is (= (c/parse-definition "julian 12-25 P2D")
          {:julian? true, :day-in-month 25, :month 12, :unknown ["p2d"]})))
-
 
 (deftest before-after-tests
   (let [monday-before-september (c/compile-before-after {:week-day 1,
@@ -310,7 +308,6 @@
     (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2023 11 21)))))
     (is (not (true? (tuesday-after-1st-monday-in-november (->day-time-context 2023 10 31)))))))
 
-
 (deftest condition-tests
   (let [new-year? (c/compile-condition
                    {:day-in-month 1,
@@ -344,6 +341,7 @@
     (is (true? (holiday-04-25? (->day-time-context 2020 4 25))) "25.4.2020 is Saturday and is holiday because of and condition")
     (is (nil? (holiday-04-25? (->day-time-context 2020 4 26))) "26.4.2020 is Sunday and is not a holiday")
     (is (true? (holiday-04-25? (->day-time-context 2020 4 27))) "27.4.2020 is Monday and is holiday because of statement")
+
     (is (true? (holiday-04-25? (->day-time-context 2022 4 25))) "25.4.2021 is Monday and is holiday")
     (is (nil? (holiday-04-25? (->day-time-context 2022 4 26))) "26.4.2021 is Tuesday and not a holiday")
 

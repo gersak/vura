@@ -1,4 +1,4 @@
-(ns vura.holidays.compiler
+(ns vura.holiday.compiler
   (:require
    [clojure.set :as set]
    [vura.core :as v]
@@ -149,6 +149,28 @@
              (= month m))
         true))))
 
+(defn compile-islamic
+  "Compiles Islamic calendar dates like {:islamic? true :day-in-month 10 :month 1}"
+  [{:keys [day-in-month month year]}]
+  (println (format "Islamic holiday: %s %d, %s"
+                   (case month
+                     1 "Muharram" 2 "Safar" 3 "Rabi al-awwal" 4 "Rabi al-thani"
+                     5 "Jumada al-awwal" 6 "Jumada al-thani" 7 "Rajab" 8 "Sha'ban"
+                     9 "Ramadan" 10 "Shawwal" 11 "Dhu al-Qidah" 12 "Dhu al-Hijjah"
+                     "Unknown")
+                   day-in-month
+                   (or year "Any Year")))
+  (fn [{:keys [value]}]
+    (let [{d :day-in-month
+           m :month}
+          (v/with-time-configuration
+            {:calendar :islamic}
+            (v/day-time-context value))]
+      (when (and (= day-in-month d)
+                 (= month m)
+                 (or (nil? year) (= year (:year (v/value->islamic-date value)))))
+        true))))
+
 (defn compile-in-month
   [{:keys [nth
            week-day
@@ -245,6 +267,48 @@
           ;; Otherwise check based on relative week-day
           :else (throw (ex-info "Unknown definition" definition)))))))
 
+(defn compile-period
+  "Compiles period definitions like {:day-in-month 1 :month 1 :period {:days 2}}
+   Creates a predicate that matches multiple consecutive days"
+  [{:keys [day-in-month month year period]}]
+  (let [days (:days period)
+        hours (:hours period)
+        minutes (:minutes period)]
+    (println (format "Period holiday: %s-%02d-%02d lasting %d days"
+                     (or year "YYYY") month day-in-month days))
+    (fn [{d :day-in-month
+          m :month
+          y :year
+          :keys [value]}]
+      ;; Check if current date falls within the period range
+      (if year
+        ;; Specific year given in definition
+        (let [start-value (:value (->day-time-context year month day-in-month))
+              end-value (+ start-value (v/days days)
+                           (if hours (v/hours hours) 0)
+                           (if minutes (v/minutes minutes) 0))]
+          (when (and (>= value start-value)
+                     (< value end-value))
+            true))
+        ;; No specific year - try current year and previous year
+        (or
+         ;; Try current year
+         (let [start-value (:value (->day-time-context y month day-in-month))
+               end-value (+ start-value (v/days days)
+                            (if hours (v/hours hours) 0)
+                            (if minutes (v/minutes minutes) 0))]
+           (when (and (>= value start-value)
+                      (< value end-value))
+             true))
+         ;; Try previous year (for year-crossing periods)
+         (let [start-value (:value (->day-time-context (dec y) month day-in-month))
+               end-value (+ start-value (v/days days)
+                            (if hours (v/hours hours) 0)
+                            (if minutes (v/minutes minutes) 0))]
+           (when (and (>= value start-value)
+                      (< value end-value))
+             true)))))))
+
 ;; Holiday types :julian :static :orthodox :easter :condition :before-after :nth
 
 (defn compile-type [definition]
@@ -252,8 +316,14 @@
     :unknown
     (constantly false)
     ;;
+    :period
+    (compile-period definition)
+    ;;
     :julian?
     (compile-julian definition)
+    ;;
+    :islamic?
+    (compile-islamic definition)
     ;;
     :easter?
     (compile-easter definition)
