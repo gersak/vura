@@ -9,8 +9,7 @@
    [vura.holiday.compiler :as compiler]))
 
 (def holidays
-  nil
-)
+  nil)
 
 (def locale-holiday-mapping
   (reduce-kv

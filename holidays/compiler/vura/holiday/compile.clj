@@ -150,23 +150,45 @@
           ;;
           (recur hdays result)))))
 
+(defn escape-quotes-in-map [m]
+  (clojure.walk/postwalk
+   (fn [x]
+     (if (string? x)
+       (clojure.string/escape x {\" "\\\""})
+       x))
+   m))
+
 (defn generate-locale-holidays [locale]
-  ;;   (slurp (io/resource "locale_holidays.template"))
-  (let [f (slurp (io/file "resources/locale_holidays.template"))]
+  (let [f (slurp (io/file "resources/locale_holidays.template"))
+        holiday-data (-> (get-holiday-days locale)
+                         parse-names
+                         escape-quotes-in-map)]
     (->
      f
-     (clojure.string/replace
-      #"<<locale>>"
-      (name locale))
-     (clojure.string/replace
-      #"<<holidays>>"
-      (with-out-str
-        (binding [clojure.core/*print-length* nil]
-          (clojure.pprint/pprint
-           (parse-names (get-holiday-days locale)))))))))
+     (clojure.string/replace #"<<locale>>" (name locale))
+     (clojure.string/replace #"<<holidays>>"
+                             (binding [clojure.core/*print-length* nil]
+                               (with-out-str
+                                 (clojure.pprint/pprint holiday-data)))))))
+
+#_(defn generate-locale-holidays [locale]
+  ;;   (slurp (io/resource "locale_holidays.template"))
+    (let [f (slurp (io/file "resources/locale_holidays.template"))]
+      (->
+       f
+       (clojure.string/replace
+        #"<<locale>>"
+        (name locale))
+       (clojure.string/replace
+        #"<<holidays>>"
+        (with-out-str
+          (binding [clojure.core/*print-length* nil]
+            (clojure.pprint/pprint
+             (parse-names (get-holiday-days locale)))))))))
 
 (comment
-  (get-holiday-days :sl))
+  (def locale :il)
+  (get-holiday-days :il))
 
 #_(defn -main []
     (map #(spit (str +target+ % ".cljc") (generate-locale-holidays (keyword %))) (map str/lower-case (keys locales))))
@@ -183,7 +205,7 @@
            "))"))))
 
 (defn -main []
-  (clojure.java.io/make-parents +target+)
+  (clojure.java.io/make-parents (str +target+ "dummy.txt"))
   (doseq [local (map str/lower-case (keys locales))]
     (spit (str +target+ local ".cljc") (generate-locale-holidays (keyword local))))
   (generate-all-namespace))
@@ -193,6 +215,7 @@
   (keys locales)
   (clojure.java.io/make-parents (str +target+ "hr" ".cljc"))
   (spit (str +target+ "hr" ".cljc") (generate-locale-holidays :hr))
+  (spit (str +target+ "il" ".cljc") (generate-locale-holidays :il))
   (def h (vura.holidays/holiday? (vura.core/date 2022 05 05) :hr))
   (vura.holidays/name h :hr)
   (count (map str/lower-case (keys locales)))

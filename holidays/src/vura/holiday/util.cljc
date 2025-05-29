@@ -70,23 +70,7 @@
     ("dhu-al-hijjah" "dhu al-hijjah") 12
     nil))
 
-(defn astronomical-event-name->info
-  "Convert astronomical event names to calculation info"
-  [event-name]
-  (case (str/lower-case event-name)
-    "equinox" {:type :equinox :season nil}
-    ("march equinox" "march-equinox" "spring-equinox") {:type :equinox :season :spring}
-    ("september equinox" "september-equinox" "autumn-equinox" "autumnal-equinox") {:type :equinox :season :autumn}
-    ("june solstice" "june-solstice" "summer-solstice") {:type :solstice :season :summer}
-    ("december solstice" "december-solstice" "winter-solstice") {:type :solstice :season :winter}
-    nil))
-
-(defn chinese-month-name->num
-  "Convert Chinese month names or numbers to month number"
-  [month-str]
-  (cond
-    (re-matches #"\d+" month-str) (parse-int month-str)
-    :else nil)) ; Could extend with Chinese month names
+; Could extend with Chinese month names
 
 (defn parse-definition
   [text]
@@ -192,46 +176,8 @@
                           :predicate predicate
                           :relative-to (parse-definition (str/join " " what)))))
           ;;
-          ;; Check for astronomical events first, then regular month names
-          #"^(january|february|march|april|may|june|july|august|september|october|november|december)$"
-          (let [[next-word & remaining-words] words]
-            (if (= next-word "equinox")
-              ;; This is an astronomical event like "march equinox"  
-              (let [[timezone & final-words] remaining-words
-                    event-info (astronomical-event-name->info (str word " equinox"))]
-                (if event-info
-                  (recur final-words
-                         (assoc result
-                                :astronomical? true
-                                :event-type (:type event-info)
-                                :season (:season event-info)
-                                :month (month-name->num word)
-                                :timezone timezone))
-                  ;; Not a recognized astronomical event
-                  (recur words (assoc result :month (month-name->num word)))))
-              ;; Regular month name
-              (recur words (assoc result :month (month-name->num word)))))
-          ;;
-          ;; Chinese calendar pattern like "chinese 01-0-00"  
-          #"chinese"
-          (let [[date-part & remaining-words] words]
-            (if (and date-part (re-matches #"\d+-\d+-\d+" date-part))
-              (let [parts (str/split date-part #"-")
-                    month (parse-int (nth parts 0))
-                    leap (parse-int (nth parts 1)) ; 0 = regular, 1 = leap month
-                    day (parse-int (nth parts 2))]
-                (recur remaining-words
-                       (assoc result
-                              :chinese? true
-                              :month month
-                              :day-in-month day
-                              :leap-month? (= leap 1))))
-              ;; Invalid Chinese date format
-              (recur words (update result :unknown (fnil conj []) word))))
-          ;;
-          ;; Solar terms like "solarterm"
-          #"solarterm"
-          (recur words (assoc result :solarterm? true))
+          #"(january|february|march|april|may|june|july|august|september|october|november|december)"
+          (recur words (assoc result :month (month-name->num word)))
           ;;
           ;; Islamic calendar months - handle single and multi-word names
           #"(muharram|safar|rabi|jumada|rajab|sha'ban|shaban|ramadan|shawwal|dhu)"

@@ -7,3 +7,4 @@ gpg.edn
 repl.clj
 .nrepl-port
 .nrepl-history
+.DS_Store

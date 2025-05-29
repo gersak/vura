@@ -9,8 +9,7 @@
    [vura.holiday.compiler :as compiler]))
 
 (def holidays
-  {"12-20" {:name (partial get-name "Abolition of Slavery")}}
-)
+  {"12-20" {:name (partial get-name "Abolition of Slavery")}})
 
 (def locale-holiday-mapping
   (reduce-kv

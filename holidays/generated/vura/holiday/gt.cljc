@@ -10,20 +10,19 @@
 
 (def holidays
   {"01-01" {:name (partial get-name "01-01")},
- "12-31 12:00" {:name (partial get-name "12-31")},
- "09-15" {:name (partial get-name "Independence Day")},
- "11-01" {:name (partial get-name "11-01")},
- "easter -1" {:name (partial get-name "easter -1")},
- "easter" {"type" "observance", :name (partial get-name "easter")},
- "10-20" {:name (partial get-name "Revolution Day")},
- "easter -2" {:name (partial get-name "easter -2")},
- "05-01" {:name (partial get-name "05-01")},
- "easter -3" {:name (partial get-name "easter -3")},
- "12-24 12:00" {:name (partial get-name "12-24")},
- "06-30 if tuesday then previous monday if wednesday,thursday then next friday"
- {:name {:es "Día de las Fuerzas Armadas", :en "Army Day"}},
- "12-25" {:name (partial get-name "12-25")}}
-)
+   "12-31 12:00" {:name (partial get-name "12-31")},
+   "09-15" {:name (partial get-name "Independence Day")},
+   "11-01" {:name (partial get-name "11-01")},
+   "easter -1" {:name (partial get-name "easter -1")},
+   "easter" {"type" "observance", :name (partial get-name "easter")},
+   "10-20" {:name (partial get-name "Revolution Day")},
+   "easter -2" {:name (partial get-name "easter -2")},
+   "05-01" {:name (partial get-name "05-01")},
+   "easter -3" {:name (partial get-name "easter -3")},
+   "12-24 12:00" {:name (partial get-name "12-24")},
+   "06-30 if tuesday then previous monday if wednesday,thursday then next friday"
+   {:name {:es "Día de las Fuerzas Armadas", :en "Army Day"}},
+   "12-25" {:name (partial get-name "12-25")}})
 
 (def locale-holiday-mapping
   (reduce-kv
