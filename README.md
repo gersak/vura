@@ -1,4 +1,3 @@
-
 # Timing ⏰
 
 [![Clojars Project](https://img.shields.io/clojars/v/dev.gersak/timing.svg)](https://clojars.org/dev.gersak/timing)
@@ -79,10 +78,10 @@ Timing leverages Clojure's sequence operations naturally:
 ### Installation
 ```clojure
 ;; deps.edn
-{:deps {dev.gersak/timing {:mvn/version "0.7.0"}}}
+{:deps {dev.gersak/timing {:mvn/version "0.6.0"}}}
 
 ;; Leiningen  
-[dev.gersak/timing "0.7.0"]
+[dev.gersak/timing "0.6.0"]
 ```
 
 ### Basic Usage
@@ -316,7 +315,7 @@ t/week        ; => 604800000
 ```clojure
 (require '[timing.holiday :as holiday])
 ;; Note: For full holiday support, also require:
-;; (require '[timing.holiday.all]) ; Add all holiday implementations
+(require '[timing.holiday.all]) ; Add all holiday implementations
 
 ;; Check holidays by country
 (holiday/? :us (t/time->value (t/date 2024 7 4)))     ; => holiday map
@@ -579,18 +578,6 @@ The `round-number` function behavior varies by strategy:
 (t/round-number 182.8137 0.25 :floor) ; => 182.75
 ```
 
-## 📚 Development
-
-### **REPL Development**
-```bash
-# Start development REPL
-clj -M:nrepl                        # Port 7888
-clj -M:cider                        # With Cider middleware
-
-# Babashka REPL with timing loaded
-bb timing-repl
-```
-
 ### **Testing**
 ```bash
 # Run all tests
@@ -598,24 +585,6 @@ clj -M:test:run.tests
 
 # Babashka compatibility test
 bb test-bb
-```
-
-### **Building**
-```bash
-# Build individual modules
-cd core && clj -T:build jar
-cd holidays && clj -T:build jar
-cd timezones && clj -T:build jar
-cd cron && clj -T:build jar
-
-# Build aggregated JAR (from root)
-mvn package
-```
-
-### **ClojureScript Development**
-```bash
-# Start shadow-cljs development
-npx shadow-cljs watch timing        # Port 3450
 ```
 
 ## 📜 License

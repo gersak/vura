@@ -137,5 +137,7 @@
      (print-calendar year month options))))
 
 (comment
+
+  (print-calendar 2024 6)
   (timing.util/print-calendar 2027 4)
   (print-year-calendar 2025))
