@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.github.gersak</groupId>
   <artifactId>vura.holidays</artifactId>
-  <version>0.5.3</version>
+  <version>0.6.0</version>
   <name>vura.holidays</name>
   <packaging>jar</packaging>
   
