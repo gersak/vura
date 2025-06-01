@@ -246,10 +246,10 @@
   (require '[timing.holiday :as holiday])
   (require '[timing.holiday.all])
 
-  (holiday/name (holiday/? :us (t/time->value (t/date 2024 7 4))) :hr)
-  (holiday/name (holiday/? :us (t/time->value (t/date 2024 12 25))) :en)
+  (holiday/name :en (holiday/? :us (t/time->value (t/date 2024 7 4))))
+  (holiday/name :en (holiday/? :us (t/time->value (t/date 2024 12 25))))
   (holiday/? :us (t/time->value (t/date 2024 1 1)))
-  (holiday/name (holiday/? :us (t/time->value (t/date 2024 1 1))) :hr)
+  (holiday/name :hr (holiday/? :us (t/time->value (t/date 2024 1 1))))
 
   (def today (t/time->value (t/date)))
   (def next-friday

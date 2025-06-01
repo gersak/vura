@@ -25,8 +25,8 @@
     (is-holiday? dispatch (-> date time->value day-time-context))))
 
 (defn name
-  ([definition] (name definition :en))
-  ([definition dispatch]
+  ([definition] (name :en definition))
+  ([dispatch definition]
    (when-some [{f :name} definition]
      (when (fn? f)
        (f dispatch)))))

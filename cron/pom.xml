@@ -3,9 +3,23 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>dev.gersak</groupId>
   <artifactId>timing.cron</artifactId>
-  <version>0.6.0</version>
+  <version>0.6.1</version>
   <name>vura.cron</name>
   <packaging>jar</packaging>
+
+  <dependencies>
+    <dependency>
+      <groupId>dev.gersak</groupId>
+      <artifactId>timing.core</artifactId>
+      <version>0.6.4</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.gersak</groupId>
+      <artifactId>dreamcatcher</artifactId>
+      <version>1.0.9</version>
+    </dependency>
+  </dependencies>
+
   
   <build>
     <resources>

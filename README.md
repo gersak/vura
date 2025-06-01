@@ -73,10 +73,10 @@ Handle edge cases naturally with smart period functions:
 ### Installation
 ```clojure
 ;; deps.edn
-{:deps {dev.gersak/timing {:mvn/version "0.6.0"}}}
+{:deps {dev.gersak/timing {:mvn/version "0.7.0"}}}
 
 ;; Leiningen  
-[dev.gersak/timing "0.6.0"]
+[dev.gersak/timing "0.7.0"]
 ```
 
 ### Basic Usage
@@ -315,10 +315,10 @@ t/week        ; => 604800000
 
 ;; Get holiday name (important: use holiday/name function!)
 (def july4-holiday (holiday/? :us (t/time->value (t/date 2024 7 4))))
-(holiday/name july4-holiday :en)  ; => "Independence Day"
+(holiday/name :en july4-holiday)  ; => "Independence Day"
 
 (def christmas-holiday (holiday/? :us (t/time->value (t/date 2024 12 25))))
-(holiday/name christmas-holiday :en)  ; => "Christmas Day"
+(holiday/name :en christmas-holiday)  ; => "Christmas Day"
 
 ;; Supports ~200 countries
 ```
@@ -551,7 +551,7 @@ Holiday functions return holiday objects that need to be processed with `holiday
 
 ;; Use holiday/name to get readable names
 (def holiday-obj (holiday/? :us (t/time->value (t/date 2024 7 4))))
-(holiday/name holiday-obj :en)  ; => "Independence Day"
+(holiday/name :en holiday-obj)  ; => "Independence Day"
 ```
 
 ### **Rounding Behavior**

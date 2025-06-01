@@ -1,8 +1,12 @@
 {:deps
- {dev.gersak/timing.core {:local/root "core"}
-  dev.gersak/timing.timezones {:local/root "timezones"}
-  dev.gersak/timing.holidays {:local/root "holidays"}
-  dev.gersak/timing.cron {:local/root "cron"}}
+ {;; dev.gersak/timing.core {:local/root "core"}
+  ;; dev.gersak/timing.timezones {:local/root "timezones"}
+  ;; dev.gersak/timing.holidays {:local/root "holidays"}
+  ;; dev.gersak/timing.cron {:local/root "cron"}
+  dev.gersak/timing.holidays {:mvn/version "0.6.3"}
+  dev.gersak/timing.cron     {:mvn/version "0.6.1"}
+  dev.gersak/timing.core     {:mvn/version "0.6.4"}}
+ :paths ["src"]
  :aliases
  {:cider
   {:extra-deps {org.clojure/clojure {:mvn/version "1.11.1"}

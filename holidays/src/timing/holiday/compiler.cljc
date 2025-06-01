@@ -162,14 +162,14 @@
 (defn compile-islamic
   "Compiles Islamic calendar dates like {:islamic? true :day-in-month 10 :month 1}"
   [{:keys [day-in-month month year]}]
-  (println (format "Islamic holiday: %s %d, %s"
-                   (case month
-                     1 "Muharram" 2 "Safar" 3 "Rabi al-awwal" 4 "Rabi al-thani"
-                     5 "Jumada al-awwal" 6 "Jumada al-thani" 7 "Rajab" 8 "Sha'ban"
-                     9 "Ramadan" 10 "Shawwal" 11 "Dhu al-Qidah" 12 "Dhu al-Hijjah"
-                     "Unknown")
-                   day-in-month
-                   (or year "Any Year")))
+  #_(println (format "Islamic holiday: %s %d, %s"
+                     (case month
+                       1 "Muharram" 2 "Safar" 3 "Rabi al-awwal" 4 "Rabi al-thani"
+                       5 "Jumada al-awwal" 6 "Jumada al-thani" 7 "Rajab" 8 "Sha'ban"
+                       9 "Ramadan" 10 "Shawwal" 11 "Dhu al-Qidah" 12 "Dhu al-Hijjah"
+                       "Unknown")
+                     day-in-month
+                     (or year "Any Year")))
   (fn [{:keys [value]}]
     (let [{d :day-in-month
            m :month}
@@ -284,8 +284,8 @@
   (let [days (:days period)
         hours (:hours period)
         minutes (:minutes period)]
-    (println (format "Period holiday: %s-%02d-%02d lasting %d days"
-                     (or year "YYYY") month day-in-month days))
+    #_(println (format "Period holiday: %s-%02d-%02d lasting %d days"
+                       (or year "YYYY") month day-in-month days))
     (fn [{d :day-in-month
           m :month
           y :year

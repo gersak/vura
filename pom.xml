@@ -3,7 +3,7 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>dev.gersak</groupId>
   <artifactId>timing</artifactId>
-  <version>0.6.0</version>
+  <version>0.7.0</version>
   <name>timing</name>
   <packaging>jar</packaging>
 
@@ -21,18 +21,19 @@
     <dependency>
       <groupId>dev.gersak</groupId>
       <artifactId>timing.cron</artifactId>
-      <version>0.6.0</version>
+      <version>0.6.1</version>
     </dependency>
     <dependency>
       <groupId>dev.gersak</groupId>
       <artifactId>timing.holidays</artifactId>
-      <version>0.6.1</version>
+      <version>0.7.0</version>
     </dependency>
   </dependencies>
 
   <build>
+    <sourceDirectory>src</sourceDirectory>
     <plugins>
-      <!-- Allow empty JAR creation for shade plugin -->
+      <!-- Create thin JAR with umbrella namespace -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-jar-plugin</artifactId>
@@ -40,26 +41,6 @@
         <configuration>
           <forceCreation>true</forceCreation>
         </configuration>
-      </plugin>
-
-      <!-- Create the shaded (fat) JAR -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-shade-plugin</artifactId>
-        <version>3.2.1</version>
-        <executions>
-          <execution>
-            <id>create-fat-jar</id>
-            <phase>package</phase>
-            <goals>
-              <goal>shade</goal>
-            </goals>
-            <configuration>
-              <createDependencyReducedPom>true</createDependencyReducedPom>
-              <shadedArtifactAttached>false</shadedArtifactAttached>
-            </configuration>
-          </execution>
-        </executions>
       </plugin>
     </plugins>
   </build>
