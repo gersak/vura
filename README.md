@@ -12,6 +12,8 @@ Timing offers a different approach to time computation by working in the numeric
 If you enjoy functional programming, sequences, and immutable data, you might find Timing's 
 approach refreshing.
 
+# [API](https://cljdoc.org/d/dev.gersak/timing.core/0.6.4/doc/readme)
+
 ## 🤔 Why Try Timing?
 
 ### **Zero Dependencies, Simple Design**
