@@ -3,14 +3,29 @@
   <modelVersion>4.0.0</modelVersion>
   <groupId>com.github.gersak</groupId>
   <artifactId>vura.holidays</artifactId>
-  <version>0.6.0</version>
-  <name>vura.holidays</name>
+  <version>0.6.1</version>
   <packaging>jar</packaging>
+
+  <dependencies>
+    <dependency>
+      <groupId>com.github.gersak</groupId>
+      <artifactId>vura.core</artifactId>
+      <version>0.6.0</version>
+    </dependency>
+    <dependency>
+      <groupId>com.github.gersak</groupId>
+      <artifactId>vura.timezones</artifactId>
+      <version>0.6.0</version>
+    </dependency>
+  </dependencies>
   
   <build>
     <resources>
       <resource>
         <directory>src</directory>
+      </resource>
+      <resource>
+        <directory>generated</directory>
       </resource>
     </resources>
   </build>
@@ -18,7 +33,6 @@
   <distributionManagement>
     <repository>
       <id>clojars</id>
-      <name>Clojars repository</name>
       <url>https://clojars.org/repo</url>
     </repository>
   </distributionManagement>
@@ -27,7 +41,6 @@
   <url>https://github.com/gersak/vura</url>
   <licenses>
     <license>
-      <name>MIT</name>
       <url>https://github.com/gersak/vura/LICENSE</url>
     </license>
   </licenses>

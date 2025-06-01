@@ -19,4 +19,10 @@
       <url>https://repo.clojars.org/</url>
     </repository>
   </distributionManagement>
+  <licenses>
+    <license>
+      <name>MIT</name>
+      <url>https://github.com/gersak/vura/LICENSE</url>
+    </license>
+  </licenses>
 </project>
