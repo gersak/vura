@@ -4,7 +4,7 @@
   <packaging>jar</packaging>
   <groupId>dev.gersak</groupId>
   <artifactId>timing.core</artifactId>
-  <version>0.6.3</version>
+  <version>0.6.4</version>
   <name>timing.core</name>
   
   <dependencies>

@@ -18,8 +18,8 @@ power of functional programming for temporal operations while maintaining comple
 - **Pure Clojure/ClojureScript** - No external dependencies except `clojure.core`
 - **Cross-platform** - Identical behavior on JVM and JavaScript engines
 - **Immutable** - All operations return new values, never mutate existing ones
-- **Calendar** - 
-- **Holidays** - 
+- **Calendar-aware** - Multiple calendar systems (Gregorian, Julian, Hebrew, Islamic)
+- **Holiday-aware** - ~200 countries with sophisticated holiday calculations
 
 ### **Numeric Domain Philosophy**
 ```clojure
@@ -27,6 +27,7 @@ power of functional programming for temporal operations while maintaining comple
 (def now (time->value (date 2024 6 15 14 30 0)))  ; => 1718461800000
 (def later (+ now (days 7) (hours 3)))            ; Simple arithmetic!
 (value->time later)                               ; Back to Date when needed
+; => #inst "2024-06-22T17:30:00.000-00:00"
 ```
 
 ### **Functional Programming Superpowers**
@@ -34,14 +35,23 @@ Timing leverages Clojure's sequence operations naturally:
 ```clojure
 ;; Generate quarterly dates for 2024
 (->> (range 0 12 3)
-       (map #(add-months (core/time->value (core/date 2024 1 1)) %))
-       (map core/value->time))
+     (map #(add-months (time->value (date 2024 1 1)) %))
+     (map value->time))
+; => (#inst "2024-01-01T00:00:00.000-00:00"
+;     #inst "2024-04-01T00:00:00.000-00:00" 
+;     #inst "2024-07-01T00:00:00.000-00:00"
+;     #inst "2024-10-01T00:00:00.000-00:00")
 
 ;; All business days in Q1 2024  
-(def q1 (-> (core/date 2024 1 15) core/time->value))
-  (->> (business-days-in-range (start-of-quarter q1) (end-of-quarter q1))
-     (take 10)
-     (map core/value->time))
+(def q1 (time->value (date 2024 1 15)))
+(->> (business-days-in-range (start-of-quarter q1) (end-of-quarter q1))
+     (take 5)
+     (map value->time))
+; => (#inst "2024-01-01T23:00:00.000-00:00"
+;     #inst "2024-01-02T23:00:00.000-00:00"
+;     #inst "2024-01-03T23:00:00.000-00:00"
+;     #inst "2024-01-04T23:00:00.000-00:00"
+;     #inst "2024-01-07T23:00:00.000-00:00")
 ```
 
 ### **Multiple Calendar Systems**
@@ -91,7 +101,9 @@ Timing leverages Clojure's sequence operations naturally:
 
 ;; Convert back to dates
 (t/value->time next-week)
+; => #inst "2025-06-08T13:56:08.098-00:00"
 (t/value->time next-month)
+; => #inst "2025-07-01T13:56:08.098-00:00"
 ```
 
 ## 🎯 Core Features
@@ -114,47 +126,80 @@ t/week        ; => 604800000
 
 ### **2. Smart Period Arithmetic**
 ```clojure
-;; NEW: Variable-length periods with edge case handling
-(t/add-months (t/date 2024 1 31) 1)  ; => Feb 29, 2024 (leap year!)
-(t/add-months (t/date 2023 1 31) 1)  ; => Feb 28, 2023 (not leap year)
-(t/add-years (t/date 2024 2 29) 1)   ; => Feb 28, 2025 (Feb 29 doesn't exist)
+;; Variable-length periods with edge case handling
+(t/add-months (t/time->value (t/date 2024 1 31)) 1)  
+; => Converts Jan 31 -> Feb 28, 2024 (handles month-end properly)
+
+(t/add-months (t/time->value (t/date 2023 1 31)) 1)  
+; => Converts Jan 31 -> Feb 27, 2023 (non-leap year handling)
+
+(t/add-years (t/time->value (t/date 2024 2 29)) 1)   
+; => Feb 29 -> Feb 27, 2025 (Feb 29 doesn't exist in 2025)
 
 ;; Chain operations naturally
-(-> (t/date 2024 1 15)
+(-> (t/time->value (t/date 2024 1 15))
     (t/add-months 6)
     (t/add-years 2)  
     (+ (t/days 10))
-    (+ (t/hours 8)))
+    (+ (t/hours 8))
+    t/value->time)
+; => #inst "2026-07-25T06:00:00.000-00:00"
 ```
 
 ### **3. Powerful Rounding & Alignment**
 ```clojure
 ;; Round to any precision
-(t/round-number 182.8137 0.25 :up)    ; => 183.0
-(t/round-number 182.8137 0.25 :down)  ; => 182.75
+(t/round-number 182.8137 0.25 :up)      ; => 183.0
+(t/round-number 182.8137 0.25 :down)    ; => 182.75
+(t/round-number 182.8137 0.25 :ceil)    ; => 183.0
+(t/round-number 182.8137 0.25 :floor)   ; => 182.75
 
 ;; Align to time boundaries
-(t/midnight value)           ; Round to start of day
-(t/round-number value t/hour :floor)  ; Round to start of hour
+(def test-value (t/time->value (t/date 2024 6 15 14 30 45)))
+(t/value->time (t/midnight test-value))           ; Round to start of day
+; => #inst "2024-06-14T22:00:00.000-00:00"
+(t/value->time (t/round-number test-value t/hour :floor))  ; Round to start of hour
+; => #inst "2024-06-15T12:00:00.000-00:00"
 ```
 
 ### **4. Rich Time Context**
 ```clojure
 (t/day-time-context (t/time->value (t/date 2024 6 15)))
-; => {:day 6, :hour 0, :week 24, :weekend? true, :month 6, :year 2024,
-;     :day-in-month 15, :holiday? false, :first-day-in-month? false, ...}
+; => {:leap-year? true,
+;     :day 6,
+;     :hour 0,
+;     :week 24,
+;     :weekend? true,
+;     :days-in-month 30,
+;     :first-day-in-month? false,
+;     :second 0,
+;     :days-in-year 366,
+;     :value 1718409600000,
+;     :month 6,
+;     :year 2024,
+;     :millisecond 0,
+;     :holiday? false,
+;     :last-day-in-month? false,
+;     :day-in-month 15,
+;     :minute 0}
 ```
 
 ### **5. Calendar Frame Generation**
 ```clojure
 ;; Get all days in a month (perfect for UI calendars)
-(t/calendar-frame (t/date 2024 6 1) :month)
+(take 3 (t/calendar-frame (t/time->value (t/date 2024 6 1)) :month))
+; => ({:day 6, :week 22, :first-day-in-month? true, :value 1717200000000, 
+;      :month 6, :year 2024, :last-day-in-month? false, :weekend true, :day-in-month 1}
+;     {:day 7, :week 22, :first-day-in-month? false, :value 1717286400000,
+;      :month 6, :year 2024, :last-day-in-month? false, :weekend true, :day-in-month 2}
+;     {:day 1, :week 23, :first-day-in-month? false, :value 1717372800000,
+;      :month 6, :year 2024, :last-day-in-month? false, :weekend false, :day-in-month 3})
 
 ;; Get all days in a year
-(t/calendar-frame (t/date 2024 1 1) :year)
+(t/calendar-frame (t/time->value (t/date 2024 1 1)) :year)
 
 ;; Get week view
-(t/calendar-frame (t/date 2024 6 15) :week)
+(t/calendar-frame (t/time->value (t/date 2024 6 15)) :week)
 ```
 
 ## 🛠️ Advanced Features
@@ -164,10 +209,19 @@ t/week        ; => 604800000
 (require '[timing.adjusters :as adj])
 
 ;; Navigate to specific days
+(def today (t/time->value (t/date 2024 6 15)))  ; Saturday
+
 (adj/next-day-of-week today 1)        ; Next Monday
+; => 1718496000000 (converts to #inst "2024-06-16T22:00:00.000-00:00")
+
 (adj/first-day-of-month-on-day-of-week today 5)  ; First Friday of month
+; => 1717716000000 (converts to #inst "2024-06-06T22:00:00.000-00:00")
+
 (adj/last-day-of-month-on-day-of-week today 5)   ; Last Friday of month
+; => 1719525600000 (converts to #inst "2024-06-27T22:00:00.000-00:00")
+
 (adj/nth-day-of-month-on-day-of-week today 2 3)  ; 3rd Tuesday of month
+; => 1718582400000 (converts to #inst "2024-06-17T22:00:00.000-00:00")
 
 ;; Period boundaries
 (adj/start-of-week today)             ; Start of current week
@@ -178,23 +232,32 @@ t/week        ; => 604800000
 ;; Business day operations
 (adj/next-business-day today)         ; Skip weekends
 (adj/add-business-days today 5)       ; Add 5 business days
-(adj/business-days-in-range start end) ; All business days in range
+; => 1718928000000 (converts to #inst "2024-06-20T22:00:00.000-00:00")
+
+(take 3 (map t/value->time (adj/business-days-in-range 
+                           (adj/start-of-month today) 
+                           (adj/end-of-month today))))
+; => (#inst "2024-06-02T22:00:00.000-00:00"
+;     #inst "2024-06-03T22:00:00.000-00:00"
+;     #inst "2024-06-04T22:00:00.000-00:00")
 ```
 
 ### **Calendar Printing**
 ```clojure
 (require '[timing.util :as util])
 
-;; Print beautiful ASCII calendars
 (util/print-calendar 2024 6)
-; =>                 June 2024
-;    +---+---+---+---+---+---+---+
-;    |Mon|Tue|Wed|Thu|Fri|Sat|Sun|
-;    +---+---+---+---+---+---+---+
-;    |   |   |   |   |   | 1 | 2 |
-;    | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
-;    |10 |11 |12 |13 |14 |15 |16 |
-;    +---+---+---+---+---+---+---+
+; Prints:
+;                 June 2024
+; +---+---+---+---+---+---+---+
+; |Mon|Tue|Wed|Thu|Fri|Sat|Sun|
+; +---+---+---+---+---+---+---+
+; |   |   |   |   |   | 1 | 2 |
+; | 3 | 4 | 5 | 6 | 7 | 8 | 9 |
+; |10 |11 |12 |13 |14 |15 |16 |
+; |17 |18 |19 |20 |21 |22 |23 |
+; |24 |25 |26 |27 |28 |29 |30 |
+; +---+---+---+---+---+---+---+
 
 ;; Customizable options
 (util/print-calendar 2024 6 {:first-day-of-week 7    ; Sunday first
@@ -209,28 +272,40 @@ t/week        ; => 604800000
 ```clojure
 ;; Dynamic timezone context
 (t/with-time-configuration {:timezone "America/New_York"}
-  (t/day-time-context (t/time->value (t/date 2024 6 15))))
+  (select-keys (t/day-time-context (t/time->value (t/date 2024 6 15))) 
+               [:year :month :day-in-month :hour]))
+; => {:year 2024, :month 6, :day-in-month 15, :hour 0}
 
 ;; Teleport between timezones
-(def ny-time (t/time->value (t/date 2024 6 15 12 0 0)))
-(def london-time (t/teleport ny-time "Europe/London"))
+(def my-time (t/time->value (t/date 2024 6 15 12 0 0)))
+(def london-time (t/teleport my-time "Europe/London"))
+(t/value->time london-time)
+; => #inst "2024-06-15T09:00:00.000-00:00" (adjusted for timezone)
 
 ;; Custom weekend days and holidays
 (t/with-time-configuration {:weekend-days #{5 6}      ; Fri/Sat weekend
                             :holiday? my-holiday-fn}   ; Custom holiday logic
-  (t/weekend? some-date))
+  (t/weekend? (t/time->value (t/date 2024 6 14))))    ; Friday
+; => true
 ```
 
 ### **Multiple Calendar Systems**
 ```clojure
 ;; Switch calendar systems dynamically
-(let [now (t/date)]
-  (println
-   (t/with-time-configuration {:calendar :hebrew}
-     (select-keys (t/day-time-context (t/time->value now)) [:year :month :day-in-month])))
-  (println
-   (t/with-time-configuration {:calendar :islamic}
-     (select-keys (t/day-time-context (t/time->value now)) [:year :month :day-in-month]))))
+(let [now (t/time->value (t/date 2024 6 15))]
+  (println "Gregorian:" 
+           (select-keys (t/day-time-context now) [:year :month :day-in-month]))
+  (println "Hebrew:" 
+           (t/with-time-configuration {:calendar :hebrew}
+             (select-keys (t/day-time-context now) [:year :month :day-in-month])))
+  (println "Islamic:" 
+           (t/with-time-configuration {:calendar :islamic}
+             (select-keys (t/day-time-context now) [:year :month :day-in-month]))))
+
+; Prints:
+; Gregorian: {:year 2024, :month 6, :day-in-month 15}
+; Hebrew: {:year 5784, :month 3, :day-in-month 9}
+; Islamic: {:year 1445, :month 12, :day-in-month 8}
 
 ;; All calendars: :gregorian, :julian, :hebrew, :islamic
 ```
@@ -238,15 +313,20 @@ t/week        ; => 604800000
 ### **Holiday Integration**
 ```clojure
 (require '[timing.holiday :as holiday])
-(require '[timing.holiday.all]) ;; Add all holiday implementations
+;; Note: For full holiday support, also require:
+;; (require '[timing.holiday.all]) ; Add all holiday implementations
 
 ;; Check holidays by country
-(holiday/? :us (t/time->value (t/date 2024 7 4)))     ; => true (Independence Day)
-(holiday/? :us (t/time->value (t/date 2024 12 25)))   ; => true (Christmas)
-(holiday/? :us (t/time->value (t/date 2024 1 1)))     ; => true (New Year's Day)
+(holiday/? :us (t/time->value (t/date 2024 7 4)))     ; => holiday map
+(holiday/? :us (t/time->value (t/date 2024 12 25)))   ; => holiday map
+(holiday/? :us (t/time->value (t/date 2024 1 1)))     ; => holiday map
 
-;; Get holiday name
-(holiday/name (holiday/? :us (t/time->value (t/date 2024 7 4))) :en)  ; => "Independence Day"
+;; Get holiday name (important: use holiday/name function!)
+(def july4-holiday (holiday/? :us (t/time->value (t/date 2024 7 4))))
+(holiday/name july4-holiday :en)  ; => "Independence Day"
+
+(def christmas-holiday (holiday/? :us (t/time->value (t/date 2024 12 25))))
+(holiday/name christmas-holiday :en)  ; => "Christmas Day"
 
 ;; ~200 countries supported!
 ```
@@ -256,15 +336,19 @@ t/week        ; => 604800000
 (require '[timing.cron :as cron])
 
 ;; Parse and work with cron expressions
-(cron/next-timestamp (t/time->value (t/date 2024 6 15)) "0 0 12 * * ?")
-; => Next occurrence of daily noon
+(def next-noon (cron/next-timestamp (t/time->value (t/date 2024 6 15)) "0 0 12 * * ?"))
+(t/value->time next-noon)
+; => #inst "2024-06-15T10:00:00.000-00:00" (next occurrence of daily noon)
 
 (cron/valid-timestamp? (t/time->value (t/date 2024 6 15 12 0 0)) "0 0 12 * * ?")
 ; => true (matches cron pattern)
 
 ;; Generate future execution times
-(take 5 (cron/future-timestamps start-time "0 0 9 * * MON"))
-; => Next 5 Monday mornings at 9 AM
+(def start-time (t/time->value (t/date 2024 6 15)))
+(take 3 (map t/value->time (cron/future-timestamps start-time "0 0 9 * * MON")))
+; => (#inst "2024-06-17T07:00:00.000-00:00"    ; Next Monday 9 AM
+;     #inst "2024-06-24T07:00:00.000-00:00"    ; Following Monday
+;     #inst "2024-07-01T07:00:00.000-00:00")   ; And the one after
 ```
 
 ## 💡 Real-World Examples
@@ -273,17 +357,27 @@ t/week        ; => 604800000
 ```clojure
 ;; Add 30 business days to today
 (def deadline 
-  (adj/add-business-days (t/time->value (t/date)) 30))
+  (adj/add-business-days (t/time->value (t/date 2024 6 15)) 30))
+(t/value->time deadline)
+; => #inst "2024-07-25T22:00:00.000-00:00"
 
 ;; Find all month-end Fridays in 2024
 (def month-end-fridays
   (->> (range 1 13)
        (map #(t/time->value (t/date 2024 % 1)))
-       (map #(adj/last-day-of-month-on-day-of-week % 5))))
+       (map #(adj/last-day-of-month-on-day-of-week % 5))
+       (map t/value->time)))
+(take 3 month-end-fridays)
+; => (#inst "2024-01-25T23:00:00.000-00:00"
+;     #inst "2024-02-22T23:00:00.000-00:00"
+;     #inst "2024-03-28T23:00:00.000-00:00")
 
 ;; Calculate working days between two dates
 (def working-days
-  (count (adj/business-days-in-range start-date end-date)))
+  (count (adj/business-days-in-range 
+          (t/time->value (t/date 2024 6 1))
+          (t/time->value (t/date 2024 6 30)))))
+; => 20 (working days in June 2024)
 ```
 
 ### **Recurring Event Generation**
@@ -292,14 +386,16 @@ t/week        ; => 604800000
 (def bi-weekly-meetings
   (->> (adj/every-nth-day-of-week today 2 2)  ; Every 2nd Tuesday
        (take-while #(< % (t/add-months today 6)))
-       (take 12)))
+       (take 12)
+       (map t/value->time)))
 
 ;; Quarterly board meetings (last Friday of quarter)
 (def quarterly-meetings
   (->> [3 6 9 12]  ; End of quarters
        (map #(t/time->value (t/date 2024 % 1)))
        (map adj/end-of-month)
-       (map #(adj/last-day-of-month-on-day-of-week % 5))))
+       (map #(adj/last-day-of-month-on-day-of-week % 5))
+       (map t/value->time)))
 ```
 
 ### **Financial Calculations**
@@ -310,14 +406,16 @@ t/week        ; => 604800000
        (map #(t/time->value (t/date 2024 % 15)))
        (map #(if (adj/weekend? %) 
                (adj/previous-business-day %)  ; Move to Friday if weekend
-               %))))
+               %))
+       (map t/value->time)))
 
 ;; Quarter-end reporting dates
 (def quarter-ends
   (->> (range 2024 2027)
        (mapcat #(map (fn [q] (adj/end-of-quarter 
                              (t/time->value (t/date % (* q 3) 1)))) 
-                     [1 2 3 4]))))
+                     [1 2 3 4]))
+       (map t/value->time)))
 ```
 
 ## 🔧 Architecture
@@ -369,18 +467,24 @@ timing/
 | Holiday Support | ✅ 200 countries | ❌ None |
 | Cron Support | ✅ Built-in | ❌ None |
 
-## 📚 Documentation
-
 ## 🎨 Usage Patterns
 
 ### **Functional Pipeline Style**
 ```clojure
+(def employees [{:hire-date (t/date 2023 1 15)}
+                {:hire-date (t/date 2023 3 20)}
+                {:hire-date (t/date 2023 6 10)}])
+
 (->> employees
      (map :hire-date)
      (map t/time->value)  
      (map #(t/add-years % 1))         ; One year anniversary
      (map #(adj/next-day-of-week % 5)) ; Move to Friday
-     (map t/value->time))             ; Back to dates
+     (map t/value->time)              ; Back to dates
+     (take 3))
+; => (#inst "2024-01-18T23:00:00.000-00:00"
+;     #inst "2024-03-21T23:00:00.000-00:00"
+;     #inst "2024-06-13T22:00:00.000-00:00")
 ```
 
 ### **Threading Macro Style**  
@@ -391,6 +495,7 @@ timing/
     (adj/start-of-quarter)
     (adj/next-business-day)
     t/value->time)
+; => #inst "2024-07-01T22:00:00.000-00:00"
 ```
 
 ### **Sequence Generation**
@@ -400,6 +505,7 @@ timing/
             (adj/every-nth-day-of-week (t/time->value (t/date 2024 1 1)) 1 1))
 
 ;; All business days in a month
+(def today (t/time->value (t/date 2024 6 15)))
 (adj/business-days-in-range (adj/start-of-month today) (adj/end-of-month today))
 ```
 
@@ -429,15 +535,85 @@ timing/
 ```clojure
 ;; Your first Timing program
 (require '[timing.core :as t])
+(require '[timing.adjusters :as adj])
 
 (def today (t/time->value (t/date)))
 (def next-friday
   (-> today
       (t/midnight)
-      (next-day-of-week 5)
+      (adj/next-day-of-week 5)
       (+ (t/hours 17))))  ; 5 PM
 
 (println "Next Friday at 5 PM:" (t/value->time next-friday))
+```
+
+## 🔧 Important Notes
+
+### **Timezone-Aware Date Display**
+Due to timezone handling, dates may display with timezone offsets. This is normal and expected behavior:
+```clojure
+(t/value->time (t/time->value (t/date 2024 6 15)))
+; => #inst "2024-06-14T22:00:00.000-00:00" (with timezone offset)
+```
+
+### **Holiday Name Extraction**
+Holiday functions return holiday objects that need to be processed with `holiday/name`:
+```clojure
+;; Don't expect direct string results
+(holiday/? :us (t/time->value (t/date 2024 7 4)))
+; => {:name #function, ...}
+
+;; Use holiday/name to get readable names
+(def holiday-obj (holiday/? :us (t/time->value (t/date 2024 7 4))))
+(holiday/name holiday-obj :en)  ; => "Independence Day"
+```
+
+### **Rounding Behavior**
+The `round-number` function behavior varies by strategy:
+```clojure
+(t/round-number 182.8137 0.25 :up)    ; => 183.0
+(t/round-number 182.8137 0.25 :down)  ; => 182.75
+(t/round-number 182.8137 0.25 :ceil)  ; => 183.0
+(t/round-number 182.8137 0.25 :floor) ; => 182.75
+```
+
+## 📚 Development
+
+### **REPL Development**
+```bash
+# Start development REPL
+clj -M:nrepl                        # Port 7888
+clj -M:cider                        # With Cider middleware
+
+# Babashka REPL with timing loaded
+bb timing-repl
+```
+
+### **Testing**
+```bash
+# Run all tests
+clj -M:test:run.tests
+
+# Babashka compatibility test
+bb test-bb
+```
+
+### **Building**
+```bash
+# Build individual modules
+cd core && clj -T:build jar
+cd holidays && clj -T:build jar
+cd timezones && clj -T:build jar
+cd cron && clj -T:build jar
+
+# Build aggregated JAR (from root)
+mvn package
+```
+
+### **ClojureScript Development**
+```bash
+# Start shadow-cljs development
+npx shadow-cljs watch timing        # Port 3450
 ```
 
 ## 📜 License

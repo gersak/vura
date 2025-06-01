@@ -1,0 +1,12 @@
+{:deps {dev.gersak/timing {:mvn/version "0.6.0"}}
+ :paths ["core/src" "timezones/src" "cron/src"]
+ :tasks
+ {:requires ([babashka.fs :as fs])
+
+  test-bb
+  {:doc "Test Babashka compatibility"
+   :task (shell "bb babashka_test.clj")}
+
+  timing-repl
+  {:doc "Start a REPL with timing modules loaded"
+   :task (clojure "-M -e (require '[timing.core :as core] '[timing.adjusters :as adj] '[timing.cron :as cron]) (clojure.main/repl)")}}}
