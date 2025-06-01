@@ -223,3 +223,39 @@
   ([start end {:keys [weekend-days] :or {weekend-days #{6 7}}}]
    (->> (range start (inc end) (core/days 1))
         (remove #(weekend-days (core/day? %))))))
+
+(comment
+  (->> (range 0 12 3)
+       (map #(add-months (core/time->value (core/date 2024 1 1)) %))
+       (map core/value->time))
+
+  (require '[timing.core :as t])
+  (let [now (t/date)]
+    (println
+     (t/with-time-configuration {:calendar :hebrew}
+       (select-keys (t/day-time-context (t/time->value now)) [:year :month :day-in-month])))
+    (println
+     (t/with-time-configuration {:calendar :islamic}
+       (select-keys (t/day-time-context (t/time->value now)) [:year :month :day-in-month]))))
+
+  (def q1 (-> (core/date 2024 1 15) core/time->value))
+  (->> (business-days-in-range (start-of-quarter q1) (end-of-quarter q1))
+       (take 10)
+       (map core/value->time))
+
+  (require '[timing.holiday :as holiday])
+  (require '[timing.holiday.all])
+
+  (holiday/name (holiday/? :us (t/time->value (t/date 2024 7 4))) :hr)
+  (holiday/name (holiday/? :us (t/time->value (t/date 2024 12 25))) :en)
+  (holiday/? :us (t/time->value (t/date 2024 1 1)))
+  (holiday/name (holiday/? :us (t/time->value (t/date 2024 1 1))) :hr)
+
+  (def today (t/time->value (t/date)))
+  (def next-friday
+    (-> today
+        (t/midnight)
+        (next-day-of-week 5)
+        (+ (t/hours 17))))  ; 5 PM
+
+  (println "Next Friday at 5 PM:" (t/value->time next-friday)))

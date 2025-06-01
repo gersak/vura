@@ -5,7 +5,7 @@
    [clojure.string]
    [timing.holiday :refer [is-holiday?]]
    [timing.holiday.util :refer [parse-definition
-                              get-name]]
+                                get-name]]
    [timing.holiday.compiler :as compiler]))
 
 (def holidays

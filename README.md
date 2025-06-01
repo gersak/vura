@@ -34,12 +34,14 @@ Timing leverages Clojure's sequence operations naturally:
 ```clojure
 ;; Generate quarterly dates for 2024
 (->> (range 0 12 3)
-     (map #(add-months (date 2024 1 1) %))
-     (map time->value))
+       (map #(add-months (core/time->value (core/date 2024 1 1)) %))
+       (map core/value->time))
 
 ;; All business days in Q1 2024  
-(->> (business-days-in-range (start-of-quarter q1) (end-of-quarter q1))
-     (take 10))
+(def q1 (-> (core/date 2024 1 15) core/time->value))
+  (->> (business-days-in-range (start-of-quarter q1) (end-of-quarter q1))
+     (take 10)
+     (map core/value->time))
 ```
 
 ### **Multiple Calendar Systems**
@@ -222,27 +224,29 @@ t/week        ; => 604800000
 ### **Multiple Calendar Systems**
 ```clojure
 ;; Switch calendar systems dynamically
-(t/with-time-configuration {:calendar :hebrew}
-  (t/day-time-context (t/time->value (t/date 2024 1 1))))
-
-(t/with-time-configuration {:calendar :islamic}  
-  (t/calendar-frame (t/date 2024 1 1) :month))
+(let [now (t/date)]
+  (println
+   (t/with-time-configuration {:calendar :hebrew}
+     (select-keys (t/day-time-context (t/time->value now)) [:year :month :day-in-month])))
+  (println
+   (t/with-time-configuration {:calendar :islamic}
+     (select-keys (t/day-time-context (t/time->value now)) [:year :month :day-in-month]))))
 
 ;; All calendars: :gregorian, :julian, :hebrew, :islamic
 ```
 
 ### **Holiday Integration**
 ```clojure
-(require '[timing.holiday :as h])
+(require '[timing.holiday :as holiday])
 (require '[timing.holiday.all]) ;; Add all holiday implementations
 
 ;; Check holidays by country
-(h/holiday? (t/date 2024 7 4) :us)     ; => true (Independence Day)
-(h/holiday? (t/date 2024 12 25) :us)   ; => true (Christmas)
-(h/holiday? (t/date 2024 1 1) :us)     ; => true (New Year's Day)
+(holiday/? :us (t/time->value (t/date 2024 7 4)))     ; => true (Independence Day)
+(holiday/? :us (t/time->value (t/date 2024 12 25)))   ; => true (Christmas)
+(holiday/? :us (t/time->value (t/date 2024 1 1)))     ; => true (New Year's Day)
 
 ;; Get holiday name
-(h/holiday-name-impl :us (t/date 2024 7 4))  ; => "Independence Day"
+(holiday/name (holiday/? :us (t/time->value (t/date 2024 7 4))) :en)  ; => "Independence Day"
 
 ;; ~200 countries supported!
 ```
@@ -323,7 +327,7 @@ t/week        ; => 604800000
 timing/
 ├── core/        # Core time computation (timing.core)
 ├── timezones/   # IANA timezone database (timing.timezones)  
-├── holidays/    # Country-specific holidays (timing.holidays)
+├── holidays/    # Country-specific holidays (timing.holiday)
 ├── cron/        # Cron scheduling (timing.cron)
 └── util/        # Utility functions (timing.util, timing.adjusters)
 ```
@@ -366,10 +370,6 @@ timing/
 | Cron Support | ✅ Built-in | ❌ None |
 
 ## 📚 Documentation
-
-- **[API Documentation](http://gersak.github.io/timing/api/timing.core.html)** - Complete function reference
-- **[Project Summary](PROJECT_SUMMARY.md)** - Architecture overview  
-- **[Test Enhancements](TEST_ENHANCEMENTS.md)** - Comprehensive test coverage
 
 ## 🎨 Usage Patterns
 
@@ -431,9 +431,11 @@ timing/
 (require '[timing.core :as t])
 
 (def today (t/time->value (t/date)))
-(def next-friday (-> today
-                     (adj/next-day-of-week 5)
-                     (+ (t/hours 17))))  ; 5 PM
+(def next-friday
+  (-> today
+      (t/midnight)
+      (next-day-of-week 5)
+      (+ (t/hours 17))))  ; 5 PM
 
 (println "Next Friday at 5 PM:" (t/value->time next-friday))
 ```
