@@ -1,12 +1,12 @@
 (ns timing.error-handling-test
-  "Tests for error handling with invalid inputs in Vura"
+  "Tests for error handling with invalid inputs in Timing"
   (:refer-clojure :exclude [second])
   (:require [clojure.test :refer :all]
             [timing.core :as v]
             [timing.timezones.db :as tz]))
 
 (deftest invalid-date-construction-tests
-  "Test behavior with edge case date inputs - Vura uses lenient date construction"
+  "Test behavior with edge case date inputs - Timing uses lenient date construction"
 
   (testing "Out of range month values get adjusted"
     ;; Month 13 becomes January of next year

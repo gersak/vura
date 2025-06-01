@@ -43,7 +43,7 @@
     (is (== (round-number 122 3) 123) "Rounding failed")
     (is (== (round-number 10.12345681928 0.125) 10.125) "Rounding failed")))
 
-(deftest vura-core
+(deftest timming-core
   (testing "Offset computation"
     (is
      (and
@@ -366,6 +366,6 @@
 
 ; (deftest TimezoneCoverage
 ;   (let [java-zones (set (TimeZone/getAvailableIDs))
-;         vura-zones (set (keys (:zones db/db)))
-;         [java vura _] (data/diff java-zones vura-zones)]
+;         timming-zones (set (keys (:zones db/db)))
+;         [java timming _] (data/diff java-zones timming-zones)]
 ;     (sort java)))

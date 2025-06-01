@@ -1,20 +1,20 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.github.gersak</groupId>
-  <artifactId>vura.holidays</artifactId>
+  <groupId>dev.gersak</groupId>
+  <artifactId>timing.holidays</artifactId>
   <version>0.6.1</version>
   <packaging>jar</packaging>
 
   <dependencies>
     <dependency>
-      <groupId>com.github.gersak</groupId>
-      <artifactId>vura.core</artifactId>
+      <groupId>dev.gersak</groupId>
+      <artifactId>timing.core</artifactId>
       <version>0.6.0</version>
     </dependency>
     <dependency>
-      <groupId>com.github.gersak</groupId>
-      <artifactId>vura.timezones</artifactId>
+      <groupId>dev.gersak</groupId>
+      <artifactId>timing.timezones</artifactId>
       <version>0.6.0</version>
     </dependency>
   </dependencies>
@@ -37,11 +37,11 @@
     </repository>
   </distributionManagement>
       
-  <description>Vura holidays</description>
-  <url>https://github.com/gersak/vura</url>
+  <description>Timing holidays</description>
+  <url>https://github.com/gersak/timing</url>
   <licenses>
     <license>
-      <url>https://github.com/gersak/vura/LICENSE</url>
+      <url>https://github.com/gersak/timing/LICENSE</url>
     </license>
   </licenses>
 </project>

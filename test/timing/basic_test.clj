@@ -1,5 +1,5 @@
 (ns timing.basic-test
-  "Basic tests to verify Vura functionality"
+  "Basic tests to verify Timing functionality"
   (:require [clojure.test :refer :all]
             [timing.core :as v]))
 

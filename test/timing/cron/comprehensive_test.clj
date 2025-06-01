@@ -1,5 +1,5 @@
 (ns timing.cron.comprehensive-test
-  "Comprehensive cron tests for Vura"
+  "Comprehensive cron tests for Timing"
   (:require [clojure.test :refer :all]
             [timing.cron :as cron]
             [timing.core :as v]))

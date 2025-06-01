@@ -8,7 +8,7 @@
 (def get-locale-timezone timing.timezones.db/get-locale-timezone)
 (def get-timezone-locale timing.timezones.db/get-timezone-locale)
 
-(declare utc-date hours minutes calendar-frame month? day-time-context -hour?)
+(declare utc-date hours minutes calendar-frame month? day-time-context -hour? date)
 
 (defn round-number
   "Function returns round number that is devidable by target-number.
@@ -268,7 +268,7 @@
                                          (if save-light?
                                            dst-rule
                                            s-rule)
-                                         :year (:year (first month-frame))))))
+                                          :year (:year (first month-frame))))))
                               save (:save dst-rule)
                               hour (-hour? value)
                               save-offset (if ((if save-light? < >=) value limit)
@@ -300,7 +300,7 @@
                                          (if save-light?
                                            dst-rule
                                            s-rule)
-                                         :year (:year (first month-frame))))))]
+                                          :year (:year (first month-frame))))))]
                           (if ((if save-light? < >=) value limit)
                             0
                             (:save dst-rule)))))))
@@ -797,10 +797,10 @@
       :islamic value->islamic-date
       :hebrew value->hebrew-date)
     value)
-   :hour (-hour? value)
-   :minute (minute? value)
-   :second (second? value)
-   :millisecond (millisecond? value)))
+    :hour (-hour? value)
+    :minute (minute? value)
+    :second (second? value)
+    :millisecond (millisecond? value)))
 
 (defn day?
   "Returns which day in week does input value belongs to. For example
@@ -1116,7 +1116,7 @@
   :last-day-in-month?
 
   for Gregorian calendar. Frame types can be extened by implementing different calendar-frame functions.
-  Vura supports calendar-frames for:
+  Timing supports calendar-frames for:
   * year
   * month
   * week"
@@ -1145,19 +1145,19 @@
     (as-> context context
       (assoc
        context
-       :value value
-       :day day
-       :weekend? (boolean (*weekend-days* day))
-       :week (week-in-year? value))
+        :value value
+        :day day
+        :weekend? (boolean (*weekend-days* day))
+        :week (week-in-year? value))
       (assoc
        context
-       :holiday? (if (fn? *holiday?*)
-                   (*holiday?* context)
-                   false)))))
+        :holiday? (if (fn? *holiday?*)
+                    (*holiday?* context)
+                    false)))))
 
 (defn day-context [value]
   (assoc (day-time-context value)
-         :hour (hour? value)))
+    :hour (hour? value)))
 
 (defn calendar-period-context
   "Computes interval statistics based on start Date and end Date
@@ -1227,58 +1227,58 @@
          ;;
          result
          (assoc result
-                :in/years
-                (let [{:keys [years]} result
-                      year-count (count years)
-                      from-start-year-part
-                      (if-not (> year-count 1) 0
-                              (/
-                               (- start-year-days (/ from-start-year-value day))
-                               start-year-days))
+           :in/years
+           (let [{:keys [years]} result
+                 year-count (count years)
+                 from-start-year-part
+                 (if-not (> year-count 1) 0
+                         (/
+                          (- start-year-days (/ from-start-year-value day))
+                          start-year-days))
                       ;;
-                      to-end-year-part
-                      (if-not (> year-count 1) 0
-                              (/
-                               (/ to-end-year-value day)
-                               end-year-days))
+                 to-end-year-part
+                 (if-not (> year-count 1) 0
+                         (/
+                          (/ to-end-year-value day)
+                          end-year-days))
                       ;;
-                      same-year-part
-                      (if (not= year-count 1) 0
-                          (/
-                           (/ (- end start) day)
-                           start-year-days))]
-                  (+
-                   (count (drop 2 years))
-                   from-start-year-part
-                   to-end-year-part
-                   same-year-part))
+                 same-year-part
+                 (if (not= year-count 1) 0
+                     (/
+                      (/ (- end start) day)
+                      start-year-days))]
+             (+
+              (count (drop 2 years))
+              from-start-year-part
+              to-end-year-part
+              same-year-part))
                 ;;
-                :in/months
-                (let [{:keys [months]} result
-                      start-month-value (context->value (dissoc start-context :year :month))
-                      end-month-value (context->value (dissoc end-context :year :month))
-                      month-count (count months)
-                      start-month-part (if-not (> month-count 1) 0
-                                               (/
-                                                (- (:days-in-month start-context) (/ start-month-value day))
-                                                (:days-in-month start-context)))
-                      end-month-part (if-not (> month-count 1) 0
-                                             (/ (/ end-month-value day) (:days-in-month end-context)))
-                      same-month-part (if-not (= 1 month-count) 0
-                                              (/ (- end-month-value start-month-value)
-                                                 day
-                                                 (:days-in-month start-context)))]
-                  (+ (count (drop 2 months)) start-month-part end-month-part same-month-part))
+           :in/months
+           (let [{:keys [months]} result
+                 start-month-value (context->value (dissoc start-context :year :month))
+                 end-month-value (context->value (dissoc end-context :year :month))
+                 month-count (count months)
+                 start-month-part (if-not (> month-count 1) 0
+                                          (/
+                                           (- (:days-in-month start-context) (/ start-month-value day))
+                                           (:days-in-month start-context)))
+                 end-month-part (if-not (> month-count 1) 0
+                                        (/ (/ end-month-value day) (:days-in-month end-context)))
+                 same-month-part (if-not (= 1 month-count) 0
+                                         (/ (- end-month-value start-month-value)
+                                            day
+                                            (:days-in-month start-context)))]
+             (+ (count (drop 2 months)) start-month-part end-month-part same-month-part))
                 ;;
-                :working-days
-                (max
-                 (-
-                  days weekends
-                  (count
-                   (filter
-                    (fn [[_ _ w]] (nil? w))
-                    holidays)))
-                 0))]
+           :working-days
+           (max
+            (-
+             days weekends
+             (count
+              (filter
+               (fn [[_ _ w]] (nil? w))
+               holidays)))
+            0))]
      #?(:clj (reduce-kv
               (fn [r k _]
                 (case (namespace k)
@@ -1347,6 +1347,7 @@
   (calendar-frame value :week))
 
 #?(:clj
+
    (defmacro time-as-value
      "bindings => [name (time->value x) ...]
 

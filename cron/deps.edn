@@ -1,6 +1,6 @@
 {:deps
- {com.github.gersak/vura.core {:local/root "../core"}
-  com.github.gersak/vura.timezones {:local/root "../timezones"}
+ {dev.gersak/timing.core {:local/root "../core"}
+  dev.gersak/timing.timezones {:local/root "../timezones"}
   kovacnica/dreamcatcher {:mvn/version "1.0.9-SNAPSHOT"
                           :exclusions [org.clojure/clojurescript]}
   org.clojure/tools.logging {:mvn/version "0.4.0"}}

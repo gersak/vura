@@ -1,6 +1,6 @@
 {:deps
- {com.github.gersak/vura.core {:local/root "../core"}
-  com.github.gersak/vura.timezones {:local/root "../timezones"}}
+ {dev.gersak/timing.core {:local/root "../core"}
+  dev.gersak/timing.timezones {:local/root "../timezones"}}
  :paths ["generated" "src"]
  :aliases
  {:compile

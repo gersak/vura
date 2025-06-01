@@ -1,5 +1,5 @@
 (ns timing.core.timezone-test
-  "Comprehensive timezone tests for Vura"
+  "Comprehensive timezone tests for Timing"
   (:require [clojure.test :refer :all]
             [timing.core :as v]
             [timing.timezones.db :as tz]))

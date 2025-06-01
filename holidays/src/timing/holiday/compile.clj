@@ -8,7 +8,7 @@
    [clojure.edn :as edn]
    [clojure.walk :as walk]))
 
-(def +target+ "generated/vura/holiday/")
+(def +target+ "generated/timing/holiday/")
 
 (defn read-locale-holidays
   [locale]

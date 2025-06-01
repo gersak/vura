@@ -1,7 +1,7 @@
 (ns timing.holiday.catholic
   #?(:cljs [timing.holiday.macros :refer [static-holiday]])
   (:require
-   [timing.core :as vura]
+   [timing.core :as timming]
    [timing.holiday :as c]
    #?(:clj [timing.holiday.macros :refer [static-holiday]])))
 
@@ -36,78 +36,78 @@
   (memoize
    (fn [year delta]
      (let [easter-day-context (easter year)
-           context (+ (vura/context->value easter-day-context) delta)]
+           context (+ (timming/context->value easter-day-context) delta)]
        {:year year
-        :month (vura/month? context)
-        :day-in-month (vura/day-in-month? context)}))))
+        :month (timming/month? context)
+        :day-in-month (timming/day-in-month? context)}))))
 
 (defn mardi-gras [{:keys [year]}]
-  (let [ash-week (iterate (partial + vura/day) (vura/context->value (easter+ year (vura/weeks -7))))
+  (let [ash-week (iterate (partial + timming/day) (timming/context->value (easter+ year (timming/weeks -7))))
         corpus-christi (first
                         (filter
-                         (comp #{2} vura/day?)
+                         (comp #{2} timming/day?)
                          ash-week))]
     {:year year
-     :month (vura/month? corpus-christi)
-     :day-in-month (vura/day-in-month? corpus-christi)}))
+     :month (timming/month? corpus-christi)
+     :day-in-month (timming/day-in-month? corpus-christi)}))
 
 (defn mardi-gras? [day-context]
   (= (mardi-gras day-context) (select-keys day-context [:year :month :day-in-month])))
 
 (defn ash-wednesday [{:keys [year]}]
-  (let [ash-week (iterate (partial + vura/day) (vura/context->value (easter+ year (vura/weeks -7))))
+  (let [ash-week (iterate (partial + timming/day) (timming/context->value (easter+ year (timming/weeks -7))))
         corpus-christi (first
                         (filter
-                         (comp #{3} vura/day?)
+                         (comp #{3} timming/day?)
                          ash-week))]
     {:year year
-     :month (vura/month? corpus-christi)
-     :day-in-month (vura/day-in-month? corpus-christi)}))
+     :month (timming/month? corpus-christi)
+     :day-in-month (timming/day-in-month? corpus-christi)}))
 
 (defn ash-wednesday? [day-context]
   (= (ash-wednesday day-context) (select-keys day-context [:year :month :day-in-month])))
 
 (defn trinity-sunday [year]
-  (easter+ year (vura/weeks 8)))
+  (easter+ year (timming/weeks 8)))
 
 (defn trinity-sunday? [{:keys [year] :as day-context}]
   (= (trinity-sunday year) (select-keys day-context [:year :month :day-in-month])))
 
 (defn corpus-christi [year]
   (let [trinity-sunday-context (trinity-sunday year)
-        trinity-week (iterate (partial + vura/day) (vura/context->value trinity-sunday-context))
+        trinity-week (iterate (partial + timming/day) (timming/context->value trinity-sunday-context))
         corpus-christi (first
                         (filter
-                         (comp #{4} vura/day?)
+                         (comp #{4} timming/day?)
                          trinity-week))]
     {:year year
-     :month (vura/month? corpus-christi)
-     :day-in-month (vura/day-in-month? corpus-christi)}))
+     :month (timming/month? corpus-christi)
+     :day-in-month (timming/day-in-month? corpus-christi)}))
 
 (defn corpus-christi?
   [{:keys [year] :as day-context}]
   (= (corpus-christi year) (select-keys day-context [:year :month :day-in-month])))
 
 (defn palm-sunday? [{:keys [year] :as day-context}]
-  (= (easter+ year (vura/weeks -1)) (select-keys day-context [:year :month :day-in-month])))
+  (= (easter+ year (timming/weeks -1)) (select-keys day-context [:year :month :day-in-month])))
 
 (defn moundy-thursday? [{:keys [year] :as day-context}]
-  (= (easter+ year (vura/days -3)) (select-keys day-context [:year :month :day-in-month])))
+  (= (easter+ year (timming/days -3)) (select-keys day-context [:year :month :day-in-month])))
 
 (defn good-friday? [{:keys [year] :as day-context}]
-  (= (easter+ year (vura/days -2)) (select-keys day-context [:year :month :day-in-month])))
+  (= (easter+ year (timming/days -2)) (select-keys day-context [:year :month :day-in-month])))
 
 (defn easter-sunday? [{:keys [year] :as day-context}]
   (= (easter+ year -1) (select-keys day-context [:year :month :day-in-month])))
 
 (defn easter-monday? [{:keys [year] :as day-context}]
-  (= (easter+ year (vura/days 1)) (select-keys day-context [:year :month :day-in-month])))
+  (= (easter+ year (timming/days 1)) (select-keys day-context [:year :month :day-in-month])))
 
 (defn ascension-of-jesus? [{:keys [year] :as day-context}]
-  (= (easter+ year (vura/days 39)) (select-keys day-context [:year :month :day-in-month])))
+  (= (easter+ year (timming/days 39)) (select-keys day-context [:year :month :day-in-month])))
 
 (defn pentecost? [{:keys [year] :as day-context}]
-  (= (easter+ year (vura/days 49)) (select-keys day-context [:year :month :day-in-month])))
+  (= (easter+ year (timming/days 49)) (select-keys day-context [:year :month :day-in-month])))
 
 (static-holiday assumption-of-the-blessed-virgin-mary? 8 15)
 (static-holiday all-saints? 11 1)

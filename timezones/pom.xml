@@ -1,10 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.github.gersak</groupId>
-  <artifactId>vura.timezones</artifactId>
+  <groupId>dev.gersak</groupId>
+  <artifactId>timing.timezones</artifactId>
   <version>0.6.0</version>
-  <name>vura.timezones</name>
+  <name>timing.timezones</name>
   <packaging>jar</packaging>
   
   <build>
@@ -23,12 +23,12 @@
     </repository>
   </distributionManagement>
       
-  <description>Vura timezone DB</description>
-  <url>https://github.com/gersak/vura</url>
+  <description>Timing timezone DB</description>
+  <url>https://github.com/gersak/timing</url>
   <licenses>
     <license>
       <name>MIT</name>
-      <url>https://github.com/gersak/vura/LICENSE</url>
+      <url>https://github.com/gersak/timing/LICENSE</url>
     </license>
   </licenses>
 </project>

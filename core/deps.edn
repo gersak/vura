@@ -1,5 +1,5 @@
-{:paths ["src" ]
- :deps {com.github.gersak/vura.timezones {:local/root "../timezones"}}
+{:paths ["src"]
+ :deps {dev.gersak/timing.timezones {:mvn/version "0.6.0"}}
  :aliases
  {:build
   {:deps {io.github.clojure/tools.build {:git/tag "v0.7.5" :git/sha "34727f7"}}

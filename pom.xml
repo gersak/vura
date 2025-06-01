@@ -1,31 +1,31 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>com.github.gersak</groupId>
-  <artifactId>vura</artifactId>
-  <version>0.7.0</version>
-  <name>vura</name>
+  <groupId>dev.gersak</groupId>
+  <artifactId>timing</artifactId>
+  <version>0.6.0</version>
+  <name>timing</name>
   <packaging>jar</packaging>
 
   <dependencies>
     <dependency>
-      <groupId>com.github.gersak</groupId>
-      <artifactId>vura.core</artifactId>
+      <groupId>dev.gersak</groupId>
+      <artifactId>timing.core</artifactId>
+      <version>0.6.1</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.gersak</groupId>
+      <artifactId>timing.timezones</artifactId>
       <version>0.6.0</version>
     </dependency>
     <dependency>
-      <groupId>com.github.gersak</groupId>
-      <artifactId>vura.timezones</artifactId>
+      <groupId>dev.gersak</groupId>
+      <artifactId>timing.cron</artifactId>
       <version>0.6.0</version>
     </dependency>
     <dependency>
-      <groupId>com.github.gersak</groupId>
-      <artifactId>vura.cron</artifactId>
-      <version>0.6.0</version>
-    </dependency>
-    <dependency>
-      <groupId>com.github.gersak</groupId>
-      <artifactId>vura.holidays</artifactId>
+      <groupId>dev.gersak</groupId>
+      <artifactId>timing.holidays</artifactId>
       <version>0.6.1</version>
     </dependency>
   </dependencies>
@@ -80,11 +80,11 @@
   </distributionManagement>
 
   <description>Clojure time/calendar library</description>
-  <url>https://github.com/gersak/vura</url>
+  <url>https://github.com/gersak/timing</url>
   <licenses>
     <license>
       <name>MIT</name>
-      <url>https://github.com/gersak/vura/LICENSE</url>
+      <url>https://github.com/gersak/timing/LICENSE</url>
     </license>
   </licenses>
 </project>
