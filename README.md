@@ -1,16 +1,18 @@
-<p align="center">
-  <img width="460" height="300" src="resources/images/infinityclock.jpg" style="border-radius:20px;">
-</p>
 
 # Timing ⏰
 
-[![Clojars Project](https://img.shields.io/clojars/v/kovacnica/timing.svg)](https://clojars.org/gersak/timing)
+[![Clojars Project](https://img.shields.io/clojars/v/dev.gersak/timing.svg)](https://clojars.org/dev.gersak/timing)
+
 
 **The ultimate zero-dependency Clojure/ClojureScript time library that thinks in numbers.**
 
 Timing is a comprehensive time computation and manipulation library that revolutionizes how you 
 work with dates and time. By working in the **numeric domain** first, Timing unlocks the full 
 power of functional programming for temporal operations while maintaining complete calendar accuracy.
+
+<p align="center">
+  <img width="460" height="300" src="resources/images/infinityclock.jpg" style="border-radius:20px;">
+</p>
 
 ## 🚀 Why Timing?
 
