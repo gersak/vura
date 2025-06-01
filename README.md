@@ -1,6 +1,3 @@
-<p align="center">
-  <img width="460" height="300" src="resources/images/infinityclock.jpg" style="border-radius:20px;">
-</p>
 
 # Timing ⏰
 
@@ -12,7 +9,12 @@ Timing offers a different approach to time computation by working in the numeric
 If you enjoy functional programming, sequences, and immutable data, you might find Timing's 
 approach refreshing.
 
+<p align="center">
+  <img width="460" height="300" src="resources/images/infinityclock.jpg" style="border-radius:20px;">
+</p>
+
 # [API](https://cljdoc.org/d/dev.gersak/timing.core/0.6.4/doc/readme)
+
 
 ## 🤔 Why Try Timing?
 
