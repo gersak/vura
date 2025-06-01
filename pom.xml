@@ -87,4 +87,11 @@
       <url>https://github.com/gersak/timing/LICENSE</url>
     </license>
   </licenses>
+
+  <scm>
+    <url>https://github.com/gersak/timing</url>
+    <connection>scm:git:git://github.com/gersak/timing.git</connection>
+    <developerConnection>scm:git:ssh://git@github.com/gersak/timing.git</developerConnection>
+    <tag>master</tag>
+  </scm>
 </project>
