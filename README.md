@@ -575,6 +575,4 @@ Released under the MIT license.
 
 ---
 
-**Built with ❤️ for the Clojure community**
-
 *Timing: A friendly approach to time computation in Clojure.*
