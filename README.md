@@ -2,27 +2,27 @@
   <img width="460" height="300" src="resources/images/infinityclock.jpg" style="border-radius:20px;">
 </p>
 
-# Vura (core)
+# Timing (core)
 
-[![Clojars Project](https://img.shields.io/clojars/v/kovacnica/vura.svg)](https://clojars.org/kovacnica/vura)
+[![Clojars Project](https://img.shields.io/clojars/v/kovacnica/timing.svg)](https://clojars.org/kovacnica/timing)
 
-Vura is small Clojure/script **zero dependency** time computation and
+Timing is small Clojure/script **zero dependency** time computation and
 manipulation library. Library uses numeric representation of time to compute
-Gregorian calendar years, months and so on. Vura calculates time with current
+Gregorian calendar years, months and so on. Timing calculates time with current
 system offset by transforming local timestamp value to UTC value at given time
 with function **time->value** that returns plain number of milliseconds. When
 computation/manipulation is over numeric value of time should be transformed to
 Date representation by caling **value->time**. For rest of core functions check
-[API docs](http://gersak.github.io/vura/api/vura.core.html).
+[API docs](http://gersak.github.io/timing/api/timing.core.html).
 
 Usual workflow would be to transform java.util.Date or some other object to
 numeric value with **time->value** protocol implementation and afterwards do the
-computation in numeric domain. vura.core offers at par functions to
+computation in numeric domain. timing.core offers at par functions to
 **clj(s)-time** only those functions work in numeric domain and on immutable
 values. This means working with numbers instead of objects to compute values.
 After computation is over if needed use **value->time** implementation of
 __TimeValueProtocol__ to transform numeric values to _java.util.Date_
-| _js/Date_, or leave them in numeric form if that fits you. Vura has nice macro
+| _js/Date_, or leave them in numeric form if that fits you. Timing has nice macro
 that transforms __Date__ instances to their value representations and afterwards
 evaluates body -> **time-as-value**. Use it to reduce boilerplate when possible.
 
@@ -118,10 +118,10 @@ vura.core=> (time (round-number 182.625 0.25 :up))
 ```
 
 ## Calendars and timezones (Credits)
-**vura.core** internals are based on algorithms provided by 
+**timing.core** internals are based on algorithms provided by 
 awesome [Astronomy answers](https://www.aa.quae.nl/en/reken/juliaansedag.html)
 
-Timezones are contained in **vura.timezones.db** namespace and are parsed from files
+Timezones are contained in **timing.timezones.db** namespace and are parsed from files
 downloaded from [IANA - Time Zone Database](https://www.iana.org/time-zones)
 
 
@@ -167,15 +167,15 @@ Yout get the idea...
 
 ## Time configuration
 Usually when working with time context/location is very important. Following
-dynamic variables are defined in _vura.core_ that affect computation of
+dynamic variables are defined in _timing.core_ that affect computation of
 _time->value_ and _value->time_ functions as well as _date_ function.
 
-- \*timezone\* - specify what timezone will vura use to translate value from UTC to ->local timezone
+- \*timezone\* - specify what timezone will timing use to translate value from UTC to ->local timezone
 - \*calendar\* - when constructing Date object which calendar is used to calculate year/month/day value
 - \*weekend-days\* - What days are weekend-days?
 - \*holiday?\* - Convinince function to check if certain day is holiday or not
 
-Vura offers **with-time-configuration** macro that binds options map to above dynamic
+Timing offers **with-time-configuration** macro that binds options map to above dynamic
 variables and afterwards evaluates body. Nice example for this macro is function _teleport_
 that transfers value from one timezone to another.
 
@@ -201,7 +201,7 @@ all live in England_.
 
 I've used to have alot of problems working with calendar, calculating weekends,
 working days and holidays, calculating daily wage or spent/unused vacation days.
-Vura offers functions like _day-time-context_:
+Timing offers functions like _day-time-context_:
 
 ```clojure
 (->
@@ -226,7 +226,7 @@ Vura offers functions like _day-time-context_:
  :minute 0}
 ```
 
-day-time-context functions can be mapped to any sequence of vura time values. So
+day-time-context functions can be mapped to any sequence of timing time values. So
 it is possible to `(iterate (partial + (days 3.5)) (date->value (date 2018)))`
 to get all dates with interval of 3.5 days till the end of time and afterwards
 apply map day-context and take 20 days for example. 
@@ -250,7 +250,7 @@ holidays and weekend-days, as well as calendar).
 
 ## Don't forget about round-number
 
-Vura returns Date representations from numeric values and all values can be
+Timing returns Date representations from numeric values and all values can be
 round-number(ed) so use that. Round values to `(days 3.5)` or `(hours 11)` or
 maybe `(period {:week 2 :days 3})`
 
@@ -258,9 +258,9 @@ maybe `(period {:week 2 :days 3})`
 
 **quot** is great way to calculate how long did some period(value) last in time units. For example
 ```clojure
-(qout (period {:weeks 3 :hours 10 :minutes 11 :seconds 32821}) vura.core/hour) ;; 523
+(qout (period {:weeks 3 :hours 10 :minutes 11 :seconds 32821}) timing.core/hour) ;; 523
 
-(qout (vura.core/interval (date 2018) (date 2019)) vura.core/minute) ;; 525600000
+(qout (timing.core/interval (date 2018) (date 2019)) timing.core/minute) ;; 525600000
 ```
 ## License
 

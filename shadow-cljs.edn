@@ -1,7 +1,7 @@
 {:deps true
- :builds 
- {:vura {:target :browser
-         :modules {:vura {:entries [vura.core]}}
-         :output-to "target/vura.js"
-         :devtools {:http-root "target"
-                    :http-port 3450}}}}
+ :builds
+ {:timing {:target :browser
+           :modules {:timing {:entries [timing.core]}}
+           :output-to "target/timing.js"
+           :devtools {:http-root "target"
+                      :http-port 3450}}}}
