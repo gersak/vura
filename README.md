@@ -1,28 +1,28 @@
-# Timing ⏰
-
-[![Clojars Project](https://img.shields.io/clojars/v/dev.gersak/timing.svg)](https://clojars.org/dev.gersak/timing)
-
-
-**The ultimate zero-dependency Clojure/ClojureScript time library that thinks in numbers.**
-
-Timing is a comprehensive time computation and manipulation library that revolutionizes how you 
-work with dates and time. By working in the **numeric domain** first, Timing unlocks the full 
-power of functional programming for temporal operations while maintaining complete calendar accuracy.
-
 <p align="center">
   <img width="460" height="300" src="resources/images/infinityclock.jpg" style="border-radius:20px;">
 </p>
 
-## 🚀 Why Timing?
+# Timing ⏰
 
-### **Zero Dependencies, Maximum Power**
-- **Pure Clojure/ClojureScript** - No external dependencies except `clojure.core`
-- **Cross-platform** - Identical behavior on JVM and JavaScript engines
-- **Immutable** - All operations return new values, never mutate existing ones
-- **Calendar-aware** - Multiple calendar systems (Gregorian, Julian, Hebrew, Islamic)
-- **Holiday-aware** - ~200 countries with sophisticated holiday calculations
+[![Clojars Project](https://img.shields.io/clojars/v/dev.gersak/timing.svg)](https://clojars.org/dev.gersak/timing)
 
-### **Numeric Domain Philosophy**
+**A time library that thinks in numbers and embraces functional programming.**
+
+Timing offers a different approach to time computation by working in the numeric domain first. 
+If you enjoy functional programming, sequences, and immutable data, you might find Timing's 
+approach refreshing.
+
+## 🤔 Why Try Timing?
+
+### **Zero Dependencies, Simple Design**
+- Pure Clojure/ClojureScript with no external dependencies
+- Cross-platform compatibility between JVM and JavaScript
+- Immutable operations that play nicely with functional code
+- Support for multiple calendar systems (Gregorian, Julian, Hebrew, Islamic)
+- Holiday awareness for ~200 countries
+
+### **Numbers-First Philosophy**
+Instead of working with date objects, Timing encourages you to:
 ```clojure
 ;; Work with time as numbers (milliseconds since epoch)
 (def now (time->value (date 2024 6 15 14 30 0)))  ; => 1718461800000
@@ -31,8 +31,8 @@ power of functional programming for temporal operations while maintaining comple
 ; => #inst "2024-06-22T17:30:00.000-00:00"
 ```
 
-### **Functional Programming Superpowers**
-Timing leverages Clojure's sequence operations naturally:
+### **Sequence-Friendly Design**
+Timing was built to work well with Clojure's sequence operations:
 ```clojure
 ;; Generate quarterly dates for 2024
 (->> (range 0 12 3)
@@ -43,7 +43,7 @@ Timing leverages Clojure's sequence operations naturally:
 ;     #inst "2024-07-01T00:00:00.000-00:00"
 ;     #inst "2024-10-01T00:00:00.000-00:00")
 
-;; All business days in Q1 2024  
+;; Business days using familiar sequence functions
 (def q1 (time->value (date 2024 1 15)))
 (->> (business-days-in-range (start-of-quarter q1) (end-of-quarter q1))
      (take 5)
@@ -55,22 +55,17 @@ Timing leverages Clojure's sequence operations naturally:
 ;     #inst "2024-01-07T23:00:00.000-00:00")
 ```
 
-### **Multiple Calendar Systems**
-- **Gregorian** (default) - Modern Western calendar
-- **Julian** - Historical calendar system  
-- **Hebrew** - Jewish calendar with proper leap year handling
-- **Islamic** - Lunar calendar support
-
-### **Smart Period Arithmetic**
+### **Flexible Period Arithmetic**
+Handle edge cases naturally with smart period functions:
 ```clojure
 ;; Fixed-length periods (traditional)
 (+ today (days 30) (hours 8))
 
-;; Variable-length periods (NEW!)
+;; Variable-length periods (handles month/year complexities)
 (-> today
     (add-months 3)    ; Handles month lengths properly
     (add-years 2)     ; Handles leap years automatically  
-    (+ (days 15)))    ; Mix with fixed periods
+    (+ (days 15)))    ; Mix with fixed periods seamlessly
 ```
 
 ## ⚡ Quick Start
@@ -147,7 +142,7 @@ t/week        ; => 604800000
 ; => #inst "2026-07-25T06:00:00.000-00:00"
 ```
 
-### **3. Powerful Rounding & Alignment**
+### **3. Flexible Rounding & Alignment**
 ```clojure
 ;; Round to any precision
 (t/round-number 182.8137 0.25 :up)      ; => 183.0
@@ -187,7 +182,7 @@ t/week        ; => 604800000
 
 ### **5. Calendar Frame Generation**
 ```clojure
-;; Get all days in a month (perfect for UI calendars)
+;; Get all days in a month (helpful for UI calendars)
 (take 3 (t/calendar-frame (t/time->value (t/date 2024 6 1)) :month))
 ; => ({:day 6, :week 22, :first-day-in-month? true, :value 1717200000000, 
 ;      :month 6, :year 2024, :last-day-in-month? false, :weekend true, :day-in-month 1}
@@ -196,11 +191,7 @@ t/week        ; => 604800000
 ;     {:day 1, :week 23, :first-day-in-month? false, :value 1717372800000,
 ;      :month 6, :year 2024, :last-day-in-month? false, :weekend false, :day-in-month 3})
 
-;; Get all days in a year
-(t/calendar-frame (t/time->value (t/date 2024 1 1)) :year)
-
-;; Get week view
-(t/calendar-frame (t/time->value (t/date 2024 6 15)) :week)
+;; Also available: :year and :week views
 ```
 
 ## 🛠️ Advanced Features
@@ -260,7 +251,7 @@ t/week        ; => 604800000
 ; |24 |25 |26 |27 |28 |29 |30 |
 ; +---+---+---+---+---+---+---+
 
-;; Customizable options
+;; Customizable options available
 (util/print-calendar 2024 6 {:first-day-of-week 7    ; Sunday first
                               :show-week-numbers true ; Show week numbers
                               :day-width 4})          ; Wider cells
@@ -277,7 +268,7 @@ t/week        ; => 604800000
                [:year :month :day-in-month :hour]))
 ; => {:year 2024, :month 6, :day-in-month 15, :hour 0}
 
-;; Teleport between timezones
+;; Convert between timezones
 (def my-time (t/time->value (t/date 2024 6 15 12 0 0)))
 (def london-time (t/teleport my-time "Europe/London"))
 (t/value->time london-time)
@@ -308,14 +299,14 @@ t/week        ; => 604800000
 ; Hebrew: {:year 5784, :month 3, :day-in-month 9}
 ; Islamic: {:year 1445, :month 12, :day-in-month 8}
 
-;; All calendars: :gregorian, :julian, :hebrew, :islamic
+;; Available calendars: :gregorian, :julian, :hebrew, :islamic
 ```
 
 ### **Holiday Integration**
 ```clojure
 (require '[timing.holiday :as holiday])
 ;; Note: For full holiday support, also require:
-(require '[timing.holiday.all]) ; Add all holiday implementations
+;; (require '[timing.holiday.all]) ; Add all holiday implementations
 
 ;; Check holidays by country
 (holiday/? :us (t/time->value (t/date 2024 7 4)))     ; => holiday map
@@ -329,7 +320,7 @@ t/week        ; => 604800000
 (def christmas-holiday (holiday/? :us (t/time->value (t/date 2024 12 25))))
 (holiday/name christmas-holiday :en)  ; => "Christmas Day"
 
-;; ~200 countries supported!
+;; Supports ~200 countries
 ```
 
 ### **Cron Scheduling**
@@ -431,42 +422,36 @@ timing/
 └── util/        # Utility functions (timing.util, timing.adjusters)
 ```
 
-### **Key Design Principles**
+### **Design Philosophy**
 
-1. **Numeric Domain First** - All computation in milliseconds
-2. **Immutable Values** - Never mutate, always return new values  
-3. **Functional Composition** - Everything chains naturally
+1. **Numeric Domain First** - Computation in milliseconds, objects for display
+2. **Immutable Values** - All operations return new values
+3. **Functional Composition** - Everything chains naturally with threading macros
 4. **Zero Dependencies** - Pure Clojure/ClojureScript
-5. **Cross-Platform** - Identical behavior everywhere
+5. **Cross-Platform** - Identical behavior on JVM and JavaScript
 
 ### **Performance Characteristics**
-- **Fast** - Numeric arithmetic is extremely efficient
-- **Memory Efficient** - Work with primitives, not objects
-- **GC Friendly** - Minimal object allocation during computation
-- **Lazy** - Sequence operations are lazy by default
+- **Efficient** - Numeric arithmetic on primitive longs
+- **Memory Friendly** - Minimal object allocation during computation
+- **Lazy-Friendly** - Works well with lazy sequences
+- **Composable** - Easy to combine with other functional operations
 
-## 🆚 Comparison with Other Libraries
+## 🤝 When to Choose Timing
 
-### **vs. Joda-Time/Java 8 Time API**
-| Feature | Timing | Joda-Time/Java 8 |
-|---------|--------|------------------|
-| Dependencies | Zero | Heavy |
-| Cross-platform | ✅ Clojure/ClojureScript | ❌ JVM only |
-| Immutability | ✅ Native | ✅ Yes |
-| Functional Style | ✅ Natural | ⚠️ Object-oriented |
-| Calendar Systems | ✅ 4 built-in | ✅ Many |
-| Parsing/Formatting | ⚠️ Host platform | ✅ Extensive |
-| Numeric Domain | ✅ Core philosophy | ❌ Object-based |
+Timing might be a good fit if you:
+- Enjoy functional programming patterns
+- Prefer working with sequences and transformations
+- Want to avoid external dependencies
+- Like the numeric domain approach to time
+- Need cross-platform Clojure/ClojureScript compatibility
+- Appreciate immutable, composable operations
 
-### **vs. clj-time**
-| Feature | Timing | clj-time |
-|---------|--------|----------|
-| Dependencies | Zero | Joda-Time |
-| ClojureScript | ✅ Native | ❌ Limited |
-| Learning Curve | Gentle | Steep |
-| Time Zones | ✅ IANA DB | ✅ Joda zones |
-| Holiday Support | ✅ 200 countries | ❌ None |
-| Cron Support | ✅ Built-in | ❌ None |
+Other excellent time libraries like `clj-time` and Java 8 Time API excel in different areas:
+- **clj-time**: Rich object model, extensive parsing/formatting
+- **Java 8 Time API**: Comprehensive feature set, strong typing
+- **js-joda**: JavaScript port of JSR-310 with excellent browser support
+
+Each approach has its strengths, and the best choice depends on your specific needs and preferences.
 
 ## 🎨 Usage Patterns
 
@@ -510,15 +495,15 @@ timing/
 (adj/business-days-in-range (adj/start-of-month today) (adj/end-of-month today))
 ```
 
-## ⚡ Performance Tips
+## ⚡ Tips for Best Results
 
 1. **Stay in Numeric Domain** - Minimize conversions to/from Date objects
-2. **Use Lazy Sequences** - Let Clojure's laziness work for you
+2. **Embrace Lazy Sequences** - Let Clojure's laziness work for you
 3. **Batch Operations** - Process collections functionally
 4. **Cache Computations** - Store frequently used values
 
 ```clojure
-;; Good: Stay numeric  
+;; Efficient: Stay numeric  
 (map #(+ % (t/days 1)) timestamps)
 
 ;; Less efficient: Convert back and forth
@@ -578,15 +563,6 @@ The `round-number` function behavior varies by strategy:
 (t/round-number 182.8137 0.25 :floor) ; => 182.75
 ```
 
-### **Testing**
-```bash
-# Run all tests
-clj -M:test:run.tests
-
-# Babashka compatibility test
-bb test-bb
-```
-
 ## 📜 License
 
 Copyright © 2018 Robert Gersak
@@ -597,4 +573,4 @@ Released under the MIT license.
 
 **Built with ❤️ for the Clojure community**
 
-*Timing: Because time is too important to be left to objects.*
+*Timing: A friendly approach to time computation in Clojure.*
