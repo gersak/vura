@@ -49,7 +49,8 @@
                   (remove
                    #(or
                      (re-find #"\d+-\d+" %)
-                     (re-find #"\*" %))
+                     (re-find #"\*" %)
+                     (= % "?"))
                    (str/split element #","))))]
       (when (and
              interval
@@ -64,6 +65,7 @@
                          :interval interval})))
       (cond
         (and (= element "*") (not interval)) (constantly true)
+        (= element "?") (constantly true)
         (= element "*") (set (range min- (inc max-) interval))
         :else (let [maybe-fixed (cond-> #{}
                                   (seq (re-find #"-" element)) (into
@@ -90,27 +92,42 @@
   of cron-mappings that define what time
   is valid to execute Job."
   [^String cron-record]
-  (comment
-    (def cron-record "0 0,30 10,11,12,13 * * 1-5")
-    (def cron-record "*/10 *")
-    (def cron-record "0 0 14* * 1-5")
-    (def cron-record "0 0 14 * * 1-5")
-    (def cron-record "0 15 9 * * TUE"))
-  (let [elements (mapv str/trim (str/split cron-record #"\s+"))
-        constraints [[0 59 :second]
-                     [0 59 :minute]
-                     [0 23 :hour]
-                     [1 31 :day-in-month]
-                     [1 12 :month]
-                     [1 7 :day]
-                     [nil nil]]]
-    (mapv cron-element-parserer elements constraints)))
+  (when (or (nil? cron-record) (str/blank? cron-record))
+    (throw (ex-info "Cron expression cannot be empty or nil" {:expression cron-record})))
+
+  (let [elements (mapv str/trim (str/split cron-record #"\s+"))]
+    (when (< (count elements) 6)
+      (throw (ex-info "Cron expression must have at least 6 fields"
+                      {:expression cron-record :field-count (count elements)})))
+
+    (let [constraints [[0 59 :second]
+                       [0 59 :minute]
+                       [0 23 :hour]
+                       [1 31 :day-in-month]
+                       [1 12 :month]
+                       [1 7 :day]
+                       [nil nil]]]
+
+      ;; Pre-validate raw values before parsing
+      (doseq [[element [min-val max-val field-name]] (map vector elements constraints)]
+        (when (and min-val max-val)
+          ;; Check for obvious out-of-range values in the raw element
+          (when-let [numbers (re-seq #"\d+" element)]
+            (doseq [num-str numbers]
+              (let [num (Integer/parseInt num-str)]
+                (when (or (< num min-val) (> num max-val))
+                  (throw (ex-info (str "Value " num " is out of range for " field-name " (valid range: " min-val "-" max-val ")")
+                                  {:field field-name :value num :min min-val :max max-val :expression cron-record}))))))))
+
+      (mapv cron-element-parserer elements constraints))))
 
 (defn valid-timestamp?
   "Given a timestamp and cron definition function returns true
    if timestamp satisfies cron definition."
   [timestamp cron-string]
-  (let [tv (core/date->value timestamp)
+  (let [tv (if (number? timestamp)
+             timestamp
+             (core/date->value timestamp))
         {:keys [year month day-in-month hour minute second] :as now} (core/day-time-context tv)
         elements [second minute hour day-in-month month (core/day? tv)]
         constraints (binding [*now* now] (parse-cron-string cron-string))]
@@ -140,7 +157,9 @@
 
 (defn future-timestamps
   [timestamp cron-string]
-  (let [timestamp-value (core/date->value timestamp)
+  (let [timestamp-value (if (number? timestamp)
+                          timestamp
+                          (core/date->value timestamp))
         {:keys [year month day-in-month hour minute second] :as now} (core/day-time-context timestamp-value)
         mapping (binding [*now* now] (parse-cron-string cron-string))
         timestamp-elements [year month day-in-month hour minute second]
@@ -189,7 +208,7 @@
                   (core/date->value (core/date y m d h minutes s))
                   (+ timestamp-value core/second))
                  ((get mapping 0 (constantly true)) s))]
-      (core/date y m d h minutes s))))
+      (core/date->value (core/date y m d h minutes s)))))
 
 (defn next-timestamp
   "Return next valid timestamp after input timestamp. If there is no such timestamp,

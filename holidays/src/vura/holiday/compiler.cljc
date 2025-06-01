@@ -1,6 +1,7 @@
 (ns vura.holiday.compiler
   (:require
    [clojure.set :as set]
+   [clojure.string :as str]
    [vura.core :as v]
    [vura.holiday.catholic :as catholic]
    [vura.holiday.ortodox :as ortodox]
@@ -9,12 +10,21 @@
 
 (defn parse-statement
   "Converts a parsed statement sequence like ('saturday' 'then' 'previous' 'friday')
-   to the expected map format {:today #{6}, :condition 'previous', :target 5}"
+   or ('saturday,sunday' 'then' 'next' 'tuesday') to the expected map format 
+   {:today #{6}, :condition 'previous', :target 5} or {:today #{6 7}, :condition 'next', :target 2}"
   [statement-seq]
   (let [[today-str _ condition-str target-str & extra] statement-seq
-        today-day (day-name->num today-str)
+        ;; Handle comma-separated days like "saturday,sunday"
+        today-days (if (and today-str (str/includes? today-str ","))
+                     (->> (str/split today-str #",")
+                          (map str/trim)
+                          (map day-name->num)
+                          (remove nil?)
+                          set)
+                     (when-let [day (day-name->num today-str)]
+                       #{day}))
         target-day (day-name->num target-str)]
-    (cond-> {:today #{today-day}
+    (cond-> {:today today-days
              :condition condition-str
              :target target-day}
       (seq extra) (assoc :unknown (vec extra)))))

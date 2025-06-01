@@ -2,7 +2,8 @@
   (:refer-clojure :exclude [name])
   (:require
    [vura.core
-    :refer [day-time-context
+    :refer [*holiday?*
+            day-time-context
             time->value]]))
 
 (defn dispatch [dispatch _] dispatch)
@@ -19,8 +20,9 @@
      #?(:clj (Exception. message)
         :cljs (js/Error. message)))))
 
-(defn ? [date dispatch]
-  (is-holiday? dispatch (-> date time->value day-time-context)))
+(defn ? [dispatch date]
+  (binding [*holiday?* nil]
+    (is-holiday? dispatch (-> date time->value day-time-context))))
 
 (defn name
   ([definition] (name definition :en))

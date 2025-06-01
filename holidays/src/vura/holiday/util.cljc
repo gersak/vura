@@ -90,8 +90,8 @@
                      (cons offset-word words)
                      words)
                    (assoc result
-                          :orthodox? true
-                          :offset offset-number)))
+                     :orthodox? true
+                     :offset offset-number)))
           ;;
           #"easter"
           (let [[offset-word & words] words
@@ -103,13 +103,13 @@
                      (cons offset-word words)
                      words)
                    (assoc result
-                          :easter? true
-                          :offset offset-number)))
+                     :easter? true
+                     :offset offset-number)))
           ;;
           #"julian"
           (recur words
                  (assoc result
-                        :julian? true))
+                   :julian? true))
           ;;
           #"\d+-\d+-\d+"
           (recur words
@@ -118,9 +118,9 @@
                        month (parse-int (split-date 1))
                        day (parse-int (split-date 2))]
                    (assoc result
-                          :year year
-                          :month month
-                          :day-in-month day)))
+                     :year year
+                     :month month
+                     :day-in-month day)))
           ;;
           #"\d+-\d+"
           (recur words
@@ -128,8 +128,8 @@
                        day (parse-int (split-date 1))
                        month (parse-int (split-date 0))]
                    (assoc result
-                          :day-in-month day
-                          :month month)))
+                     :day-in-month day
+                     :month month)))
           ;;
           #"if$"
           (let [statement (take-while #(not= "if" %) words)]
@@ -145,9 +145,9 @@
           (let [match (re-find #"p(\d+)d(?:t(?:(\d+)h)?(?:(\d+)m)?)?" word)]
             (recur words
                    (assoc result
-                          :period {:days (parse-int (nth match 1))
-                                   :hours (when (nth match 2) (parse-int (nth match 2)))
-                                   :minutes (when (nth match 3) (parse-int (nth match 3)))})))
+                     :period {:days (parse-int (nth match 1))
+                              :hours (when (nth match 2) (parse-int (nth match 2)))
+                              :minutes (when (nth match 3) (parse-int (nth match 3)))})))
           ;;
           #"\d[a-z]{2}"
           (recur words (assoc result :nth (parse-int ((str/split word #"") 0))))
@@ -160,10 +160,10 @@
                 target-month-number (month-name->num target-month)
                 results (if (nil? target-month-number) ;; ????
                           (assoc result
-                                 :unknown [target-month])
+                            :unknown [target-month])
                           (assoc result
-                                 :in? true
-                                 :month target-month-number))]
+                            :in? true
+                            :month target-month-number))]
             (recur words results))
           ;;
           #"(before|after)"
@@ -173,8 +173,8 @@
                 what (take n words)]
             (recur (drop (count what) words)
                    (assoc result
-                          :predicate predicate
-                          :relative-to (parse-definition (str/join " " what)))))
+                     :predicate predicate
+                     :relative-to (parse-definition (str/join " " what)))))
           ;;
           #"(january|february|march|april|may|june|july|august|september|october|november|december)"
           (recur words (assoc result :month (month-name->num word)))
@@ -222,9 +222,9 @@
           (let [match (re-find #"p(\d+)d(?:t(?:(\d+)h)?(?:(\d+)m)?)?" word)]
             (recur words
                    (assoc result
-                          :period {:days (parse-int (nth match 1))
-                                   :hours (when (nth match 2) (parse-int (nth match 2)))
-                                   :minutes (when (nth match 3) (parse-int (nth match 3)))})))
+                     :period {:days (parse-int (nth match 1))
+                              :hours (when (nth match 2) (parse-int (nth match 2)))
+                              :minutes (when (nth match 3) (parse-int (nth match 3)))})))
           ;;
           (recur
            words

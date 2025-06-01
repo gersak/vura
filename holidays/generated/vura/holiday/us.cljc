@@ -63,8 +63,8 @@
   (reduce-kv
    (fn [result definition name-mapping]
      (assoc result
-            (compiler/compile-type (parse-definition definition))
-            name-mapping))
+       (compiler/compile-type (parse-definition definition))
+       name-mapping))
    {}
    holidays))
 
